@@ -43,10 +43,10 @@ remains current as source/source-location navigation ordering.
 The next sequence is documentation and contract authority first, then bounded implementation slices:
 
 1. Documentation authority alignment over the post-deletion substrate.
-2. Local browser entry point and local child candidate row contracts, including Default Music as a Music-specific
+2. Local browse entry point and local browse item contracts, including Default Music as a Music-specific
    companion and source admission handoff.
 3. Performance bounding for current reads, maintenance, and projection paths.
-4. Local browse renderer projection and UI only after entry point reads, local child reads, and admission contracts stay
+4. Local browse renderer projection and UI only after entry point reads, item reads, and admission contracts stay
    distinct from admitted source rows.
 5. Workspace topology stays later because the related design work is not ready yet.
 6. Analysis and waveform contracts stay later over current attachment, primary-media, candidate, and decision
@@ -56,16 +56,16 @@ The next sequence is documentation and contract authority first, then bounded im
 This keeps the V0 local DJ foundation first: visible local entry points, explicit admission, explicit scan, deterministic
 reads, and stable projection before broader workspace, preparation, waveform, or runtime surfaces.
 
-The implemented local browser entry point read boundary is `readLocalBrowserEntryPoints`. It is a read-only candidate
-listing boundary with shallow platform status resolution. The resolver is hardened for Windows V0 entry points and
-non-Windows unsupported behavior. Admission hints from this read are display/action guidance only; they are not admission
+The implemented local browse entry point read boundary is `readLocalBrowseEntryPoints`. It is a read-only entry point
+boundary with shallow platform status resolution. The resolver is hardened for Windows V0 entry points and non-Windows
+unsupported behavior. Admission actions from this read are display/action recommendations only; they are not admission
 results and do not persist source state.
 
-This slice adds the local child read boundary, `readLocalBrowserChildren`, as a bounded pre-admission candidate read.
-It reads immediate child rows for an entry point root or local descendant candidate path, marks exact admitted-source
-duplicates as hints, and does not register sources, create source substrate rows, or start scans. Renderer projection and
-visible local browse UI follow after this slice. Workspace topology remains later. Waveform and analysis remain later
-over current attachment, primary-media, candidate, and decision authority.
+This slice adds the local browse item read boundary, `readLocalBrowseItems`, as a bounded pre-admission item read. It
+reads immediate child items for a validated entry point root or local descendant parent path, marks exact admitted-source
+duplicates as status, and does not register sources, create source substrate rows, or start scans. Renderer projection
+and visible local browse UI follow after this slice. Workspace topology remains later. Waveform and analysis remain
+later over current attachment, primary-media, candidate, and decision authority.
 
 A-5 attachment occurrence remains the accepted evidence-only substrate feeding A-6. It does not decide duplicate song,
 safe deletion, preferred copy, accepted relocation, canonical track, cleanup, or track merge.
@@ -868,7 +868,7 @@ These substitutions are non-negotiable in product-facing surfaces, docs, and cod
 | Auto-cleanup, removal, or merge         | Never without explicit user decision flow and record                     |
 | Product contents rows populated from attachments | Product contents projection is a future layer                     |
 | Renderer-owned library truth            | Never                                                                    |
-| Local browser projection/UI             | Local browser entry point, local child candidate row, and root-admission contracts are in force; candidates stay distinct from admitted sources |
+| Local browse projection/UI              | Local browse entry point, local browse item, and root-admission contracts are in force; local browse rows stay distinct from admitted sources |
 | Playlists as central workflow model     | Crates/sleeves/routes designed first                                     |
 | Search from renderer                    | A-7 search/filter contract must land first                               |
 | Import as silent canonical              | Always evidence; user confirmation required                              |
@@ -892,7 +892,7 @@ silently kept.
 
 > **Local DJ foundation first. Exact byte identity first. Probe facts before product occurrence claims. Collection health
 > before occurrence UI. Occurrence model before occurrence interpretation views. User decision pattern before track and
-> prep schemas. Local browser entry points and candidate child rows before local browse UI. Search/index contract before
+> prep schemas. Local browse entry points and items before local browse UI. Search/index contract before
 > browse surfaces. Import interoperability contract before track identity and prep facet hardening. Future Prepared Room formal model before room
 > workflow implementation. RT Flight Deck and performance session doctrine before runtime event design. No automatic
 > removal or merge without an explicit user decision record.**

@@ -42,8 +42,8 @@ impl MaintainedSnapshotScope {
             SnapshotReadCommand::ReadSourceFileAttachment(_)
             | SnapshotReadCommand::ReadAttachmentSourceFiles(_)
             | SnapshotReadCommand::ReadSourceAttachmentSummary(_)
-            | SnapshotReadCommand::ReadLocalBrowserEntryPoints(_)
-            | SnapshotReadCommand::ReadLocalBrowserChildren(_)
+            | SnapshotReadCommand::ReadLocalBrowseEntryPoints(_)
+            | SnapshotReadCommand::ReadLocalBrowseItems(_)
             | SnapshotReadCommand::SearchFilterRead(_) => None,
         }
     }
@@ -266,7 +266,7 @@ mod tests {
         ContentsReadPolicy, ContentsReadRequest, ContentsScope, ContentsScopeDepth,
         LibraryTreeEntryPoint, LoadNavigationRowByStableKeyRequest, LoadNavigationRowRequest,
         PrimaryMediaKind, ReadAttachmentSourceFilesRequest, ReadLibraryTreeChildrenRequest,
-        ReadLocalBrowserEntryPointsRequest, ReadNavigationRowsRequest,
+        ReadLocalBrowseEntryPointsRequest, ReadNavigationRowsRequest,
         ReadSourceAttachmentSummaryRequest, ReadSourceFileAttachmentRequest,
         ReadSourceIntegrityRequest, ReadSourceLifecycleRequest, SnapshotReadCommand,
     };
@@ -326,7 +326,7 @@ mod tests {
         }
 
         let explicit_attachment_reads = [
-            SnapshotReadCommand::ReadLocalBrowserEntryPoints(ReadLocalBrowserEntryPointsRequest),
+            SnapshotReadCommand::ReadLocalBrowseEntryPoints(ReadLocalBrowseEntryPointsRequest),
             SnapshotReadCommand::ReadSourceFileAttachment(ReadSourceFileAttachmentRequest {
                 source_file_id: 8,
             }),

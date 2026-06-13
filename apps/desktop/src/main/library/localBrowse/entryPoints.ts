@@ -1,55 +1,49 @@
 import type {
-  LocalBrowserChildRow as ContractLocalBrowserChildRow,
-  ReadLocalBrowserChildrenRequest as ContractReadLocalBrowserChildrenRequest
+  LocalBrowseEntryPoint as ContractLocalBrowseEntryPoint,
+  ReadLocalBrowseEntryPointsRequest
 } from '@dekzer/library-boundary-contract'
 
 import { LibraryBoundaryHostError } from '../boundary/errors'
 import type { LibraryBoundaryHost, LibraryBoundaryHostClient } from '../boundary/host'
 import type {
-  LocalBrowserChildRow,
-  ReadLocalBrowserChildrenErrorCode,
-  ReadLocalBrowserChildrenErrorState,
-  ReadLocalBrowserChildrenOutcome,
-  ReadLocalBrowserChildrenRequest
-} from '../../../shared/library/localBrowser/children'
+  LocalBrowseEntryPoint,
+  ReadLocalBrowseEntryPointsErrorCode,
+  ReadLocalBrowseEntryPointsErrorState,
+  ReadLocalBrowseEntryPointsOutcome
+} from '../../../shared/library/localBrowse/entryPoints'
 
-export async function readLocalBrowserChildrenThroughHost(
-  host: LibraryBoundaryHost,
-  request: ReadLocalBrowserChildrenRequest
-): Promise<ReadLocalBrowserChildrenOutcome> {
+export async function readLocalBrowseEntryPointsThroughHost(
+  host: LibraryBoundaryHost
+): Promise<ReadLocalBrowseEntryPointsOutcome> {
   const client = getStartedClient(host)
 
-  if (isReadLocalBrowserChildrenOutcome(client)) {
+  if (isReadLocalBrowseEntryPointsOutcome(client)) {
     return client
   }
 
   try {
-    const reply = await client.readLocalBrowserChildren(
-      request satisfies ContractReadLocalBrowserChildrenRequest
+    const reply = await client.readLocalBrowseEntryPoints(
+      null satisfies ReadLocalBrowseEntryPointsRequest
     )
 
     return {
       state: 'read',
       status: reply.status,
-      windowIdentity: reply.windowIdentity,
-      offset: reply.offset,
-      limit: reply.limit,
-      totalRows: reply.totalRows,
-      rows: reply.rows.map(mapLocalBrowserChildRow),
+      entries: reply.entries.map(mapLocalBrowseEntryPoint),
       failure: reply.failure
     }
   } catch {
-    return createReadLocalBrowserChildrenErrorResult(
+    return createReadLocalBrowseEntryPointsErrorResult(
       'readFailed',
       'readFailed',
-      'Unable to read local browser children.'
+      'Unable to read local browse entry points.'
     )
   }
 }
 
 function getStartedClient(
   host: LibraryBoundaryHost
-): LibraryBoundaryHostClient | ReadLocalBrowserChildrenOutcome {
+): LibraryBoundaryHostClient | ReadLocalBrowseEntryPointsOutcome {
   try {
     return host.client
   } catch (error: unknown) {
@@ -57,7 +51,7 @@ function getStartedClient(
       return hostUnavailableResult(host, error)
     }
 
-    return createReadLocalBrowserChildrenErrorResult(
+    return createReadLocalBrowseEntryPointsErrorResult(
       'hostUnavailable',
       'hostFailed',
       'The library boundary host is unavailable.'
@@ -68,8 +62,8 @@ function getStartedClient(
 function hostUnavailableResult(
   host: LibraryBoundaryHost,
   error: LibraryBoundaryHostError
-): ReadLocalBrowserChildrenOutcome {
-  return createReadLocalBrowserChildrenErrorResult(
+): ReadLocalBrowseEntryPointsOutcome {
+  return createReadLocalBrowseEntryPointsErrorResult(
     'hostUnavailable',
     hostErrorCode(host, error),
     hostErrorMessage(host, error)
@@ -79,7 +73,7 @@ function hostUnavailableResult(
 function hostErrorCode(
   host: LibraryBoundaryHost,
   error: LibraryBoundaryHostError
-): ReadLocalBrowserChildrenErrorCode {
+): ReadLocalBrowseEntryPointsErrorCode {
   if (host.state === 'failed') {
     return 'hostFailed'
   }
@@ -114,11 +108,11 @@ function hostErrorMessage(host: LibraryBoundaryHost, error: LibraryBoundaryHostE
   }
 }
 
-function createReadLocalBrowserChildrenErrorResult(
-  state: ReadLocalBrowserChildrenErrorState,
-  code: ReadLocalBrowserChildrenErrorCode,
+function createReadLocalBrowseEntryPointsErrorResult(
+  state: ReadLocalBrowseEntryPointsErrorState,
+  code: ReadLocalBrowseEntryPointsErrorCode,
   message: string
-): ReadLocalBrowserChildrenOutcome {
+): ReadLocalBrowseEntryPointsOutcome {
   return {
     state,
     error: {
@@ -128,23 +122,20 @@ function createReadLocalBrowserChildrenErrorResult(
   }
 }
 
-function mapLocalBrowserChildRow(row: ContractLocalBrowserChildRow): LocalBrowserChildRow {
+function mapLocalBrowseEntryPoint(entry: ContractLocalBrowseEntryPoint): LocalBrowseEntryPoint {
   return {
-    identity: row.identity,
-    rowKind: row.rowKind,
-    displayName: row.displayName,
-    status: row.status,
-    platform: row.platform,
-    fileKind: row.fileKind,
-    mediaRelevance: row.mediaRelevance,
-    admissionHint: row.admissionHint,
-    affordances: row.affordances,
-    failure: row.failure
+    identity: entry.identity,
+    displayName: entry.displayName,
+    status: entry.status,
+    platform: entry.platform,
+    admissionAction: entry.admissionAction,
+    availableActions: entry.availableActions,
+    failure: entry.failure
   }
 }
 
-function isReadLocalBrowserChildrenOutcome(
+function isReadLocalBrowseEntryPointsOutcome(
   value: unknown
-): value is ReadLocalBrowserChildrenOutcome {
+): value is ReadLocalBrowseEntryPointsOutcome {
   return typeof value === 'object' && value !== null && 'state' in value
 }

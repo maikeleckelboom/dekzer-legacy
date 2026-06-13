@@ -220,28 +220,28 @@ async function validatesSuccessResponseResolution(): Promise<void> {
   }
 }
 
-async function validatesLocalBrowserEntryPointSnapshotResponse(): Promise<void> {
+async function validatesLocalBrowseEntryPointSnapshotResponse(): Promise<void> {
   const transport = createTransport();
   try {
     const client = createLibraryBoundaryClient(transport);
-    const reply = await client.readLocalBrowserEntryPoints(null);
+    const reply = await client.readLocalBrowseEntryPoints(null);
 
-    equal(reply.status, "complete", "local browser entry point read status is preserved");
+    equal(reply.status, "complete", "local browse entry point read status is preserved");
     equal(
       reply.entries[0]?.identity.entryPointKind,
       "music",
-      "local browser entry point fixture routes through stdio transport"
+      "local browse entry point fixture routes through stdio transport"
     );
   } finally {
     await transport.close();
   }
 }
 
-async function validatesLocalBrowserChildrenSnapshotResponse(): Promise<void> {
+async function validatesLocalBrowseItemSnapshotResponse(): Promise<void> {
   const transport = createTransport();
   try {
     const client = createLibraryBoundaryClient(transport);
-    const reply = await client.readLocalBrowserChildren({
+    const reply = await client.readLocalBrowseItems({
       entryPointKind: "music",
       rootCanonicalPath: "C:\\Users\\DJ\\Music",
       parentCanonicalPath: "C:\\Users\\DJ\\Music",
@@ -249,16 +249,16 @@ async function validatesLocalBrowserChildrenSnapshotResponse(): Promise<void> {
       limit: 50
     });
 
-    equal(reply.status, "complete", "local browser child read status is preserved");
+    equal(reply.status, "complete", "local browse item read status is preserved");
     equal(
-      reply.rows[0]?.rowKind,
-      "mediaFileCandidate",
-      "local browser child fixture routes through stdio transport"
+      reply.items[0]?.itemKind,
+      "mediaFile",
+      "local browse item fixture routes through stdio transport"
     );
     equal(
-      reply.rows[0]?.admissionHint,
-      "chooseParentDirectory",
-      "local browser child admission handoff hint is preserved"
+      reply.items[0]?.admissionAction,
+      "requestParentAdmission",
+      "local browse item admission action is preserved"
     );
   } finally {
     await transport.close();
@@ -680,8 +680,8 @@ await validatesExecuteBeforeReadyWaitsForReadiness();
 await validatesProcessExitBeforeReadyRejectsReady();
 await validatesMalformedStdoutBeforeReadyRejectsReady();
 await validatesSuccessResponseResolution();
-await validatesLocalBrowserEntryPointSnapshotResponse();
-await validatesLocalBrowserChildrenSnapshotResponse();
+await validatesLocalBrowseEntryPointSnapshotResponse();
+await validatesLocalBrowseItemSnapshotResponse();
 await validatesProtocolErrorOutcomeIsPreserved();
 await validatesClientTurnsProtocolErrorOutcomeIntoClientError();
 await validatesRemoteTransportErrorCodeParsing();

@@ -6,11 +6,8 @@ import type {
   PersistedLibraryViewState
 } from '../viewState/persistence'
 import type { ReadRequest, ReadResult } from '../hierarchy/read'
-import type {
-  ReadLocalBrowserChildrenOutcome,
-  ReadLocalBrowserChildrenRequest
-} from '../localBrowser/children'
-import type { ReadLocalBrowserEntryPointsOutcome } from '../localBrowser/entryPoints'
+import type { ReadLocalBrowseItemsOutcome, ReadLocalBrowseItemsRequest } from '../localBrowse/items'
+import type { ReadLocalBrowseEntryPointsOutcome } from '../localBrowse/entryPoints'
 import type { NavigationReadRowsRequest, NavigationReadRowsResult } from '../navigation/read'
 import type { ContentsReadRequest, ContentsReadResult } from '../contents/read'
 import type { SearchFilterReadRequest, SearchFilterReadResult } from '../searchFilter/read'
@@ -46,7 +43,7 @@ import type { UnregisterLocalRootRequest, UnregisterLocalRootResult } from '../r
 
 export type LibraryApi = {
   readonly host: LibraryHostApi
-  readonly localBrowser: LibraryLocalBrowserApi
+  readonly localBrowse: LibraryLocalBrowseApi
   readonly navigation: LibraryNavigationApi
   readonly hierarchy: LibraryHierarchyApi
   readonly sourceLifecycle: LibrarySourceLifecycleApi
@@ -73,9 +70,9 @@ export type LibraryHostApi = {
   onStatusChanged(callback: LibraryBoundaryHostStatusChangedCallback): () => void
 }
 
-export type LibraryLocalBrowserApi = {
-  readEntryPoints(): Promise<ReadLocalBrowserEntryPointsOutcome>
-  readChildren(request: ReadLocalBrowserChildrenRequest): Promise<ReadLocalBrowserChildrenOutcome>
+export type LibraryLocalBrowseApi = {
+  readEntryPoints(): Promise<ReadLocalBrowseEntryPointsOutcome>
+  readItems(request: ReadLocalBrowseItemsRequest): Promise<ReadLocalBrowseItemsOutcome>
 }
 
 export type LibraryHierarchyApi = {

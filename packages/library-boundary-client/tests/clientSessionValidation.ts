@@ -648,13 +648,13 @@ async function validatesSourceIntegrityReadRequestAndReply(): Promise<void> {
   )
 }
 
-async function validatesLocalBrowserEntryPointReadRequestAndReply(): Promise<void> {
+async function validatesLocalBrowseEntryPointReadRequestAndReply(): Promise<void> {
   const transport = new RecordingTransport()
   transport.enqueueOutcome(
     success({
       type: 'snapshotRead',
       payload: {
-        type: 'localBrowserEntryPoints',
+        type: 'localBrowseEntryPoints',
         payload: {
           status: 'complete',
           entries: [
@@ -666,12 +666,12 @@ async function validatesLocalBrowserEntryPointReadRequestAndReply(): Promise<voi
               displayName: 'Music',
               status: 'available',
               platform: 'windows',
-              admissionHint: 'defaultMusicFolder',
-              affordances: {
+              admissionAction: 'requestDefaultMusicFolderAdmission',
+              availableActions: {
                 canBrowse: true,
                 canRequestAdmission: true,
                 canChooseDescendant: true,
-                requiresConfirmation: false
+                canRequestParentAdmission: false
               },
               failure: null
             }
@@ -683,34 +683,34 @@ async function validatesLocalBrowserEntryPointReadRequestAndReply(): Promise<voi
   )
   const client = new LibraryBoundaryClient(transport)
 
-  const reply = await client.readLocalBrowserEntryPoints(null)
+  const reply = await client.readLocalBrowseEntryPoints(null)
 
   deepEqual(
     transport.sentRequests[0],
     {
       type: 'snapshotRead',
       payload: {
-        type: 'readLocalBrowserEntryPoints',
+        type: 'readLocalBrowseEntryPoints',
         payload: null
       }
     } satisfies CommandRequest,
-    'readLocalBrowserEntryPoints sends the generated snapshot command'
+    'readLocalBrowseEntryPoints sends the generated snapshot command'
   )
   equal(reply.entries[0]?.identity.entryPointKind, 'music', 'entry point kind is preserved')
   equal(
-    reply.entries[0]?.admissionHint,
-    'defaultMusicFolder',
-    'admission hint is preserved'
+    reply.entries[0]?.admissionAction,
+    'requestDefaultMusicFolderAdmission',
+    'admission action is preserved'
   )
 }
 
-async function validatesLocalBrowserChildReadRequestAndReply(): Promise<void> {
+async function validatesLocalBrowseItemReadRequestAndReply(): Promise<void> {
   const transport = new RecordingTransport()
   transport.enqueueOutcome(
     success({
       type: 'snapshotRead',
       payload: {
-        type: 'localBrowserChildren',
+        type: 'localBrowseItems',
         payload: {
           status: 'complete',
           windowIdentity: {
@@ -720,27 +720,26 @@ async function validatesLocalBrowserChildReadRequestAndReply(): Promise<void> {
           },
           offset: 0,
           limit: 50,
-          totalRows: 1,
-          rows: [
+          totalItems: 1,
+          items: [
             {
               identity: {
                 entryPointKind: 'music',
                 rootCanonicalPath: 'C:\\Users\\DJ\\Music',
-                candidateCanonicalPath: 'C:\\Users\\DJ\\Music\\Track.flac'
+                itemCanonicalPath: 'C:\\Users\\DJ\\Music\\Track.flac'
               },
-              rowKind: 'mediaFileCandidate',
+              itemKind: 'mediaFile',
               displayName: 'Track.flac',
               status: 'available',
               platform: 'windows',
               fileKind: 'audio',
               mediaRelevance: 'mediaRelevant',
-              admissionHint: 'chooseParentDirectory',
-              affordances: {
+              admissionAction: 'requestParentAdmission',
+              availableActions: {
                 canBrowse: false,
                 canRequestAdmission: false,
                 canChooseDescendant: false,
-                canRequestParentAdmission: true,
-                requiresConfirmation: false
+                canRequestParentAdmission: true
               },
               failure: null
             }
@@ -759,24 +758,24 @@ async function validatesLocalBrowserChildReadRequestAndReply(): Promise<void> {
     offset: 0,
     limit: 50
   } as const
-  const reply = await client.readLocalBrowserChildren(request)
+  const reply = await client.readLocalBrowseItems(request)
 
   deepEqual(
     transport.sentRequests[0],
     {
       type: 'snapshotRead',
       payload: {
-        type: 'readLocalBrowserChildren',
+        type: 'readLocalBrowseItems',
         payload: request
       }
     } satisfies CommandRequest,
-    'readLocalBrowserChildren sends the generated snapshot command'
+    'readLocalBrowseItems sends the generated snapshot command'
   )
-  equal(reply.rows[0]?.rowKind, 'mediaFileCandidate', 'child row kind is preserved')
+  equal(reply.items[0]?.itemKind, 'mediaFile', 'item kind is preserved')
   equal(
-    reply.rows[0]?.admissionHint,
-    'chooseParentDirectory',
-    'media file admission handoff hint is preserved'
+    reply.items[0]?.admissionAction,
+    'requestParentAdmission',
+    'media file admission action is preserved'
   )
 }
 
@@ -1546,8 +1545,8 @@ await validatesRegisterLocalRootRequestAndReply()
 await validatesHashSourceFilesBlake3RequestAndReply()
 await validatesSourceMaintenanceRequestsAndReplies()
 await validatesSourceIntegrityReadRequestAndReply()
-await validatesLocalBrowserEntryPointReadRequestAndReply()
-await validatesLocalBrowserChildReadRequestAndReply()
+await validatesLocalBrowseEntryPointReadRequestAndReply()
+await validatesLocalBrowseItemReadRequestAndReply()
 await validatesTrackIdentityDecisionRequestsAndReplies()
 await validatesTrackIdentityReviewCandidateReads()
 await validatesAttachmentIdentityReadRequestsAndReplies()

@@ -1,49 +1,55 @@
 import type {
-  LocalBrowserEntryPoint as ContractLocalBrowserEntryPoint,
-  ReadLocalBrowserEntryPointsRequest
+  LocalBrowseItem as ContractLocalBrowseItem,
+  ReadLocalBrowseItemsRequest as ContractReadLocalBrowseItemsRequest
 } from '@dekzer/library-boundary-contract'
 
 import { LibraryBoundaryHostError } from '../boundary/errors'
 import type { LibraryBoundaryHost, LibraryBoundaryHostClient } from '../boundary/host'
 import type {
-  LocalBrowserEntryPoint,
-  ReadLocalBrowserEntryPointsErrorCode,
-  ReadLocalBrowserEntryPointsErrorState,
-  ReadLocalBrowserEntryPointsOutcome
-} from '../../../shared/library/localBrowser/entryPoints'
+  LocalBrowseItem,
+  ReadLocalBrowseItemsErrorCode,
+  ReadLocalBrowseItemsErrorState,
+  ReadLocalBrowseItemsOutcome,
+  ReadLocalBrowseItemsRequest
+} from '../../../shared/library/localBrowse/items'
 
-export async function readLocalBrowserEntryPointsThroughHost(
-  host: LibraryBoundaryHost
-): Promise<ReadLocalBrowserEntryPointsOutcome> {
+export async function readLocalBrowseItemsThroughHost(
+  host: LibraryBoundaryHost,
+  request: ReadLocalBrowseItemsRequest
+): Promise<ReadLocalBrowseItemsOutcome> {
   const client = getStartedClient(host)
 
-  if (isReadLocalBrowserEntryPointsOutcome(client)) {
+  if (isReadLocalBrowseItemsOutcome(client)) {
     return client
   }
 
   try {
-    const reply = await client.readLocalBrowserEntryPoints(
-      null satisfies ReadLocalBrowserEntryPointsRequest
+    const reply = await client.readLocalBrowseItems(
+      request satisfies ContractReadLocalBrowseItemsRequest
     )
 
     return {
       state: 'read',
       status: reply.status,
-      entries: reply.entries.map(mapLocalBrowserEntryPoint),
+      windowIdentity: reply.windowIdentity,
+      offset: reply.offset,
+      limit: reply.limit,
+      totalItems: reply.totalItems,
+      items: reply.items.map(mapLocalBrowseItem),
       failure: reply.failure
     }
   } catch {
-    return createReadLocalBrowserEntryPointsErrorResult(
+    return createReadLocalBrowseItemsErrorResult(
       'readFailed',
       'readFailed',
-      'Unable to read local browser entry points.'
+      'Unable to read local browse items.'
     )
   }
 }
 
 function getStartedClient(
   host: LibraryBoundaryHost
-): LibraryBoundaryHostClient | ReadLocalBrowserEntryPointsOutcome {
+): LibraryBoundaryHostClient | ReadLocalBrowseItemsOutcome {
   try {
     return host.client
   } catch (error: unknown) {
@@ -51,7 +57,7 @@ function getStartedClient(
       return hostUnavailableResult(host, error)
     }
 
-    return createReadLocalBrowserEntryPointsErrorResult(
+    return createReadLocalBrowseItemsErrorResult(
       'hostUnavailable',
       'hostFailed',
       'The library boundary host is unavailable.'
@@ -62,8 +68,8 @@ function getStartedClient(
 function hostUnavailableResult(
   host: LibraryBoundaryHost,
   error: LibraryBoundaryHostError
-): ReadLocalBrowserEntryPointsOutcome {
-  return createReadLocalBrowserEntryPointsErrorResult(
+): ReadLocalBrowseItemsOutcome {
+  return createReadLocalBrowseItemsErrorResult(
     'hostUnavailable',
     hostErrorCode(host, error),
     hostErrorMessage(host, error)
@@ -73,7 +79,7 @@ function hostUnavailableResult(
 function hostErrorCode(
   host: LibraryBoundaryHost,
   error: LibraryBoundaryHostError
-): ReadLocalBrowserEntryPointsErrorCode {
+): ReadLocalBrowseItemsErrorCode {
   if (host.state === 'failed') {
     return 'hostFailed'
   }
@@ -108,11 +114,11 @@ function hostErrorMessage(host: LibraryBoundaryHost, error: LibraryBoundaryHostE
   }
 }
 
-function createReadLocalBrowserEntryPointsErrorResult(
-  state: ReadLocalBrowserEntryPointsErrorState,
-  code: ReadLocalBrowserEntryPointsErrorCode,
+function createReadLocalBrowseItemsErrorResult(
+  state: ReadLocalBrowseItemsErrorState,
+  code: ReadLocalBrowseItemsErrorCode,
   message: string
-): ReadLocalBrowserEntryPointsOutcome {
+): ReadLocalBrowseItemsOutcome {
   return {
     state,
     error: {
@@ -122,20 +128,21 @@ function createReadLocalBrowserEntryPointsErrorResult(
   }
 }
 
-function mapLocalBrowserEntryPoint(entry: ContractLocalBrowserEntryPoint): LocalBrowserEntryPoint {
+function mapLocalBrowseItem(item: ContractLocalBrowseItem): LocalBrowseItem {
   return {
-    identity: entry.identity,
-    displayName: entry.displayName,
-    status: entry.status,
-    platform: entry.platform,
-    admissionHint: entry.admissionHint,
-    affordances: entry.affordances,
-    failure: entry.failure
+    identity: item.identity,
+    itemKind: item.itemKind,
+    displayName: item.displayName,
+    status: item.status,
+    platform: item.platform,
+    fileKind: item.fileKind,
+    mediaRelevance: item.mediaRelevance,
+    admissionAction: item.admissionAction,
+    availableActions: item.availableActions,
+    failure: item.failure
   }
 }
 
-function isReadLocalBrowserEntryPointsOutcome(
-  value: unknown
-): value is ReadLocalBrowserEntryPointsOutcome {
+function isReadLocalBrowseItemsOutcome(value: unknown): value is ReadLocalBrowseItemsOutcome {
   return typeof value === 'object' && value !== null && 'state' in value
 }

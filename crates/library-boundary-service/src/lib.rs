@@ -1,11 +1,11 @@
 #![deny(unsafe_code)]
 
-mod local_browser_children;
+mod local_browse_entry_points;
 #[cfg(test)]
-mod local_browser_children_tests;
-mod local_browser_entry_points;
+mod local_browse_entry_points_tests;
+mod local_browse_items;
 #[cfg(test)]
-mod local_browser_entry_points_tests;
+mod local_browse_items_tests;
 mod search_filter_protocol;
 mod service;
 mod session_events;

@@ -6,18 +6,18 @@ use library_boundary_protocol as protocol;
 #[cfg(windows)]
 use std::os::windows::ffi::{OsStrExt, OsStringExt};
 
-pub(crate) trait LocalBrowserEntryPointResolver: Send + Sync {
+pub(crate) trait LocalBrowseEntryPointResolver: Send + Sync {
     fn resolve_entry_points(
         &self,
-    ) -> Result<LocalBrowserEntryPointResolution, LocalBrowserEntryPointResolveFailure>;
+    ) -> Result<LocalBrowseEntryPointResolution, LocalBrowseEntryPointResolveFailure>;
 }
 
-pub(crate) trait LocalBrowserPathStatusResolver: Send + Sync {
-    fn resolve_status(&self, path: &Path) -> LocalBrowserPathStatusProbe;
+pub(crate) trait LocalBrowsePathStatusResolver: Send + Sync {
+    fn resolve_status(&self, path: &Path) -> LocalBrowsePathStatusProbe;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum LocalBrowserPathStatusProbe {
+pub(crate) enum LocalBrowsePathStatusProbe {
     Directory,
     NonDirectory,
     NotFound,
@@ -25,124 +25,124 @@ pub(crate) enum LocalBrowserPathStatusProbe {
     Unavailable,
 }
 
-impl LocalBrowserPathStatusProbe {
-    fn status(self) -> protocol::LocalBrowserEntryPointStatus {
+impl LocalBrowsePathStatusProbe {
+    fn status(self) -> protocol::LocalBrowseEntryPointStatus {
         match self {
-            Self::Directory => protocol::LocalBrowserEntryPointStatus::Available,
+            Self::Directory => protocol::LocalBrowseEntryPointStatus::Available,
             Self::NonDirectory | Self::Unavailable => {
-                protocol::LocalBrowserEntryPointStatus::Unavailable
+                protocol::LocalBrowseEntryPointStatus::Unavailable
             }
-            Self::NotFound => protocol::LocalBrowserEntryPointStatus::Missing,
-            Self::PermissionBlocked => protocol::LocalBrowserEntryPointStatus::PermissionBlocked,
+            Self::NotFound => protocol::LocalBrowseEntryPointStatus::Missing,
+            Self::PermissionBlocked => protocol::LocalBrowseEntryPointStatus::PermissionBlocked,
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct LocalBrowserEntryPointResolution {
-    pub(crate) entries: Vec<ResolvedLocalBrowserEntryPoint>,
-    pub(crate) failure: Option<LocalBrowserEntryPointResolveFailure>,
+pub(crate) struct LocalBrowseEntryPointResolution {
+    pub(crate) entries: Vec<ResolvedLocalBrowseEntryPoint>,
+    pub(crate) failure: Option<LocalBrowseEntryPointResolveFailure>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ResolvedLocalBrowserEntryPoint {
-    pub(crate) entry_point_kind: protocol::LocalBrowserEntryPointKind,
+pub(crate) struct ResolvedLocalBrowseEntryPoint {
+    pub(crate) entry_point_kind: protocol::LocalBrowseEntryPointKind,
     pub(crate) canonical_path: Option<PathBuf>,
     pub(crate) display_name: String,
-    pub(crate) status: protocol::LocalBrowserEntryPointStatus,
-    pub(crate) platform: protocol::LocalBrowserEntryPointPlatform,
-    pub(crate) failure: Option<LocalBrowserEntryPointResolveFailure>,
+    pub(crate) status: protocol::LocalBrowseEntryPointStatus,
+    pub(crate) platform: protocol::LocalBrowsePlatform,
+    pub(crate) failure: Option<LocalBrowseEntryPointResolveFailure>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct LocalBrowserEntryPointResolveFailure {
-    pub(crate) code: protocol::LocalBrowserEntryPointFailureCode,
+pub(crate) struct LocalBrowseEntryPointResolveFailure {
+    pub(crate) code: protocol::LocalBrowseEntryPointFailureCode,
     pub(crate) detail: String,
 }
 
-pub(crate) fn production_local_browser_entry_point_resolver()
--> Arc<dyn LocalBrowserEntryPointResolver> {
-    Arc::new(PlatformLocalBrowserEntryPointResolver)
+pub(crate) fn production_local_browse_entry_point_resolver()
+-> Arc<dyn LocalBrowseEntryPointResolver> {
+    Arc::new(PlatformLocalBrowseEntryPointResolver)
 }
 
-pub(crate) struct PlatformLocalBrowserPathStatusResolver;
+pub(crate) struct PlatformLocalBrowsePathStatusResolver;
 
-impl LocalBrowserPathStatusResolver for PlatformLocalBrowserPathStatusResolver {
-    fn resolve_status(&self, path: &Path) -> LocalBrowserPathStatusProbe {
+impl LocalBrowsePathStatusResolver for PlatformLocalBrowsePathStatusResolver {
+    fn resolve_status(&self, path: &Path) -> LocalBrowsePathStatusProbe {
         resolve_platform_path_status(path)
     }
 }
 
-pub(crate) fn local_browser_entry_point_platform() -> protocol::LocalBrowserEntryPointPlatform {
+pub(crate) fn local_browse_entry_point_platform() -> protocol::LocalBrowsePlatform {
     #[cfg(windows)]
     {
-        protocol::LocalBrowserEntryPointPlatform::Windows
+        protocol::LocalBrowsePlatform::Windows
     }
     #[cfg(target_os = "macos")]
     {
-        protocol::LocalBrowserEntryPointPlatform::Macos
+        protocol::LocalBrowsePlatform::Macos
     }
     #[cfg(target_os = "linux")]
     {
-        protocol::LocalBrowserEntryPointPlatform::Linux
+        protocol::LocalBrowsePlatform::Linux
     }
     #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
     {
-        protocol::LocalBrowserEntryPointPlatform::Unsupported
+        protocol::LocalBrowsePlatform::Unsupported
     }
 }
 
-struct PlatformLocalBrowserEntryPointResolver;
+struct PlatformLocalBrowseEntryPointResolver;
 
-impl LocalBrowserEntryPointResolver for PlatformLocalBrowserEntryPointResolver {
+impl LocalBrowseEntryPointResolver for PlatformLocalBrowseEntryPointResolver {
     fn resolve_entry_points(
         &self,
-    ) -> Result<LocalBrowserEntryPointResolution, LocalBrowserEntryPointResolveFailure> {
+    ) -> Result<LocalBrowseEntryPointResolution, LocalBrowseEntryPointResolveFailure> {
         resolve_platform_entry_points()
     }
 }
 
 fn entry_failure(
-    code: protocol::LocalBrowserEntryPointFailureCode,
+    code: protocol::LocalBrowseEntryPointFailureCode,
     detail: impl Into<String>,
-) -> LocalBrowserEntryPointResolveFailure {
-    LocalBrowserEntryPointResolveFailure {
+) -> LocalBrowseEntryPointResolveFailure {
+    LocalBrowseEntryPointResolveFailure {
         code,
         detail: detail.into(),
     }
 }
 
 fn entry(
-    entry_point_kind: protocol::LocalBrowserEntryPointKind,
+    entry_point_kind: protocol::LocalBrowseEntryPointKind,
     canonical_path: Option<PathBuf>,
     display_name: impl Into<String>,
-    status: protocol::LocalBrowserEntryPointStatus,
-    failure: Option<LocalBrowserEntryPointResolveFailure>,
-) -> ResolvedLocalBrowserEntryPoint {
-    ResolvedLocalBrowserEntryPoint {
+    status: protocol::LocalBrowseEntryPointStatus,
+    failure: Option<LocalBrowseEntryPointResolveFailure>,
+) -> ResolvedLocalBrowseEntryPoint {
+    ResolvedLocalBrowseEntryPoint {
         entry_point_kind,
         canonical_path,
         display_name: display_name.into(),
         status,
-        platform: local_browser_entry_point_platform(),
+        platform: local_browse_entry_point_platform(),
         failure,
     }
 }
 
-pub(crate) fn status_for_path(path: &Path) -> protocol::LocalBrowserEntryPointStatus {
-    status_for_path_with_resolver(&PlatformLocalBrowserPathStatusResolver, path)
+pub(crate) fn status_for_path(path: &Path) -> protocol::LocalBrowseEntryPointStatus {
+    status_for_path_with_resolver(&PlatformLocalBrowsePathStatusResolver, path)
 }
 
 pub(crate) fn status_for_path_with_resolver(
-    resolver: &dyn LocalBrowserPathStatusResolver,
+    resolver: &dyn LocalBrowsePathStatusResolver,
     path: &Path,
-) -> protocol::LocalBrowserEntryPointStatus {
+) -> protocol::LocalBrowseEntryPointStatus {
     resolver.resolve_status(path).status()
 }
 
 #[cfg(windows)]
 #[allow(unsafe_code)]
-fn resolve_platform_path_status(path: &Path) -> LocalBrowserPathStatusProbe {
+fn resolve_platform_path_status(path: &Path) -> LocalBrowsePathStatusProbe {
     use windows_sys::Win32::Foundation::GetLastError;
     use windows_sys::Win32::Storage::FileSystem::{
         FILE_ATTRIBUTE_DIRECTORY, GetFileAttributesW, INVALID_FILE_ATTRIBUTES,
@@ -151,16 +151,16 @@ fn resolve_platform_path_status(path: &Path) -> LocalBrowserPathStatusProbe {
     let attributes = unsafe { GetFileAttributesW(nul_terminated_wide(path).as_ptr()) };
     if attributes != INVALID_FILE_ATTRIBUTES {
         if attributes & FILE_ATTRIBUTE_DIRECTORY != 0 {
-            return LocalBrowserPathStatusProbe::Directory;
+            return LocalBrowsePathStatusProbe::Directory;
         }
-        return LocalBrowserPathStatusProbe::NonDirectory;
+        return LocalBrowsePathStatusProbe::NonDirectory;
     }
 
     windows_path_status_probe_from_error(unsafe { GetLastError() })
 }
 
 #[cfg(windows)]
-pub(crate) fn windows_path_status_probe_from_error(error: u32) -> LocalBrowserPathStatusProbe {
+pub(crate) fn windows_path_status_probe_from_error(error: u32) -> LocalBrowsePathStatusProbe {
     use windows_sys::Win32::Foundation::{
         ERROR_ACCESS_DENIED, ERROR_ACCESS_DENIED_APPDATA, ERROR_BAD_NETPATH,
         ERROR_CLOUD_FILE_ACCESS_DENIED, ERROR_CLOUD_FILE_AUTHENTICATION_FAILED,
@@ -171,11 +171,11 @@ pub(crate) fn windows_path_status_probe_from_error(error: u32) -> LocalBrowserPa
     };
 
     match error {
-        ERROR_FILE_NOT_FOUND | ERROR_PATH_NOT_FOUND => LocalBrowserPathStatusProbe::NotFound,
+        ERROR_FILE_NOT_FOUND | ERROR_PATH_NOT_FOUND => LocalBrowsePathStatusProbe::NotFound,
         ERROR_ACCESS_DENIED
         | ERROR_ACCESS_DENIED_APPDATA
         | ERROR_CLOUD_FILE_ACCESS_DENIED
-        | ERROR_CLOUD_FILE_AUTHENTICATION_FAILED => LocalBrowserPathStatusProbe::PermissionBlocked,
+        | ERROR_CLOUD_FILE_AUTHENTICATION_FAILED => LocalBrowsePathStatusProbe::PermissionBlocked,
         ERROR_NOT_READY
         | ERROR_BAD_NETPATH
         | ERROR_NETWORK_UNREACHABLE
@@ -183,30 +183,30 @@ pub(crate) fn windows_path_status_probe_from_error(error: u32) -> LocalBrowserPa
         | ERROR_CLOUD_FILE_PROVIDER_NOT_RUNNING
         | ERROR_CLOUD_FILE_PROVIDER_TERMINATED
         | ERROR_CLOUD_FILE_REQUEST_TIMEOUT
-        | ERROR_CLOUD_FILE_UNSUCCESSFUL => LocalBrowserPathStatusProbe::Unavailable,
-        _ => LocalBrowserPathStatusProbe::Unavailable,
+        | ERROR_CLOUD_FILE_UNSUCCESSFUL => LocalBrowsePathStatusProbe::Unavailable,
+        _ => LocalBrowsePathStatusProbe::Unavailable,
     }
 }
 
 #[cfg(not(windows))]
-fn resolve_platform_path_status(path: &Path) -> LocalBrowserPathStatusProbe {
+fn resolve_platform_path_status(path: &Path) -> LocalBrowsePathStatusProbe {
     match std::fs::symlink_metadata(path) {
-        Ok(metadata) if metadata.is_dir() => LocalBrowserPathStatusProbe::Directory,
-        Ok(_) => LocalBrowserPathStatusProbe::NonDirectory,
+        Ok(metadata) if metadata.is_dir() => LocalBrowsePathStatusProbe::Directory,
+        Ok(_) => LocalBrowsePathStatusProbe::NonDirectory,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            LocalBrowserPathStatusProbe::NotFound
+            LocalBrowsePathStatusProbe::NotFound
         }
         Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => {
-            LocalBrowserPathStatusProbe::PermissionBlocked
+            LocalBrowsePathStatusProbe::PermissionBlocked
         }
-        Err(_) => LocalBrowserPathStatusProbe::Unavailable,
+        Err(_) => LocalBrowsePathStatusProbe::Unavailable,
     }
 }
 
 #[cfg(windows)]
 #[allow(unsafe_code)]
 fn resolve_platform_entry_points()
--> Result<LocalBrowserEntryPointResolution, LocalBrowserEntryPointResolveFailure> {
+-> Result<LocalBrowseEntryPointResolution, LocalBrowseEntryPointResolveFailure> {
     use std::ffi::OsString;
     use std::ptr;
 
@@ -232,7 +232,7 @@ fn resolve_platform_entry_points()
         Ok(path) => {
             let status = status_for_path(&path);
             entries.push(entry(
-                protocol::LocalBrowserEntryPointKind::SystemDriveRoot,
+                protocol::LocalBrowseEntryPointKind::SystemDriveRoot,
                 Some(path.clone()),
                 path_to_display_name(&path),
                 status,
@@ -242,10 +242,10 @@ fn resolve_platform_entry_points()
         }
         Err(failure) => {
             entries.push(entry(
-                protocol::LocalBrowserEntryPointKind::SystemDriveRoot,
+                protocol::LocalBrowseEntryPointKind::SystemDriveRoot,
                 None,
                 "System Drive",
-                protocol::LocalBrowserEntryPointStatus::Unavailable,
+                protocol::LocalBrowseEntryPointStatus::Unavailable,
                 Some(failure),
             ));
             None
@@ -256,16 +256,16 @@ fn resolve_platform_entry_points()
         Ok(volume_roots) => {
             let system_key = system_drive_root
                 .as_deref()
-                .map(crate::local_browser_entry_points::normalize_local_browser_path_key);
+                .map(crate::local_browse_entry_points::normalize_local_browse_path_key);
             for volume in volume_roots {
                 if volume.drive_type == DRIVE_FIXED {
                     if system_key.as_deref()
-                        == Some(normalize_local_browser_path_key(&volume.path).as_str())
+                        == Some(normalize_local_browse_path_key(&volume.path).as_str())
                     {
                         continue;
                     }
                     entries.push(entry(
-                        protocol::LocalBrowserEntryPointKind::LocalDataVolumeRoot,
+                        protocol::LocalBrowseEntryPointKind::LocalDataVolumeRoot,
                         Some(volume.path.clone()),
                         path_to_display_name(&volume.path),
                         status_for_path(&volume.path),
@@ -273,7 +273,7 @@ fn resolve_platform_entry_points()
                     ));
                 } else if volume.drive_type == DRIVE_REMOVABLE {
                     entries.push(entry(
-                        protocol::LocalBrowserEntryPointKind::RemovableVolumeRoot,
+                        protocol::LocalBrowseEntryPointKind::RemovableVolumeRoot,
                         Some(volume.path.clone()),
                         path_to_display_name(&volume.path),
                         status_for_path(&volume.path),
@@ -288,27 +288,27 @@ fn resolve_platform_entry_points()
     }
 
     entries.push(resolve_known_folder_entry(
-        protocol::LocalBrowserEntryPointKind::UserHome,
+        protocol::LocalBrowseEntryPointKind::UserHome,
         &FOLDERID_Profile,
         "Home",
     ));
     entries.push(resolve_known_folder_entry(
-        protocol::LocalBrowserEntryPointKind::Desktop,
+        protocol::LocalBrowseEntryPointKind::Desktop,
         &FOLDERID_Desktop,
         "Desktop",
     ));
     entries.push(resolve_known_folder_entry(
-        protocol::LocalBrowserEntryPointKind::Downloads,
+        protocol::LocalBrowseEntryPointKind::Downloads,
         &FOLDERID_Downloads,
         "Downloads",
     ));
     entries.push(resolve_known_folder_entry(
-        protocol::LocalBrowserEntryPointKind::Music,
+        protocol::LocalBrowseEntryPointKind::Music,
         &FOLDERID_Music,
         "Music",
     ));
 
-    return Ok(LocalBrowserEntryPointResolution {
+    return Ok(LocalBrowseEntryPointResolution {
         entries,
         failure: resolution_failure,
     });
@@ -319,10 +319,10 @@ fn resolve_platform_entry_points()
     }
 
     fn resolve_known_folder_entry(
-        entry_point_kind: protocol::LocalBrowserEntryPointKind,
+        entry_point_kind: protocol::LocalBrowseEntryPointKind,
         folder_id: &GUID,
         display_name: &'static str,
-    ) -> ResolvedLocalBrowserEntryPoint {
+    ) -> ResolvedLocalBrowseEntryPoint {
         match known_folder_path(folder_id) {
             Ok(path) => entry(
                 entry_point_kind,
@@ -335,15 +335,13 @@ fn resolve_platform_entry_points()
                 entry_point_kind,
                 None,
                 display_name,
-                protocol::LocalBrowserEntryPointStatus::Unavailable,
+                protocol::LocalBrowseEntryPointStatus::Unavailable,
                 Some(failure),
             ),
         }
     }
 
-    fn known_folder_path(
-        folder_id: &GUID,
-    ) -> Result<PathBuf, LocalBrowserEntryPointResolveFailure> {
+    fn known_folder_path(folder_id: &GUID) -> Result<PathBuf, LocalBrowseEntryPointResolveFailure> {
         let mut raw_path: PWSTR = ptr::null_mut();
         let result = unsafe {
             SHGetKnownFolderPath(
@@ -355,7 +353,7 @@ fn resolve_platform_entry_points()
         };
         if result < 0 || raw_path.is_null() {
             return Err(entry_failure(
-                protocol::LocalBrowserEntryPointFailureCode::KnownFolderUnavailable,
+                protocol::LocalBrowseEntryPointFailureCode::KnownFolderUnavailable,
                 format!("SHGetKnownFolderPath failed with HRESULT {result:#x}"),
             ));
         }
@@ -366,18 +364,18 @@ fn resolve_platform_entry_points()
         }
         path.ok_or_else(|| {
             entry_failure(
-                protocol::LocalBrowserEntryPointFailureCode::KnownFolderUnavailable,
+                protocol::LocalBrowseEntryPointFailureCode::KnownFolderUnavailable,
                 "SHGetKnownFolderPath returned an empty path",
             )
         })
     }
 
-    fn resolve_system_drive_root() -> Result<PathBuf, LocalBrowserEntryPointResolveFailure> {
+    fn resolve_system_drive_root() -> Result<PathBuf, LocalBrowseEntryPointResolveFailure> {
         let windows_directory = windows_directory_path()?;
         volume_path_for(&windows_directory)
     }
 
-    fn windows_directory_path() -> Result<PathBuf, LocalBrowserEntryPointResolveFailure> {
+    fn windows_directory_path() -> Result<PathBuf, LocalBrowseEntryPointResolveFailure> {
         let mut buffer = vec![0_u16; MAX_WINDOWS_PATH_BUFFER];
         let length = unsafe {
             GetSystemWindowsDirectoryW(
@@ -387,7 +385,7 @@ fn resolve_platform_entry_points()
         };
         if length == 0 || usize::try_from(length).map_or(true, |len| len >= buffer.len()) {
             return Err(entry_failure(
-                protocol::LocalBrowserEntryPointFailureCode::SystemDriveUnavailable,
+                protocol::LocalBrowseEntryPointFailureCode::SystemDriveUnavailable,
                 "GetSystemWindowsDirectoryW failed to resolve the system Windows directory",
             ));
         }
@@ -395,7 +393,7 @@ fn resolve_platform_entry_points()
         Ok(PathBuf::from(OsString::from_wide(&buffer)))
     }
 
-    fn volume_path_for(path: &Path) -> Result<PathBuf, LocalBrowserEntryPointResolveFailure> {
+    fn volume_path_for(path: &Path) -> Result<PathBuf, LocalBrowseEntryPointResolveFailure> {
         let path_wide = nul_terminated_wide(path);
         let mut buffer = vec![0_u16; MAX_WINDOWS_PATH_BUFFER];
         let success = unsafe {
@@ -407,25 +405,25 @@ fn resolve_platform_entry_points()
         };
         if success == 0 {
             return Err(entry_failure(
-                protocol::LocalBrowserEntryPointFailureCode::SystemDriveUnavailable,
+                protocol::LocalBrowseEntryPointFailureCode::SystemDriveUnavailable,
                 "GetVolumePathNameW failed to resolve the system volume root",
             ));
         }
         wide_buffer_to_path_buf(&buffer).ok_or_else(|| {
             entry_failure(
-                protocol::LocalBrowserEntryPointFailureCode::SystemDriveUnavailable,
+                protocol::LocalBrowseEntryPointFailureCode::SystemDriveUnavailable,
                 "GetVolumePathNameW returned an empty system volume root",
             )
         })
     }
 
     fn resolve_windows_volume_roots()
-    -> Result<Vec<WindowsVolumeRoot>, LocalBrowserEntryPointResolveFailure> {
+    -> Result<Vec<WindowsVolumeRoot>, LocalBrowseEntryPointResolveFailure> {
         let logical_drives = unsafe { GetLogicalDrives() };
         if logical_drives == 0 {
             return Err(entry_failure(
-                protocol::LocalBrowserEntryPointFailureCode::VolumeEnumerationUnavailable,
-                "GetLogicalDrives failed while resolving local browser entry points",
+                protocol::LocalBrowseEntryPointFailureCode::VolumeEnumerationUnavailable,
+                "GetLogicalDrives failed while resolving local browse entry points",
             ));
         }
 
@@ -477,38 +475,38 @@ fn nul_terminated_wide(path: &Path) -> Vec<u16> {
 
 #[cfg(not(windows))]
 fn resolve_platform_entry_points()
--> Result<LocalBrowserEntryPointResolution, LocalBrowserEntryPointResolveFailure> {
-    let platform = local_browser_entry_point_platform();
+-> Result<LocalBrowseEntryPointResolution, LocalBrowseEntryPointResolveFailure> {
+    let platform = local_browse_entry_point_platform();
     let entries = [
-        protocol::LocalBrowserEntryPointKind::SystemDriveRoot,
-        protocol::LocalBrowserEntryPointKind::LocalDataVolumeRoot,
-        protocol::LocalBrowserEntryPointKind::RemovableVolumeRoot,
-        protocol::LocalBrowserEntryPointKind::UserHome,
-        protocol::LocalBrowserEntryPointKind::Desktop,
-        protocol::LocalBrowserEntryPointKind::Downloads,
-        protocol::LocalBrowserEntryPointKind::Music,
+        protocol::LocalBrowseEntryPointKind::SystemDriveRoot,
+        protocol::LocalBrowseEntryPointKind::LocalDataVolumeRoot,
+        protocol::LocalBrowseEntryPointKind::RemovableVolumeRoot,
+        protocol::LocalBrowseEntryPointKind::UserHome,
+        protocol::LocalBrowseEntryPointKind::Desktop,
+        protocol::LocalBrowseEntryPointKind::Downloads,
+        protocol::LocalBrowseEntryPointKind::Music,
     ]
     .into_iter()
-    .map(|kind| ResolvedLocalBrowserEntryPoint {
+    .map(|kind| ResolvedLocalBrowseEntryPoint {
         entry_point_kind: kind,
         canonical_path: None,
         display_name: default_display_name(kind).to_string(),
-        status: protocol::LocalBrowserEntryPointStatus::UnsupportedPlatform,
+        status: protocol::LocalBrowseEntryPointStatus::UnsupportedPlatform,
         platform,
         failure: Some(entry_failure(
-            protocol::LocalBrowserEntryPointFailureCode::UnsupportedPlatform,
-            "local browser entry point resolution is Windows-only in V0",
+            protocol::LocalBrowseEntryPointFailureCode::UnsupportedPlatform,
+            "local browse entry point resolution is Windows-only in V0",
         )),
     })
     .collect();
 
-    Ok(LocalBrowserEntryPointResolution {
+    Ok(LocalBrowseEntryPointResolution {
         entries,
         failure: None,
     })
 }
 
-pub(crate) fn normalize_local_browser_path_key(path: &Path) -> String {
+pub(crate) fn normalize_local_browse_path_key(path: &Path) -> String {
     let mut text = path.to_string_lossy().replace('/', "\\");
     if let Some(stripped) = text.strip_prefix("\\\\?\\UNC\\") {
         text = format!("\\\\{stripped}");
@@ -528,14 +526,14 @@ fn path_to_display_name(path: &Path) -> String {
 }
 
 #[cfg(not(windows))]
-fn default_display_name(kind: protocol::LocalBrowserEntryPointKind) -> &'static str {
+fn default_display_name(kind: protocol::LocalBrowseEntryPointKind) -> &'static str {
     match kind {
-        protocol::LocalBrowserEntryPointKind::SystemDriveRoot => "System Drive",
-        protocol::LocalBrowserEntryPointKind::LocalDataVolumeRoot => "Local Data Volume",
-        protocol::LocalBrowserEntryPointKind::RemovableVolumeRoot => "Removable Volume",
-        protocol::LocalBrowserEntryPointKind::UserHome => "Home",
-        protocol::LocalBrowserEntryPointKind::Desktop => "Desktop",
-        protocol::LocalBrowserEntryPointKind::Downloads => "Downloads",
-        protocol::LocalBrowserEntryPointKind::Music => "Music",
+        protocol::LocalBrowseEntryPointKind::SystemDriveRoot => "System Drive",
+        protocol::LocalBrowseEntryPointKind::LocalDataVolumeRoot => "Local Data Volume",
+        protocol::LocalBrowseEntryPointKind::RemovableVolumeRoot => "Removable Volume",
+        protocol::LocalBrowseEntryPointKind::UserHome => "Home",
+        protocol::LocalBrowseEntryPointKind::Desktop => "Desktop",
+        protocol::LocalBrowseEntryPointKind::Downloads => "Downloads",
+        protocol::LocalBrowseEntryPointKind::Music => "Music",
     }
 }

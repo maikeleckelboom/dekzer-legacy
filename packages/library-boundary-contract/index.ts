@@ -55,7 +55,7 @@ export type RejectTrackIdentityCandidateRequest = { candidateId: string, reason?
 
 export type DeferTrackIdentityCandidateRequest = { candidateId: string, reason?: string, };
 
-export type SnapshotReadCommand = { "type": "readNavigationRows", "payload": ReadNavigationRowsRequest } | { "type": "loadNavigationRow", "payload": LoadNavigationRowRequest } | { "type": "loadNavigationRowByStableKey", "payload": LoadNavigationRowByStableKeyRequest } | { "type": "readLocalBrowserEntryPoints", "payload": ReadLocalBrowserEntryPointsRequest } | { "type": "readLocalBrowserChildren", "payload": ReadLocalBrowserChildrenRequest } | { "type": "readLibraryTreeChildren", "payload": ReadLibraryTreeChildrenRequest } | { "type": "readSourceLifecycle", "payload": ReadSourceLifecycleRequest } | { "type": "readSourceIntegrity", "payload": ReadSourceIntegrityRequest } | { "type": "readSourceMaintenance", "payload": ReadSourceMaintenanceRequest } | { "type": "readSourceFileAttachment", "payload": ReadSourceFileAttachmentRequest } | { "type": "readAttachmentSourceFiles", "payload": ReadAttachmentSourceFilesRequest } | { "type": "readSourceAttachmentSummary", "payload": ReadSourceAttachmentSummaryRequest } | { "type": "readTrackIdentityReviewCandidates", "payload": ReadTrackIdentityReviewCandidatesRequest } | { "type": "contentsRead", "payload": ContentsReadRequest } | { "type": "searchFilterRead", "payload": SearchFilterReadRequest };
+export type SnapshotReadCommand = { "type": "readNavigationRows", "payload": ReadNavigationRowsRequest } | { "type": "loadNavigationRow", "payload": LoadNavigationRowRequest } | { "type": "loadNavigationRowByStableKey", "payload": LoadNavigationRowByStableKeyRequest } | { "type": "readLocalBrowseEntryPoints", "payload": ReadLocalBrowseEntryPointsRequest } | { "type": "readLocalBrowseItems", "payload": ReadLocalBrowseItemsRequest } | { "type": "readLibraryTreeChildren", "payload": ReadLibraryTreeChildrenRequest } | { "type": "readSourceLifecycle", "payload": ReadSourceLifecycleRequest } | { "type": "readSourceIntegrity", "payload": ReadSourceIntegrityRequest } | { "type": "readSourceMaintenance", "payload": ReadSourceMaintenanceRequest } | { "type": "readSourceFileAttachment", "payload": ReadSourceFileAttachmentRequest } | { "type": "readAttachmentSourceFiles", "payload": ReadAttachmentSourceFilesRequest } | { "type": "readSourceAttachmentSummary", "payload": ReadSourceAttachmentSummaryRequest } | { "type": "readTrackIdentityReviewCandidates", "payload": ReadTrackIdentityReviewCandidatesRequest } | { "type": "contentsRead", "payload": ContentsReadRequest } | { "type": "searchFilterRead", "payload": SearchFilterReadRequest };
 
 export type ReadNavigationRowsRequest = { parentNavigationRowId: string | null, };
 
@@ -63,29 +63,27 @@ export type LoadNavigationRowRequest = { navigationRowId: string, };
 
 export type LoadNavigationRowByStableKeyRequest = { stableKey: string, };
 
-export type ReadLocalBrowserEntryPointsRequest = null;
+export type ReadLocalBrowseEntryPointsRequest = null;
 
-export type LocalBrowserEntryPointKind = "systemDriveRoot" | "localDataVolumeRoot" | "removableVolumeRoot" | "userHome" | "desktop" | "downloads" | "music";
+export type LocalBrowseEntryPointKind = "systemDriveRoot" | "localDataVolumeRoot" | "removableVolumeRoot" | "userHome" | "desktop" | "downloads" | "music";
 
-export type LocalBrowserEntryPointStatus = "resolving" | "available" | "unavailable" | "permissionBlocked" | "missing" | "unsupportedPlatform" | "duplicateOfAdmittedSource";
+export type LocalBrowseEntryPointStatus = "resolving" | "available" | "unavailable" | "permissionBlocked" | "missing" | "unsupportedPlatform" | "duplicateOfAdmittedSource";
 
-export type LocalBrowserEntryPointPlatform = "windows" | "macos" | "linux" | "unsupported";
+export type LocalBrowsePlatform = "windows" | "macos" | "linux" | "unsupported";
 
-export type LocalBrowserEntryPointAdmissionHint = "notDirectlyAdmissible" | "requiresConfirmation" | "defaultMusicFolder" | "duplicateOfAdmittedSource" | "unavailable" | "unsupportedPlatform";
+export type LocalBrowseAdmissionAction = "requestAdmission" | "requestDefaultMusicFolderAdmission" | "requestParentAdmission";
 
-export type LocalBrowserEntryPointFailureCode = "unsupportedPlatform" | "knownFolderUnavailable" | "systemDriveUnavailable" | "volumeEnumerationUnavailable" | "metadataUnavailable";
+export type LocalBrowseEntryPointFailureCode = "unsupportedPlatform" | "knownFolderUnavailable" | "systemDriveUnavailable" | "volumeEnumerationUnavailable" | "metadataUnavailable";
 
-export type ReadLocalBrowserChildrenRequest = { entryPointKind: LocalBrowserEntryPointKind, rootCanonicalPath: string, parentCanonicalPath: string, offset: number, limit: number, };
+export type ReadLocalBrowseItemsRequest = { entryPointKind: LocalBrowseEntryPointKind, rootCanonicalPath: string, parentCanonicalPath: string, offset: number, limit: number, };
 
-export type LocalBrowserCandidateRowKind = "directoryCandidate" | "mediaFileCandidate" | "unsupportedFileCandidate" | "rejectedRootCandidate" | "inaccessibleCandidate" | "unknownCandidate";
+export type LocalBrowseItemKind = "directory" | "mediaFile" | "unsupportedFile" | "rejectedRoot" | "inaccessible" | "unknown";
 
-export type LocalBrowserCandidateStatus = "available" | "unavailable" | "permissionBlocked" | "missing" | "unsupportedPlatform" | "duplicateOfAdmittedSource" | "rejected" | "unknown";
+export type LocalBrowseItemStatus = "available" | "unavailable" | "permissionBlocked" | "missing" | "unsupportedPlatform" | "duplicateOfAdmittedSource" | "rejected" | "unknown";
 
-export type LocalBrowserCandidateMediaRelevance = "mediaRelevant" | "companionMetadata" | "unsupported" | "unknown";
+export type LocalBrowseItemMediaRelevance = "mediaRelevant" | "companionMetadata" | "unsupported" | "unknown";
 
-export type LocalBrowserCandidateAdmissionHint = "canRequestAdmission" | "requiresConfirmation" | "chooseParentDirectory" | "notDirectlyAdmissible" | "duplicateOfAdmittedSource" | "unavailable" | "unsupportedPlatform" | "rejected";
-
-export type LocalBrowserChildFailureCode = "unsupportedPlatform" | "rootPathUnavailable" | "parentPathUnavailable" | "parentMissing" | "parentNotDirectory" | "parentOutsideRoot" | "permissionDenied" | "metadataUnavailable" | "enumerationUnavailable" | "reparsePointSkipped" | "rejectedRoot" | "unknownFileType";
+export type LocalBrowseItemFailureCode = "unsupportedPlatform" | "rootIdentityMismatch" | "rootPathUnavailable" | "parentPathUnavailable" | "parentMissing" | "parentNotDirectory" | "parentOutsideRoot" | "permissionDenied" | "metadataUnavailable" | "enumerationUnavailable" | "reparsePointSkipped" | "rejectedRoot" | "unknownFileType";
 
 export type ReadLibraryTreeChildrenRequest = { entryPoint: LibraryTreeEntryPoint, parentSourceDirectoryId: string | null, offset: number, limit: number, };
 
@@ -220,7 +218,7 @@ export type TrackIdentityEffectiveDecisionPrecedence = "user" | "system" | "none
 
 export type TrackIdentityUserBlockingDecisionState = "none" | "rejected" | "deferred";
 
-export type SnapshotReadReply = { "type": "navigationRows", "payload": ReadNavigationRowsReply } | { "type": "navigationRow", "payload": LoadNavigationRowReply } | { "type": "navigationRowByStableKey", "payload": LoadNavigationRowByStableKeyReply } | { "type": "localBrowserEntryPoints", "payload": ReadLocalBrowserEntryPointsReply } | { "type": "localBrowserChildren", "payload": ReadLocalBrowserChildrenReply } | { "type": "libraryTreeChildren", "payload": ReadLibraryTreeChildrenReply } | { "type": "sourceLifecycle", "payload": ReadSourceLifecycleReply } | { "type": "sourceIntegrity", "payload": ReadSourceIntegrityReply } | { "type": "sourceMaintenance", "payload": ReadSourceMaintenanceReply } | { "type": "sourceFileAttachment", "payload": ReadSourceFileAttachmentReply } | { "type": "attachmentSourceFiles", "payload": ReadAttachmentSourceFilesReply } | { "type": "sourceAttachmentSummary", "payload": ReadSourceAttachmentSummaryReply } | { "type": "trackIdentityReviewCandidates", "payload": ReadTrackIdentityReviewCandidatesReply } | { "type": "contents", "payload": ContentsReadReply } | { "type": "searchFilter", "payload": SearchFilterReadReply };
+export type SnapshotReadReply = { "type": "navigationRows", "payload": ReadNavigationRowsReply } | { "type": "navigationRow", "payload": LoadNavigationRowReply } | { "type": "navigationRowByStableKey", "payload": LoadNavigationRowByStableKeyReply } | { "type": "localBrowseEntryPoints", "payload": ReadLocalBrowseEntryPointsReply } | { "type": "localBrowseItems", "payload": ReadLocalBrowseItemsReply } | { "type": "libraryTreeChildren", "payload": ReadLibraryTreeChildrenReply } | { "type": "sourceLifecycle", "payload": ReadSourceLifecycleReply } | { "type": "sourceIntegrity", "payload": ReadSourceIntegrityReply } | { "type": "sourceMaintenance", "payload": ReadSourceMaintenanceReply } | { "type": "sourceFileAttachment", "payload": ReadSourceFileAttachmentReply } | { "type": "attachmentSourceFiles", "payload": ReadAttachmentSourceFilesReply } | { "type": "sourceAttachmentSummary", "payload": ReadSourceAttachmentSummaryReply } | { "type": "trackIdentityReviewCandidates", "payload": ReadTrackIdentityReviewCandidatesReply } | { "type": "contents", "payload": ContentsReadReply } | { "type": "searchFilter", "payload": SearchFilterReadReply };
 
 export type ReadNavigationRowsReply = { rows: Array<NavigationRow>, };
 
@@ -228,31 +226,29 @@ export type LoadNavigationRowReply = { row: NavigationRow | null, };
 
 export type LoadNavigationRowByStableKeyReply = { row: NavigationRow | null, };
 
-export type ReadLocalBrowserEntryPointsReply = { status: LocalBrowserEntryPointsReadStatus, entries: Array<LocalBrowserEntryPoint>, failure: LocalBrowserEntryPointFailure | null, };
+export type ReadLocalBrowseEntryPointsReply = { status: LocalBrowseEntryPointsReadStatus, entries: Array<LocalBrowseEntryPoint>, failure: LocalBrowseEntryPointFailure | null, };
 
-export type LocalBrowserEntryPointsReadStatus = "complete" | "partialFailure" | "failed" | "unsupportedPlatform";
+export type LocalBrowseEntryPointsReadStatus = "complete" | "partialFailure" | "failed" | "unsupportedPlatform";
 
-export type LocalBrowserEntryPoint = { identity: LocalBrowserEntryPointIdentity, displayName: string, status: LocalBrowserEntryPointStatus, platform: LocalBrowserEntryPointPlatform, admissionHint: LocalBrowserEntryPointAdmissionHint, affordances: LocalBrowserEntryPointAffordances, failure: LocalBrowserEntryPointFailure | null, };
+export type LocalBrowseEntryPoint = { identity: LocalBrowseEntryPointIdentity, displayName: string, status: LocalBrowseEntryPointStatus, platform: LocalBrowsePlatform, admissionAction: LocalBrowseAdmissionAction | null, availableActions: LocalBrowseAvailableActions, failure: LocalBrowseEntryPointFailure | null, };
 
-export type LocalBrowserEntryPointIdentity = { entryPointKind: LocalBrowserEntryPointKind, canonicalPath: string | null, };
+export type LocalBrowseEntryPointIdentity = { entryPointKind: LocalBrowseEntryPointKind, canonicalPath: string | null, };
 
-export type LocalBrowserEntryPointAffordances = { canBrowse: boolean, canRequestAdmission: boolean, canChooseDescendant: boolean, requiresConfirmation: boolean, };
+export type LocalBrowseAvailableActions = { canBrowse: boolean, canRequestAdmission: boolean, canChooseDescendant: boolean, canRequestParentAdmission: boolean, };
 
-export type LocalBrowserEntryPointFailure = { code: LocalBrowserEntryPointFailureCode, detail: string, };
+export type LocalBrowseEntryPointFailure = { code: LocalBrowseEntryPointFailureCode, detail: string, };
 
-export type ReadLocalBrowserChildrenReply = { status: LocalBrowserChildrenReadStatus, windowIdentity: LocalBrowserChildWindowIdentity, offset: number, limit: number, totalRows: number, rows: Array<LocalBrowserChildRow>, failure: LocalBrowserChildFailure | null, };
+export type ReadLocalBrowseItemsReply = { status: LocalBrowseItemsReadStatus, windowIdentity: LocalBrowseWindowIdentity, offset: number, limit: number, totalItems: number, items: Array<LocalBrowseItem>, failure: LocalBrowseItemFailure | null, };
 
-export type LocalBrowserChildrenReadStatus = "complete" | "partialFailure" | "failed" | "unsupportedPlatform" | "missing" | "permissionBlocked" | "unavailable";
+export type LocalBrowseItemsReadStatus = "complete" | "partialFailure" | "failed" | "unsupportedPlatform" | "missing" | "permissionBlocked" | "unavailable";
 
-export type LocalBrowserChildWindowIdentity = { entryPointKind: LocalBrowserEntryPointKind, rootCanonicalPath: string, parentCanonicalPath: string, };
+export type LocalBrowseWindowIdentity = { entryPointKind: LocalBrowseEntryPointKind, rootCanonicalPath: string, parentCanonicalPath: string, };
 
-export type LocalBrowserChildRow = { identity: LocalBrowserCandidateIdentity, rowKind: LocalBrowserCandidateRowKind, displayName: string, status: LocalBrowserCandidateStatus, platform: LocalBrowserEntryPointPlatform, fileKind: ContentsFileKind | null, mediaRelevance: LocalBrowserCandidateMediaRelevance | null, admissionHint: LocalBrowserCandidateAdmissionHint, affordances: LocalBrowserCandidateAffordances, failure: LocalBrowserChildFailure | null, };
+export type LocalBrowseItem = { identity: LocalBrowseItemIdentity, itemKind: LocalBrowseItemKind, displayName: string, status: LocalBrowseItemStatus, platform: LocalBrowsePlatform, fileKind: ContentsFileKind | null, mediaRelevance: LocalBrowseItemMediaRelevance | null, admissionAction: LocalBrowseAdmissionAction | null, availableActions: LocalBrowseAvailableActions, failure: LocalBrowseItemFailure | null, };
 
-export type LocalBrowserCandidateIdentity = { entryPointKind: LocalBrowserEntryPointKind, rootCanonicalPath: string, candidateCanonicalPath: string, };
+export type LocalBrowseItemIdentity = { entryPointKind: LocalBrowseEntryPointKind, rootCanonicalPath: string, itemCanonicalPath: string, };
 
-export type LocalBrowserCandidateAffordances = { canBrowse: boolean, canRequestAdmission: boolean, canChooseDescendant: boolean, canRequestParentAdmission: boolean, requiresConfirmation: boolean, };
-
-export type LocalBrowserChildFailure = { code: LocalBrowserChildFailureCode, detail: string, };
+export type LocalBrowseItemFailure = { code: LocalBrowseItemFailureCode, detail: string, };
 
 export type ReadLibraryTreeChildrenReply = { window: LibraryTreeWindow | null, };
 

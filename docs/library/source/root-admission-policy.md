@@ -16,10 +16,10 @@ Admission is owned by the service layer. The renderer displays results; it does 
 
 ## Displayable Local Entry Points
 
-A displayable local browser entry point does not imply an admissible source root. Entry points are browse candidates
-until the user selects a path and the service runs this admission policy.
+A displayable local browse entry point does not imply an admissible source root. Entry points are pre-admission browse
+roots until the user selects a path and the service runs this admission policy.
 
-The OS drive can be shown as a local browser entry point while remaining rejected as a source root. Broad roots remain
+The OS drive can be shown as a local browse entry point while remaining rejected as a source root. Broad roots remain
 confirmation-required or rejected according to this policy, regardless of where they appeared in a local entry point
 surface.
 

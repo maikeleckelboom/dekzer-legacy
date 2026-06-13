@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
@@ -15,14 +15,12 @@ use library_store_sqlite::{
     UnregisterLocalRootInput,
 };
 
-use crate::local_browser_children::{
-    LocalBrowserChildReader, production_local_browser_child_reader,
+use crate::local_browse_entry_points::{
+    LocalBrowseEntryPointResolution, LocalBrowseEntryPointResolveFailure,
+    LocalBrowseEntryPointResolver, ResolvedLocalBrowseEntryPoint, normalize_local_browse_path_key,
+    production_local_browse_entry_point_resolver,
 };
-use crate::local_browser_entry_points::{
-    LocalBrowserEntryPointResolution, LocalBrowserEntryPointResolveFailure,
-    LocalBrowserEntryPointResolver, ResolvedLocalBrowserEntryPoint,
-    normalize_local_browser_path_key, production_local_browser_entry_point_resolver,
-};
+use crate::local_browse_items::{LocalBrowseItemReader, production_local_browse_item_reader};
 use crate::search_filter_protocol::{map_search_filter_read_reply, store_search_filter_request};
 use crate::session_events::{LibraryBoundaryEventStream, ScanEventInput};
 use crate::snapshot_read_protocol::{
@@ -89,8 +87,8 @@ impl ScanJobRegistry {
 pub struct LibraryBoundaryService {
     durable_store: SqliteDurableStore,
     session_events: LibraryBoundaryEventStream,
-    local_browser_entry_point_resolver: Arc<dyn LocalBrowserEntryPointResolver>,
-    local_browser_child_reader: Arc<dyn LocalBrowserChildReader>,
+    local_browse_entry_point_resolver: Arc<dyn LocalBrowseEntryPointResolver>,
+    local_browse_item_reader: Arc<dyn LocalBrowseItemReader>,
     scan_registry: Mutex<ScanJobRegistry>,
     source_maintenance: SourceMaintenanceController,
 }
@@ -115,29 +113,29 @@ impl LibraryBoundaryService {
     }
 
     pub fn from_store(durable_store: SqliteDurableStore) -> protocol::ProtocolResult<Self> {
-        Self::from_store_with_local_browser_resolvers(
+        Self::from_store_with_local_browse_resolvers(
             durable_store,
-            production_local_browser_entry_point_resolver(),
-            production_local_browser_child_reader(),
+            production_local_browse_entry_point_resolver(),
+            production_local_browse_item_reader(),
         )
     }
 
     #[cfg(test)]
-    pub(crate) fn from_store_with_local_browser_entry_point_resolver(
+    pub(crate) fn from_store_with_local_browse_entry_point_resolver(
         durable_store: SqliteDurableStore,
-        local_browser_entry_point_resolver: Arc<dyn LocalBrowserEntryPointResolver>,
+        local_browse_entry_point_resolver: Arc<dyn LocalBrowseEntryPointResolver>,
     ) -> protocol::ProtocolResult<Self> {
-        Self::from_store_with_local_browser_resolvers(
+        Self::from_store_with_local_browse_resolvers(
             durable_store,
-            local_browser_entry_point_resolver,
-            production_local_browser_child_reader(),
+            local_browse_entry_point_resolver,
+            production_local_browse_item_reader(),
         )
     }
 
-    pub(crate) fn from_store_with_local_browser_resolvers(
+    pub(crate) fn from_store_with_local_browse_resolvers(
         durable_store: SqliteDurableStore,
-        local_browser_entry_point_resolver: Arc<dyn LocalBrowserEntryPointResolver>,
-        local_browser_child_reader: Arc<dyn LocalBrowserChildReader>,
+        local_browse_entry_point_resolver: Arc<dyn LocalBrowseEntryPointResolver>,
+        local_browse_item_reader: Arc<dyn LocalBrowseItemReader>,
     ) -> protocol::ProtocolResult<Self> {
         let initial_revisions = durable_store
             .read_maintained_read_model_revisions()
@@ -148,8 +146,8 @@ impl LibraryBoundaryService {
         Ok(Self {
             durable_store,
             session_events,
-            local_browser_entry_point_resolver,
-            local_browser_child_reader,
+            local_browse_entry_point_resolver,
+            local_browse_item_reader,
             scan_registry: Mutex::new(ScanJobRegistry::default()),
             source_maintenance: SourceMaintenanceController::new(),
         })
@@ -414,47 +412,60 @@ impl LibraryBoundaryService {
         })
     }
 
-    pub fn read_local_browser_entry_points(
+    pub fn read_local_browse_entry_points(
         &self,
-        _request: protocol::ReadLocalBrowserEntryPointsRequest,
-    ) -> protocol::ProtocolResult<protocol::ReadLocalBrowserEntryPointsReply> {
+        _request: protocol::ReadLocalBrowseEntryPointsRequest,
+    ) -> protocol::ProtocolResult<protocol::ReadLocalBrowseEntryPointsReply> {
         let admitted_source_path_keys = self
             .durable_store
             .read_local_roots()
             .map_err(map_store_error)?
             .roots
             .into_iter()
-            .map(|root| normalize_local_browser_path_key(&root.canonical_path))
+            .map(|root| normalize_local_browse_path_key(&root.canonical_path))
             .collect::<HashSet<_>>();
 
         let resolution = self
-            .local_browser_entry_point_resolver
+            .local_browse_entry_point_resolver
             .resolve_entry_points()
             .map_err(|failure| protocol::ProtocolError::HostFailure {
                 detail: failure.detail,
             })?;
 
-        Ok(map_local_browser_entry_points_reply(
+        Ok(map_local_browse_entry_points_reply(
             resolution,
             &admitted_source_path_keys,
         ))
     }
 
-    pub fn read_local_browser_children(
+    pub fn read_local_browse_items(
         &self,
-        request: protocol::ReadLocalBrowserChildrenRequest,
-    ) -> protocol::ProtocolResult<protocol::ReadLocalBrowserChildrenReply> {
+        request: protocol::ReadLocalBrowseItemsRequest,
+    ) -> protocol::ProtocolResult<protocol::ReadLocalBrowseItemsReply> {
         let admitted_source_path_keys = self
             .durable_store
             .read_local_roots()
             .map_err(map_store_error)?
             .roots
             .into_iter()
-            .map(|root| normalize_local_browser_path_key(&root.canonical_path))
+            .map(|root| normalize_local_browse_path_key(&root.canonical_path))
             .collect::<HashSet<_>>();
 
-        self.local_browser_child_reader
-            .read_children(request, &admitted_source_path_keys)
+        let resolution = self
+            .local_browse_entry_point_resolver
+            .resolve_entry_points()
+            .map_err(|failure| protocol::ProtocolError::HostFailure {
+                detail: failure.detail,
+            })?;
+
+        if !local_browse_platform_unsupported(&resolution.entries)
+            && !local_browse_root_identity_matches(&resolution.entries, &request)
+        {
+            return Ok(local_browse_root_identity_failure_reply(&request));
+        }
+
+        self.local_browse_item_reader
+            .read_items(request, &admitted_source_path_keys)
     }
 
     pub fn read_navigation_rows(
@@ -888,12 +899,12 @@ impl LibraryBoundaryService {
             protocol::SnapshotReadCommand::LoadNavigationRowByStableKey(request) => self
                 .load_navigation_row_by_stable_key(request)
                 .map(protocol::SnapshotReadReply::NavigationRowByStableKey),
-            protocol::SnapshotReadCommand::ReadLocalBrowserEntryPoints(request) => self
-                .read_local_browser_entry_points(request)
-                .map(protocol::SnapshotReadReply::LocalBrowserEntryPoints),
-            protocol::SnapshotReadCommand::ReadLocalBrowserChildren(request) => self
-                .read_local_browser_children(request)
-                .map(protocol::SnapshotReadReply::LocalBrowserChildren),
+            protocol::SnapshotReadCommand::ReadLocalBrowseEntryPoints(request) => self
+                .read_local_browse_entry_points(request)
+                .map(protocol::SnapshotReadReply::LocalBrowseEntryPoints),
+            protocol::SnapshotReadCommand::ReadLocalBrowseItems(request) => self
+                .read_local_browse_items(request)
+                .map(protocol::SnapshotReadReply::LocalBrowseItems),
             protocol::SnapshotReadCommand::ReadLibraryTreeChildren(request) => self
                 .read_library_tree_children(request)
                 .map(protocol::SnapshotReadReply::LibraryTreeChildren),
@@ -941,67 +952,67 @@ impl LibraryBoundaryService {
     }
 }
 
-fn map_local_browser_entry_points_reply(
-    resolution: LocalBrowserEntryPointResolution,
+fn map_local_browse_entry_points_reply(
+    resolution: LocalBrowseEntryPointResolution,
     admitted_source_path_keys: &HashSet<String>,
-) -> protocol::ReadLocalBrowserEntryPointsReply {
+) -> protocol::ReadLocalBrowseEntryPointsReply {
     let entries = resolution
         .entries
         .into_iter()
-        .map(|entry| map_local_browser_entry_point(entry, admitted_source_path_keys))
+        .map(|entry| map_local_browse_entry_point(entry, admitted_source_path_keys))
         .collect::<Vec<_>>();
-    let status = local_browser_entry_points_read_status(&entries, resolution.failure.as_ref());
-    protocol::ReadLocalBrowserEntryPointsReply {
+    let status = local_browse_entry_points_read_status(&entries, resolution.failure.as_ref());
+    protocol::ReadLocalBrowseEntryPointsReply {
         status,
         entries,
-        failure: resolution
-            .failure
-            .map(map_local_browser_entry_point_failure),
+        failure: resolution.failure.map(map_local_browse_entry_point_failure),
     }
 }
 
-fn local_browser_entry_points_read_status(
-    entries: &[protocol::LocalBrowserEntryPoint],
-    failure: Option<&LocalBrowserEntryPointResolveFailure>,
-) -> protocol::LocalBrowserEntryPointsReadStatus {
+fn local_browse_entry_points_read_status(
+    entries: &[protocol::LocalBrowseEntryPoint],
+    failure: Option<&LocalBrowseEntryPointResolveFailure>,
+) -> protocol::LocalBrowseEntryPointsReadStatus {
     if entries.is_empty() && failure.is_some() {
-        return protocol::LocalBrowserEntryPointsReadStatus::Failed;
+        return protocol::LocalBrowseEntryPointsReadStatus::Failed;
     }
 
     if !entries.is_empty()
-        && entries.iter().all(|entry| {
-            entry.status == protocol::LocalBrowserEntryPointStatus::UnsupportedPlatform
-        })
+        && entries
+            .iter()
+            .all(|entry| entry.status == protocol::LocalBrowseEntryPointStatus::UnsupportedPlatform)
     {
-        return protocol::LocalBrowserEntryPointsReadStatus::UnsupportedPlatform;
+        return protocol::LocalBrowseEntryPointsReadStatus::UnsupportedPlatform;
     }
 
     if failure.is_some() {
-        return protocol::LocalBrowserEntryPointsReadStatus::PartialFailure;
+        return protocol::LocalBrowseEntryPointsReadStatus::PartialFailure;
     }
 
-    protocol::LocalBrowserEntryPointsReadStatus::Complete
+    protocol::LocalBrowseEntryPointsReadStatus::Complete
 }
 
-fn map_local_browser_entry_point(
-    entry: ResolvedLocalBrowserEntryPoint,
+fn map_local_browse_entry_point(
+    entry: ResolvedLocalBrowseEntryPoint,
     admitted_source_path_keys: &HashSet<String>,
-) -> protocol::LocalBrowserEntryPoint {
+) -> protocol::LocalBrowseEntryPoint {
     let duplicate_of_admitted_source = entry
         .canonical_path
         .as_deref()
-        .map(normalize_local_browser_path_key)
+        .map(normalize_local_browse_path_key)
         .is_some_and(|key| admitted_source_path_keys.contains(&key));
     let status = if duplicate_of_admitted_source {
-        protocol::LocalBrowserEntryPointStatus::DuplicateOfAdmittedSource
+        protocol::LocalBrowseEntryPointStatus::DuplicateOfAdmittedSource
     } else {
         entry.status
     };
-    let admission_hint = local_browser_entry_point_admission_hint(entry.entry_point_kind, status);
-    let affordances = local_browser_entry_point_affordances(entry.entry_point_kind, status);
+    let admission_action =
+        local_browse_entry_point_admission_action(entry.entry_point_kind, status);
+    let available_actions =
+        local_browse_entry_point_available_actions(entry.entry_point_kind, status);
 
-    protocol::LocalBrowserEntryPoint {
-        identity: protocol::LocalBrowserEntryPointIdentity {
+    protocol::LocalBrowseEntryPoint {
+        identity: protocol::LocalBrowseEntryPointIdentity {
             entry_point_kind: entry.entry_point_kind,
             canonical_path: entry
                 .canonical_path
@@ -1010,73 +1021,107 @@ fn map_local_browser_entry_point(
         display_name: entry.display_name,
         status,
         platform: entry.platform,
-        admission_hint,
-        affordances,
-        failure: entry.failure.map(map_local_browser_entry_point_failure),
+        admission_action,
+        available_actions,
+        failure: entry.failure.map(map_local_browse_entry_point_failure),
     }
 }
 
-fn local_browser_entry_point_admission_hint(
-    kind: protocol::LocalBrowserEntryPointKind,
-    status: protocol::LocalBrowserEntryPointStatus,
-) -> protocol::LocalBrowserEntryPointAdmissionHint {
+fn local_browse_entry_point_admission_action(
+    kind: protocol::LocalBrowseEntryPointKind,
+    status: protocol::LocalBrowseEntryPointStatus,
+) -> Option<protocol::LocalBrowseAdmissionAction> {
     match status {
-        protocol::LocalBrowserEntryPointStatus::DuplicateOfAdmittedSource => {
-            protocol::LocalBrowserEntryPointAdmissionHint::DuplicateOfAdmittedSource
-        }
-        protocol::LocalBrowserEntryPointStatus::UnsupportedPlatform => {
-            protocol::LocalBrowserEntryPointAdmissionHint::UnsupportedPlatform
-        }
-        protocol::LocalBrowserEntryPointStatus::Available
-        | protocol::LocalBrowserEntryPointStatus::Resolving => match kind {
-            protocol::LocalBrowserEntryPointKind::SystemDriveRoot => {
-                protocol::LocalBrowserEntryPointAdmissionHint::NotDirectlyAdmissible
+        protocol::LocalBrowseEntryPointStatus::DuplicateOfAdmittedSource
+        | protocol::LocalBrowseEntryPointStatus::UnsupportedPlatform => None,
+        protocol::LocalBrowseEntryPointStatus::Available
+        | protocol::LocalBrowseEntryPointStatus::Resolving => match kind {
+            protocol::LocalBrowseEntryPointKind::SystemDriveRoot => None,
+            protocol::LocalBrowseEntryPointKind::Music => {
+                Some(protocol::LocalBrowseAdmissionAction::RequestDefaultMusicFolderAdmission)
             }
-            protocol::LocalBrowserEntryPointKind::Music => {
-                protocol::LocalBrowserEntryPointAdmissionHint::DefaultMusicFolder
-            }
-            protocol::LocalBrowserEntryPointKind::LocalDataVolumeRoot
-            | protocol::LocalBrowserEntryPointKind::RemovableVolumeRoot
-            | protocol::LocalBrowserEntryPointKind::UserHome
-            | protocol::LocalBrowserEntryPointKind::Desktop
-            | protocol::LocalBrowserEntryPointKind::Downloads => {
-                protocol::LocalBrowserEntryPointAdmissionHint::RequiresConfirmation
+            protocol::LocalBrowseEntryPointKind::LocalDataVolumeRoot
+            | protocol::LocalBrowseEntryPointKind::RemovableVolumeRoot
+            | protocol::LocalBrowseEntryPointKind::UserHome
+            | protocol::LocalBrowseEntryPointKind::Desktop
+            | protocol::LocalBrowseEntryPointKind::Downloads => {
+                Some(protocol::LocalBrowseAdmissionAction::RequestAdmission)
             }
         },
-        protocol::LocalBrowserEntryPointStatus::Unavailable
-        | protocol::LocalBrowserEntryPointStatus::PermissionBlocked
-        | protocol::LocalBrowserEntryPointStatus::Missing => {
-            protocol::LocalBrowserEntryPointAdmissionHint::Unavailable
-        }
+        protocol::LocalBrowseEntryPointStatus::Unavailable
+        | protocol::LocalBrowseEntryPointStatus::PermissionBlocked
+        | protocol::LocalBrowseEntryPointStatus::Missing => None,
     }
 }
 
-fn local_browser_entry_point_affordances(
-    kind: protocol::LocalBrowserEntryPointKind,
-    status: protocol::LocalBrowserEntryPointStatus,
-) -> protocol::LocalBrowserEntryPointAffordances {
+fn local_browse_entry_point_available_actions(
+    kind: protocol::LocalBrowseEntryPointKind,
+    status: protocol::LocalBrowseEntryPointStatus,
+) -> protocol::LocalBrowseAvailableActions {
     let can_browse = matches!(
         status,
-        protocol::LocalBrowserEntryPointStatus::Available
-            | protocol::LocalBrowserEntryPointStatus::DuplicateOfAdmittedSource
+        protocol::LocalBrowseEntryPointStatus::Available
+            | protocol::LocalBrowseEntryPointStatus::DuplicateOfAdmittedSource
     );
-    let can_request_admission = matches!(status, protocol::LocalBrowserEntryPointStatus::Available)
-        && kind != protocol::LocalBrowserEntryPointKind::SystemDriveRoot;
-    let requires_confirmation =
-        can_request_admission && kind != protocol::LocalBrowserEntryPointKind::Music;
+    let can_request_admission = matches!(status, protocol::LocalBrowseEntryPointStatus::Available)
+        && kind != protocol::LocalBrowseEntryPointKind::SystemDriveRoot;
 
-    protocol::LocalBrowserEntryPointAffordances {
+    protocol::LocalBrowseAvailableActions {
         can_browse,
         can_request_admission,
         can_choose_descendant: can_browse,
-        requires_confirmation,
+        can_request_parent_admission: false,
     }
 }
 
-fn map_local_browser_entry_point_failure(
-    failure: LocalBrowserEntryPointResolveFailure,
-) -> protocol::LocalBrowserEntryPointFailure {
-    protocol::LocalBrowserEntryPointFailure {
+fn local_browse_platform_unsupported(entries: &[ResolvedLocalBrowseEntryPoint]) -> bool {
+    !entries.is_empty()
+        && entries
+            .iter()
+            .all(|entry| entry.status == protocol::LocalBrowseEntryPointStatus::UnsupportedPlatform)
+}
+
+fn local_browse_root_identity_matches(
+    entries: &[ResolvedLocalBrowseEntryPoint],
+    request: &protocol::ReadLocalBrowseItemsRequest,
+) -> bool {
+    let requested_root_key =
+        normalize_local_browse_path_key(Path::new(&request.root_canonical_path));
+    entries.iter().any(|entry| {
+        entry.entry_point_kind == request.entry_point_kind
+            && entry
+                .canonical_path
+                .as_deref()
+                .map(normalize_local_browse_path_key)
+                .is_some_and(|entry_root_key| entry_root_key == requested_root_key)
+    })
+}
+
+fn local_browse_root_identity_failure_reply(
+    request: &protocol::ReadLocalBrowseItemsRequest,
+) -> protocol::ReadLocalBrowseItemsReply {
+    protocol::ReadLocalBrowseItemsReply {
+        status: protocol::LocalBrowseItemsReadStatus::Failed,
+        window_identity: protocol::LocalBrowseWindowIdentity {
+            entry_point_kind: request.entry_point_kind,
+            root_canonical_path: request.root_canonical_path.clone(),
+            parent_canonical_path: request.parent_canonical_path.clone(),
+        },
+        offset: request.offset,
+        limit: request.limit,
+        total_items: 0,
+        items: Vec::new(),
+        failure: Some(protocol::LocalBrowseItemFailure {
+            code: protocol::LocalBrowseItemFailureCode::RootIdentityMismatch,
+            detail: "entryPointKind and rootCanonicalPath do not match a current local browse entry point".to_string(),
+        }),
+    }
+}
+
+fn map_local_browse_entry_point_failure(
+    failure: LocalBrowseEntryPointResolveFailure,
+) -> protocol::LocalBrowseEntryPointFailure {
+    protocol::LocalBrowseEntryPointFailure {
         code: failure.code,
         detail: failure.detail,
     }

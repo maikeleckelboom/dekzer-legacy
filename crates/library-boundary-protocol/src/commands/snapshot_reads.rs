@@ -8,8 +8,10 @@ use super::{
 #[derive(
     Debug,
     Clone,
+    Copy,
     PartialEq,
     Eq,
+    Hash,
     serde::Serialize,
     serde::Deserialize,
     schemars::JsonSchema,
@@ -119,7 +121,7 @@ pub struct LoadNavigationRowByStableKeyReply {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct ReadLocalBrowserEntryPointsRequest;
+pub struct ReadLocalBrowseEntryPointsRequest;
 
 #[derive(
     Debug,
@@ -133,19 +135,17 @@ pub struct ReadLocalBrowserEntryPointsRequest;
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct ReadLocalBrowserEntryPointsReply {
-    pub status: LocalBrowserEntryPointsReadStatus,
-    pub entries: Vec<LocalBrowserEntryPoint>,
-    pub failure: Option<LocalBrowserEntryPointFailure>,
+pub struct ReadLocalBrowseEntryPointsReply {
+    pub status: LocalBrowseEntryPointsReadStatus,
+    pub entries: Vec<LocalBrowseEntryPoint>,
+    pub failure: Option<LocalBrowseEntryPointFailure>,
 }
 
 #[derive(
     Debug,
     Clone,
-    Copy,
     PartialEq,
     Eq,
-    Hash,
     serde::Serialize,
     serde::Deserialize,
     schemars::JsonSchema,
@@ -153,7 +153,7 @@ pub struct ReadLocalBrowserEntryPointsReply {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub enum LocalBrowserEntryPointsReadStatus {
+pub enum LocalBrowseEntryPointsReadStatus {
     Complete,
     PartialFailure,
     Failed,
@@ -172,14 +172,14 @@ pub enum LocalBrowserEntryPointsReadStatus {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct LocalBrowserEntryPoint {
-    pub identity: LocalBrowserEntryPointIdentity,
+pub struct LocalBrowseEntryPoint {
+    pub identity: LocalBrowseEntryPointIdentity,
     pub display_name: String,
-    pub status: LocalBrowserEntryPointStatus,
-    pub platform: LocalBrowserEntryPointPlatform,
-    pub admission_hint: LocalBrowserEntryPointAdmissionHint,
-    pub affordances: LocalBrowserEntryPointAffordances,
-    pub failure: Option<LocalBrowserEntryPointFailure>,
+    pub status: LocalBrowseEntryPointStatus,
+    pub platform: LocalBrowsePlatform,
+    pub admission_action: Option<LocalBrowseAdmissionAction>,
+    pub available_actions: LocalBrowseAvailableActions,
+    pub failure: Option<LocalBrowseEntryPointFailure>,
 }
 
 #[derive(
@@ -194,8 +194,8 @@ pub struct LocalBrowserEntryPoint {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct LocalBrowserEntryPointIdentity {
-    pub entry_point_kind: LocalBrowserEntryPointKind,
+pub struct LocalBrowseEntryPointIdentity {
+    pub entry_point_kind: LocalBrowseEntryPointKind,
     pub canonical_path: Option<String>,
 }
 
@@ -213,7 +213,7 @@ pub struct LocalBrowserEntryPointIdentity {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub enum LocalBrowserEntryPointKind {
+pub enum LocalBrowseEntryPointKind {
     SystemDriveRoot,
     LocalDataVolumeRoot,
     RemovableVolumeRoot,
@@ -237,7 +237,7 @@ pub enum LocalBrowserEntryPointKind {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub enum LocalBrowserEntryPointStatus {
+pub enum LocalBrowseEntryPointStatus {
     Resolving,
     Available,
     Unavailable,
@@ -261,7 +261,7 @@ pub enum LocalBrowserEntryPointStatus {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub enum LocalBrowserEntryPointPlatform {
+pub enum LocalBrowsePlatform {
     Windows,
     Macos,
     Linux,
@@ -282,13 +282,10 @@ pub enum LocalBrowserEntryPointPlatform {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub enum LocalBrowserEntryPointAdmissionHint {
-    NotDirectlyAdmissible,
-    RequiresConfirmation,
-    DefaultMusicFolder,
-    DuplicateOfAdmittedSource,
-    Unavailable,
-    UnsupportedPlatform,
+pub enum LocalBrowseAdmissionAction {
+    RequestAdmission,
+    RequestDefaultMusicFolderAdmission,
+    RequestParentAdmission,
 }
 
 #[derive(
@@ -304,11 +301,11 @@ pub enum LocalBrowserEntryPointAdmissionHint {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct LocalBrowserEntryPointAffordances {
+pub struct LocalBrowseAvailableActions {
     pub can_browse: bool,
     pub can_request_admission: bool,
     pub can_choose_descendant: bool,
-    pub requires_confirmation: bool,
+    pub can_request_parent_admission: bool,
 }
 
 #[derive(
@@ -323,8 +320,8 @@ pub struct LocalBrowserEntryPointAffordances {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct LocalBrowserEntryPointFailure {
-    pub code: LocalBrowserEntryPointFailureCode,
+pub struct LocalBrowseEntryPointFailure {
+    pub code: LocalBrowseEntryPointFailureCode,
     pub detail: String,
 }
 
@@ -342,7 +339,7 @@ pub struct LocalBrowserEntryPointFailure {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub enum LocalBrowserEntryPointFailureCode {
+pub enum LocalBrowseEntryPointFailureCode {
     UnsupportedPlatform,
     KnownFolderUnavailable,
     SystemDriveUnavailable,
@@ -362,8 +359,8 @@ pub enum LocalBrowserEntryPointFailureCode {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct ReadLocalBrowserChildrenRequest {
-    pub entry_point_kind: LocalBrowserEntryPointKind,
+pub struct ReadLocalBrowseItemsRequest {
+    pub entry_point_kind: LocalBrowseEntryPointKind,
     pub root_canonical_path: String,
     pub parent_canonical_path: String,
     pub offset: usize,
@@ -382,14 +379,14 @@ pub struct ReadLocalBrowserChildrenRequest {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct ReadLocalBrowserChildrenReply {
-    pub status: LocalBrowserChildrenReadStatus,
-    pub window_identity: LocalBrowserChildWindowIdentity,
+pub struct ReadLocalBrowseItemsReply {
+    pub status: LocalBrowseItemsReadStatus,
+    pub window_identity: LocalBrowseWindowIdentity,
     pub offset: usize,
     pub limit: usize,
-    pub total_rows: usize,
-    pub rows: Vec<LocalBrowserChildRow>,
-    pub failure: Option<LocalBrowserChildFailure>,
+    pub total_items: usize,
+    pub items: Vec<LocalBrowseItem>,
+    pub failure: Option<LocalBrowseItemFailure>,
 }
 
 #[derive(
@@ -406,7 +403,7 @@ pub struct ReadLocalBrowserChildrenReply {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub enum LocalBrowserChildrenReadStatus {
+pub enum LocalBrowseItemsReadStatus {
     Complete,
     PartialFailure,
     Failed,
@@ -428,8 +425,8 @@ pub enum LocalBrowserChildrenReadStatus {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct LocalBrowserChildWindowIdentity {
-    pub entry_point_kind: LocalBrowserEntryPointKind,
+pub struct LocalBrowseWindowIdentity {
+    pub entry_point_kind: LocalBrowseEntryPointKind,
     pub root_canonical_path: String,
     pub parent_canonical_path: String,
 }
@@ -446,17 +443,17 @@ pub struct LocalBrowserChildWindowIdentity {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct LocalBrowserChildRow {
-    pub identity: LocalBrowserCandidateIdentity,
-    pub row_kind: LocalBrowserCandidateRowKind,
+pub struct LocalBrowseItem {
+    pub identity: LocalBrowseItemIdentity,
+    pub item_kind: LocalBrowseItemKind,
     pub display_name: String,
-    pub status: LocalBrowserCandidateStatus,
-    pub platform: LocalBrowserEntryPointPlatform,
+    pub status: LocalBrowseItemStatus,
+    pub platform: LocalBrowsePlatform,
     pub file_kind: Option<ContentsFileKind>,
-    pub media_relevance: Option<LocalBrowserCandidateMediaRelevance>,
-    pub admission_hint: LocalBrowserCandidateAdmissionHint,
-    pub affordances: LocalBrowserCandidateAffordances,
-    pub failure: Option<LocalBrowserChildFailure>,
+    pub media_relevance: Option<LocalBrowseItemMediaRelevance>,
+    pub admission_action: Option<LocalBrowseAdmissionAction>,
+    pub available_actions: LocalBrowseAvailableActions,
+    pub failure: Option<LocalBrowseItemFailure>,
 }
 
 #[derive(
@@ -471,10 +468,10 @@ pub struct LocalBrowserChildRow {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct LocalBrowserCandidateIdentity {
-    pub entry_point_kind: LocalBrowserEntryPointKind,
+pub struct LocalBrowseItemIdentity {
+    pub entry_point_kind: LocalBrowseEntryPointKind,
     pub root_canonical_path: String,
-    pub candidate_canonical_path: String,
+    pub item_canonical_path: String,
 }
 
 #[derive(
@@ -491,13 +488,13 @@ pub struct LocalBrowserCandidateIdentity {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub enum LocalBrowserCandidateRowKind {
-    DirectoryCandidate,
-    MediaFileCandidate,
-    UnsupportedFileCandidate,
-    RejectedRootCandidate,
-    InaccessibleCandidate,
-    UnknownCandidate,
+pub enum LocalBrowseItemKind {
+    Directory,
+    MediaFile,
+    UnsupportedFile,
+    RejectedRoot,
+    Inaccessible,
+    Unknown,
 }
 
 #[derive(
@@ -514,7 +511,7 @@ pub enum LocalBrowserCandidateRowKind {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub enum LocalBrowserCandidateStatus {
+pub enum LocalBrowseItemStatus {
     Available,
     Unavailable,
     PermissionBlocked,
@@ -539,7 +536,7 @@ pub enum LocalBrowserCandidateStatus {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub enum LocalBrowserCandidateMediaRelevance {
+pub enum LocalBrowseItemMediaRelevance {
     MediaRelevant,
     CompanionMetadata,
     Unsupported,
@@ -549,32 +546,6 @@ pub enum LocalBrowserCandidateMediaRelevance {
 #[derive(
     Debug,
     Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    Hash,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
-    ts_rs::TS,
-)]
-#[serde(rename_all = "camelCase")]
-#[ts(rename_all = "camelCase")]
-pub enum LocalBrowserCandidateAdmissionHint {
-    CanRequestAdmission,
-    RequiresConfirmation,
-    ChooseParentDirectory,
-    NotDirectlyAdmissible,
-    DuplicateOfAdmittedSource,
-    Unavailable,
-    UnsupportedPlatform,
-    Rejected,
-}
-
-#[derive(
-    Debug,
-    Clone,
-    Copy,
     PartialEq,
     Eq,
     serde::Serialize,
@@ -584,28 +555,8 @@ pub enum LocalBrowserCandidateAdmissionHint {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct LocalBrowserCandidateAffordances {
-    pub can_browse: bool,
-    pub can_request_admission: bool,
-    pub can_choose_descendant: bool,
-    pub can_request_parent_admission: bool,
-    pub requires_confirmation: bool,
-}
-
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    Eq,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
-    ts_rs::TS,
-)]
-#[serde(rename_all = "camelCase")]
-#[ts(rename_all = "camelCase")]
-pub struct LocalBrowserChildFailure {
-    pub code: LocalBrowserChildFailureCode,
+pub struct LocalBrowseItemFailure {
+    pub code: LocalBrowseItemFailureCode,
     pub detail: String,
 }
 
@@ -623,8 +574,9 @@ pub struct LocalBrowserChildFailure {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub enum LocalBrowserChildFailureCode {
+pub enum LocalBrowseItemFailureCode {
     UnsupportedPlatform,
+    RootIdentityMismatch,
     RootPathUnavailable,
     ParentPathUnavailable,
     ParentMissing,
@@ -2485,8 +2437,8 @@ pub enum SnapshotReadCommand {
     ReadNavigationRows(ReadNavigationRowsRequest),
     LoadNavigationRow(LoadNavigationRowRequest),
     LoadNavigationRowByStableKey(LoadNavigationRowByStableKeyRequest),
-    ReadLocalBrowserEntryPoints(ReadLocalBrowserEntryPointsRequest),
-    ReadLocalBrowserChildren(ReadLocalBrowserChildrenRequest),
+    ReadLocalBrowseEntryPoints(ReadLocalBrowseEntryPointsRequest),
+    ReadLocalBrowseItems(ReadLocalBrowseItemsRequest),
     ReadLibraryTreeChildren(ReadLibraryTreeChildrenRequest),
     ReadSourceLifecycle(ReadSourceLifecycleRequest),
     ReadSourceIntegrity(ReadSourceIntegrityRequest),
@@ -2508,8 +2460,8 @@ pub enum SnapshotReadReply {
     NavigationRows(ReadNavigationRowsReply),
     NavigationRow(LoadNavigationRowReply),
     NavigationRowByStableKey(LoadNavigationRowByStableKeyReply),
-    LocalBrowserEntryPoints(ReadLocalBrowserEntryPointsReply),
-    LocalBrowserChildren(ReadLocalBrowserChildrenReply),
+    LocalBrowseEntryPoints(ReadLocalBrowseEntryPointsReply),
+    LocalBrowseItems(ReadLocalBrowseItemsReply),
     LibraryTreeChildren(ReadLibraryTreeChildrenReply),
     SourceLifecycle(ReadSourceLifecycleReply),
     SourceIntegrity(Box<ReadSourceIntegrityReply>),
@@ -2532,27 +2484,25 @@ mod tests {
         DirectoryScanState, LibraryTreeCoverage, LibraryTreeCoverageState, LibraryTreeEntryPoint,
         LibraryTreeFileClass, LibraryTreeNode, LibraryTreeNodeKind, LibraryTreePresenceState,
         LibraryTreeWindow, LoadNavigationRowByStableKeyRequest, LoadNavigationRowRequest,
-        LocalBrowserCandidateAdmissionHint, LocalBrowserCandidateAffordances,
-        LocalBrowserCandidateIdentity, LocalBrowserCandidateMediaRelevance,
-        LocalBrowserCandidateRowKind, LocalBrowserCandidateStatus, LocalBrowserChildFailure,
-        LocalBrowserChildFailureCode, LocalBrowserChildRow, LocalBrowserChildWindowIdentity,
-        LocalBrowserChildrenReadStatus, LocalBrowserEntryPoint,
-        LocalBrowserEntryPointAdmissionHint, LocalBrowserEntryPointAffordances,
-        LocalBrowserEntryPointFailure, LocalBrowserEntryPointFailureCode,
-        LocalBrowserEntryPointIdentity, LocalBrowserEntryPointKind, LocalBrowserEntryPointPlatform,
-        LocalBrowserEntryPointStatus, LocalBrowserEntryPointsReadStatus, NavigableChildScopeState,
-        NavigationRow, NavigationRowFamily, NavigationRowKind, NavigationRowSelectorKind,
-        PrimaryMediaKind, ReadAttachmentSourceFilesReply, ReadAttachmentSourceFilesRequest,
+        LocalBrowseAdmissionAction, LocalBrowseAvailableActions, LocalBrowseEntryPoint,
+        LocalBrowseEntryPointFailure, LocalBrowseEntryPointFailureCode,
+        LocalBrowseEntryPointIdentity, LocalBrowseEntryPointKind, LocalBrowseEntryPointStatus,
+        LocalBrowseEntryPointsReadStatus, LocalBrowseItem, LocalBrowseItemFailure,
+        LocalBrowseItemFailureCode, LocalBrowseItemIdentity, LocalBrowseItemKind,
+        LocalBrowseItemMediaRelevance, LocalBrowseItemStatus, LocalBrowseItemsReadStatus,
+        LocalBrowsePlatform, LocalBrowseWindowIdentity, NavigableChildScopeState, NavigationRow,
+        NavigationRowFamily, NavigationRowKind, NavigationRowSelectorKind, PrimaryMediaKind,
+        ReadAttachmentSourceFilesReply, ReadAttachmentSourceFilesRequest,
         ReadLibraryTreeChildrenReply, ReadLibraryTreeChildrenRequest,
-        ReadLocalBrowserChildrenReply, ReadLocalBrowserChildrenRequest,
-        ReadLocalBrowserEntryPointsReply, ReadLocalBrowserEntryPointsRequest,
-        ReadNavigationRowsRequest, ReadSourceAttachmentSummaryReply,
-        ReadSourceAttachmentSummaryRequest, ReadSourceFileAttachmentReply,
-        ReadSourceFileAttachmentRequest, ReadSourceIntegrityReply, ReadSourceLifecycleReply,
-        ReadSourceLifecycleRequest, ReadTrackIdentityReviewCandidatesReply,
-        ReadTrackIdentityReviewCandidatesRequest, SearchFilterFileClass, SnapshotReadCommand,
-        SnapshotReadReply, SourceAccessState, SourceAttachmentSummary, SourceClass,
-        SourceFileAttachmentLink, SourceFileAttachmentLinkStatus, SourceIntegrityAvailability,
+        ReadLocalBrowseEntryPointsReply, ReadLocalBrowseEntryPointsRequest,
+        ReadLocalBrowseItemsReply, ReadLocalBrowseItemsRequest, ReadNavigationRowsRequest,
+        ReadSourceAttachmentSummaryReply, ReadSourceAttachmentSummaryRequest,
+        ReadSourceFileAttachmentReply, ReadSourceFileAttachmentRequest, ReadSourceIntegrityReply,
+        ReadSourceLifecycleReply, ReadSourceLifecycleRequest,
+        ReadTrackIdentityReviewCandidatesReply, ReadTrackIdentityReviewCandidatesRequest,
+        SearchFilterFileClass, SnapshotReadCommand, SnapshotReadReply, SourceAccessState,
+        SourceAttachmentSummary, SourceClass, SourceFileAttachmentLink,
+        SourceFileAttachmentLinkStatus, SourceIntegrityAvailability,
         SourceIntegrityAvailabilityState, SourceIntegrityCoverage,
         SourceIntegrityEvidenceAndMaintenance, SourceIntegrityRuntimeMaintenance,
         SourceIntegrityRuntimeMaintenanceState, SourceLifecycle, SourceLifecycleIssueKind,
@@ -2571,15 +2521,14 @@ mod tests {
             parent_navigation_row_id: Some(7),
         });
         let entry_points =
-            SnapshotReadCommand::ReadLocalBrowserEntryPoints(ReadLocalBrowserEntryPointsRequest);
-        let local_children =
-            SnapshotReadCommand::ReadLocalBrowserChildren(ReadLocalBrowserChildrenRequest {
-                entry_point_kind: LocalBrowserEntryPointKind::Music,
-                root_canonical_path: "C:\\Users\\DJ\\Music".to_string(),
-                parent_canonical_path: "C:\\Users\\DJ\\Music\\Albums".to_string(),
-                offset: 5,
-                limit: 25,
-            });
+            SnapshotReadCommand::ReadLocalBrowseEntryPoints(ReadLocalBrowseEntryPointsRequest);
+        let local_items = SnapshotReadCommand::ReadLocalBrowseItems(ReadLocalBrowseItemsRequest {
+            entry_point_kind: LocalBrowseEntryPointKind::Music,
+            root_canonical_path: "C:\\Users\\DJ\\Music".to_string(),
+            parent_canonical_path: "C:\\Users\\DJ\\Music\\Albums".to_string(),
+            offset: 5,
+            limit: 25,
+        });
         let library_tree =
             SnapshotReadCommand::ReadLibraryTreeChildren(ReadLibraryTreeChildrenRequest {
                 entry_point: LibraryTreeEntryPoint::Source { source_id: 7 },
@@ -2596,12 +2545,12 @@ mod tests {
         ));
         assert!(matches!(
             entry_points,
-            SnapshotReadCommand::ReadLocalBrowserEntryPoints(ReadLocalBrowserEntryPointsRequest)
+            SnapshotReadCommand::ReadLocalBrowseEntryPoints(ReadLocalBrowseEntryPointsRequest)
         ));
         assert!(matches!(
-            local_children,
-            SnapshotReadCommand::ReadLocalBrowserChildren(ReadLocalBrowserChildrenRequest {
-                entry_point_kind: LocalBrowserEntryPointKind::Music,
+            local_items,
+            SnapshotReadCommand::ReadLocalBrowseItems(ReadLocalBrowseItemsRequest {
+                entry_point_kind: LocalBrowseEntryPointKind::Music,
                 ref root_canonical_path,
                 ref parent_canonical_path,
                 offset: 5,
@@ -2621,14 +2570,14 @@ mod tests {
     }
 
     #[test]
-    fn local_browser_entry_points_serialize_candidate_boundary_shape() {
+    fn local_browse_entry_points_serialize_boundary_shape() {
         let command =
-            SnapshotReadCommand::ReadLocalBrowserEntryPoints(ReadLocalBrowserEntryPointsRequest);
+            SnapshotReadCommand::ReadLocalBrowseEntryPoints(ReadLocalBrowseEntryPointsRequest);
         let command_json = serde_json::to_value(&command).expect("serialize command");
         assert_eq!(
             command_json,
             json!({
-                "type": "readLocalBrowserEntryPoints",
+                "type": "readLocalBrowseEntryPoints",
                 "payload": null
             })
         );
@@ -2638,27 +2587,29 @@ mod tests {
             command
         );
 
-        let reply = SnapshotReadReply::LocalBrowserEntryPoints(ReadLocalBrowserEntryPointsReply {
-            status: LocalBrowserEntryPointsReadStatus::Complete,
-            entries: vec![LocalBrowserEntryPoint {
-                identity: LocalBrowserEntryPointIdentity {
-                    entry_point_kind: LocalBrowserEntryPointKind::Music,
+        let reply = SnapshotReadReply::LocalBrowseEntryPoints(ReadLocalBrowseEntryPointsReply {
+            status: LocalBrowseEntryPointsReadStatus::Complete,
+            entries: vec![LocalBrowseEntryPoint {
+                identity: LocalBrowseEntryPointIdentity {
+                    entry_point_kind: LocalBrowseEntryPointKind::Music,
                     canonical_path: Some("C:\\Users\\DJ\\Music".to_string()),
                 },
                 display_name: "Music".to_string(),
-                status: LocalBrowserEntryPointStatus::Available,
-                platform: LocalBrowserEntryPointPlatform::Windows,
-                admission_hint: LocalBrowserEntryPointAdmissionHint::DefaultMusicFolder,
-                affordances: LocalBrowserEntryPointAffordances {
+                status: LocalBrowseEntryPointStatus::Available,
+                platform: LocalBrowsePlatform::Windows,
+                admission_action: Some(
+                    LocalBrowseAdmissionAction::RequestDefaultMusicFolderAdmission,
+                ),
+                available_actions: LocalBrowseAvailableActions {
                     can_browse: true,
                     can_request_admission: true,
                     can_choose_descendant: true,
-                    requires_confirmation: false,
+                    can_request_parent_admission: false,
                 },
                 failure: None,
             }],
-            failure: Some(LocalBrowserEntryPointFailure {
-                code: LocalBrowserEntryPointFailureCode::VolumeEnumerationUnavailable,
+            failure: Some(LocalBrowseEntryPointFailure {
+                code: LocalBrowseEntryPointFailureCode::VolumeEnumerationUnavailable,
                 detail: "volume enumeration failed".to_string(),
             }),
         });
@@ -2666,7 +2617,7 @@ mod tests {
         assert_eq!(
             reply_json,
             json!({
-                "type": "localBrowserEntryPoints",
+                "type": "localBrowseEntryPoints",
                 "payload": {
                     "status": "complete",
                     "entries": [{
@@ -2677,12 +2628,12 @@ mod tests {
                         "displayName": "Music",
                         "status": "available",
                         "platform": "windows",
-                        "admissionHint": "defaultMusicFolder",
-                        "affordances": {
+                        "admissionAction": "requestDefaultMusicFolderAdmission",
+                        "availableActions": {
                             "canBrowse": true,
                             "canRequestAdmission": true,
                             "canChooseDescendant": true,
-                            "requiresConfirmation": false
+                            "canRequestParentAdmission": false
                         },
                         "failure": null
                     }],
@@ -2700,20 +2651,19 @@ mod tests {
     }
 
     #[test]
-    fn local_browser_children_serialize_candidate_boundary_shape() {
-        let command =
-            SnapshotReadCommand::ReadLocalBrowserChildren(ReadLocalBrowserChildrenRequest {
-                entry_point_kind: LocalBrowserEntryPointKind::Music,
-                root_canonical_path: "C:\\Users\\DJ\\Music".to_string(),
-                parent_canonical_path: "C:\\Users\\DJ\\Music".to_string(),
-                offset: 0,
-                limit: 50,
-            });
+    fn local_browse_items_serialize_boundary_shape() {
+        let command = SnapshotReadCommand::ReadLocalBrowseItems(ReadLocalBrowseItemsRequest {
+            entry_point_kind: LocalBrowseEntryPointKind::Music,
+            root_canonical_path: "C:\\Users\\DJ\\Music".to_string(),
+            parent_canonical_path: "C:\\Users\\DJ\\Music".to_string(),
+            offset: 0,
+            limit: 50,
+        });
         let command_json = serde_json::to_value(&command).expect("serialize command");
         assert_eq!(
             command_json,
             json!({
-                "type": "readLocalBrowserChildren",
+                "type": "readLocalBrowseItems",
                 "payload": {
                     "entryPointKind": "music",
                     "rootCanonicalPath": "C:\\Users\\DJ\\Music",
@@ -2729,40 +2679,39 @@ mod tests {
             command
         );
 
-        let reply = SnapshotReadReply::LocalBrowserChildren(ReadLocalBrowserChildrenReply {
-            status: LocalBrowserChildrenReadStatus::Complete,
-            window_identity: LocalBrowserChildWindowIdentity {
-                entry_point_kind: LocalBrowserEntryPointKind::Music,
+        let reply = SnapshotReadReply::LocalBrowseItems(ReadLocalBrowseItemsReply {
+            status: LocalBrowseItemsReadStatus::Complete,
+            window_identity: LocalBrowseWindowIdentity {
+                entry_point_kind: LocalBrowseEntryPointKind::Music,
                 root_canonical_path: "C:\\Users\\DJ\\Music".to_string(),
                 parent_canonical_path: "C:\\Users\\DJ\\Music".to_string(),
             },
             offset: 0,
             limit: 50,
-            total_rows: 1,
-            rows: vec![LocalBrowserChildRow {
-                identity: LocalBrowserCandidateIdentity {
-                    entry_point_kind: LocalBrowserEntryPointKind::Music,
+            total_items: 1,
+            items: vec![LocalBrowseItem {
+                identity: LocalBrowseItemIdentity {
+                    entry_point_kind: LocalBrowseEntryPointKind::Music,
                     root_canonical_path: "C:\\Users\\DJ\\Music".to_string(),
-                    candidate_canonical_path: "C:\\Users\\DJ\\Music\\Track.flac".to_string(),
+                    item_canonical_path: "C:\\Users\\DJ\\Music\\Track.flac".to_string(),
                 },
-                row_kind: LocalBrowserCandidateRowKind::MediaFileCandidate,
+                item_kind: LocalBrowseItemKind::MediaFile,
                 display_name: "Track.flac".to_string(),
-                status: LocalBrowserCandidateStatus::Available,
-                platform: LocalBrowserEntryPointPlatform::Windows,
+                status: LocalBrowseItemStatus::Available,
+                platform: LocalBrowsePlatform::Windows,
                 file_kind: Some(ContentsFileKind::Audio),
-                media_relevance: Some(LocalBrowserCandidateMediaRelevance::MediaRelevant),
-                admission_hint: LocalBrowserCandidateAdmissionHint::ChooseParentDirectory,
-                affordances: LocalBrowserCandidateAffordances {
+                media_relevance: Some(LocalBrowseItemMediaRelevance::MediaRelevant),
+                admission_action: Some(LocalBrowseAdmissionAction::RequestParentAdmission),
+                available_actions: LocalBrowseAvailableActions {
                     can_browse: false,
                     can_request_admission: false,
                     can_choose_descendant: false,
                     can_request_parent_admission: true,
-                    requires_confirmation: false,
                 },
                 failure: None,
             }],
-            failure: Some(LocalBrowserChildFailure {
-                code: LocalBrowserChildFailureCode::EnumerationUnavailable,
+            failure: Some(LocalBrowseItemFailure {
+                code: LocalBrowseItemFailureCode::EnumerationUnavailable,
                 detail: "one child failed".to_string(),
             }),
         });
@@ -2770,7 +2719,7 @@ mod tests {
         assert_eq!(
             reply_json,
             json!({
-                "type": "localBrowserChildren",
+                "type": "localBrowseItems",
                 "payload": {
                     "status": "complete",
                     "windowIdentity": {
@@ -2780,26 +2729,25 @@ mod tests {
                     },
                     "offset": 0,
                     "limit": 50,
-                    "totalRows": 1,
-                    "rows": [{
+                    "totalItems": 1,
+                    "items": [{
                         "identity": {
                             "entryPointKind": "music",
                             "rootCanonicalPath": "C:\\Users\\DJ\\Music",
-                            "candidateCanonicalPath": "C:\\Users\\DJ\\Music\\Track.flac"
+                            "itemCanonicalPath": "C:\\Users\\DJ\\Music\\Track.flac"
                         },
-                        "rowKind": "mediaFileCandidate",
+                        "itemKind": "mediaFile",
                         "displayName": "Track.flac",
                         "status": "available",
                         "platform": "windows",
                         "fileKind": "audio",
                         "mediaRelevance": "mediaRelevant",
-                        "admissionHint": "chooseParentDirectory",
-                        "affordances": {
+                        "admissionAction": "requestParentAdmission",
+                        "availableActions": {
                             "canBrowse": false,
                             "canRequestAdmission": false,
                             "canChooseDescendant": false,
-                            "canRequestParentAdmission": true,
-                            "requiresConfirmation": false
+                            "canRequestParentAdmission": true
                         },
                         "failure": null
                     }],

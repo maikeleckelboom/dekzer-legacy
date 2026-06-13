@@ -53,13 +53,13 @@ stdin.on("line", (line) => {
   const commandFamily = envelope.request.type;
   const commandType = envelope.request.payload.type;
 
-  if (commandFamily === "snapshotRead" && commandType === "readLocalBrowserEntryPoints") {
-    writeLocalBrowserEntryPointsSuccess(envelope);
+  if (commandFamily === "snapshotRead" && commandType === "readLocalBrowseEntryPoints") {
+    writeLocalBrowseEntryPointsSuccess(envelope);
     return;
   }
 
-  if (commandFamily === "snapshotRead" && commandType === "readLocalBrowserChildren") {
-    writeLocalBrowserChildrenSuccess(envelope);
+  if (commandFamily === "snapshotRead" && commandType === "readLocalBrowseItems") {
+    writeLocalBrowseItemsSuccess(envelope);
     return;
   }
 
@@ -205,7 +205,7 @@ function writeSuccess(envelope: RequestEnvelope, rootId: string): void {
   });
 }
 
-function writeLocalBrowserEntryPointsSuccess(envelope: RequestEnvelope): void {
+function writeLocalBrowseEntryPointsSuccess(envelope: RequestEnvelope): void {
   writeEnvelope({
     type: "commandOutcome",
     requestId: envelope.requestId,
@@ -215,7 +215,7 @@ function writeLocalBrowserEntryPointsSuccess(envelope: RequestEnvelope): void {
         reply: {
           type: "snapshotRead",
           payload: {
-            type: "localBrowserEntryPoints",
+            type: "localBrowseEntryPoints",
             payload: {
               status: "complete",
               entries: [
@@ -227,12 +227,12 @@ function writeLocalBrowserEntryPointsSuccess(envelope: RequestEnvelope): void {
                   displayName: "Music",
                   status: "available",
                   platform: "windows",
-                  admissionHint: "defaultMusicFolder",
-                  affordances: {
+                  admissionAction: "requestDefaultMusicFolderAdmission",
+                  availableActions: {
                     canBrowse: true,
                     canRequestAdmission: true,
                     canChooseDescendant: true,
-                    requiresConfirmation: false
+                    canRequestParentAdmission: false
                   },
                   failure: null
                 }
@@ -246,7 +246,7 @@ function writeLocalBrowserEntryPointsSuccess(envelope: RequestEnvelope): void {
   });
 }
 
-function writeLocalBrowserChildrenSuccess(envelope: RequestEnvelope): void {
+function writeLocalBrowseItemsSuccess(envelope: RequestEnvelope): void {
   writeEnvelope({
     type: "commandOutcome",
     requestId: envelope.requestId,
@@ -256,7 +256,7 @@ function writeLocalBrowserChildrenSuccess(envelope: RequestEnvelope): void {
         reply: {
           type: "snapshotRead",
           payload: {
-            type: "localBrowserChildren",
+            type: "localBrowseItems",
             payload: {
               status: "complete",
               windowIdentity: {
@@ -266,27 +266,26 @@ function writeLocalBrowserChildrenSuccess(envelope: RequestEnvelope): void {
               },
               offset: 0,
               limit: 50,
-              totalRows: 1,
-              rows: [
+              totalItems: 1,
+              items: [
                 {
                   identity: {
                     entryPointKind: "music",
                     rootCanonicalPath: "C:\\Users\\DJ\\Music",
-                    candidateCanonicalPath: "C:\\Users\\DJ\\Music\\Track.flac"
+                    itemCanonicalPath: "C:\\Users\\DJ\\Music\\Track.flac"
                   },
-                  rowKind: "mediaFileCandidate",
+                  itemKind: "mediaFile",
                   displayName: "Track.flac",
                   status: "available",
                   platform: "windows",
                   fileKind: "audio",
                   mediaRelevance: "mediaRelevant",
-                  admissionHint: "chooseParentDirectory",
-                  affordances: {
+                  admissionAction: "requestParentAdmission",
+                  availableActions: {
                     canBrowse: false,
                     canRequestAdmission: false,
                     canChooseDescendant: false,
-                    canRequestParentAdmission: true,
-                    requiresConfirmation: false
+                    canRequestParentAdmission: true
                   },
                   failure: null
                 }

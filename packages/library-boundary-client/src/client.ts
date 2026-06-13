@@ -15,10 +15,10 @@ import type {
   ReadAttachmentSourceFilesRequest,
   ReadLibraryBoundaryEventsAfterReply,
   ReadLibraryBoundaryEventsAfterRequest,
-  ReadLocalBrowserChildrenReply,
-  ReadLocalBrowserChildrenRequest,
-  ReadLocalBrowserEntryPointsReply,
-  ReadLocalBrowserEntryPointsRequest,
+  ReadLocalBrowseItemsReply,
+  ReadLocalBrowseItemsRequest,
+  ReadLocalBrowseEntryPointsReply,
+  ReadLocalBrowseEntryPointsRequest,
   ReadLibraryTreeChildrenReply,
   ReadLibraryTreeChildrenRequest,
   ReadTrackIdentityReviewCandidatesReply,
@@ -201,29 +201,29 @@ export class LibraryBoundaryClient {
     )
   }
 
-  readLocalBrowserEntryPoints(
-    request: ReadLocalBrowserEntryPointsRequest
-  ): Promise<ReadLocalBrowserEntryPointsReply> {
+  readLocalBrowseEntryPoints(
+    request: ReadLocalBrowseEntryPointsRequest
+  ): Promise<ReadLocalBrowseEntryPointsReply> {
     return this.sendAndExpect(
       {
         type: 'snapshotRead',
-        payload: { type: 'readLocalBrowserEntryPoints', payload: request }
+        payload: { type: 'readLocalBrowseEntryPoints', payload: request }
       },
       'snapshotRead',
-      'localBrowserEntryPoints'
+      'localBrowseEntryPoints'
     )
   }
 
-  readLocalBrowserChildren(
-    request: ReadLocalBrowserChildrenRequest
-  ): Promise<ReadLocalBrowserChildrenReply> {
+  readLocalBrowseItems(
+    request: ReadLocalBrowseItemsRequest
+  ): Promise<ReadLocalBrowseItemsReply> {
     return this.sendAndExpect(
       {
         type: 'snapshotRead',
-        payload: { type: 'readLocalBrowserChildren', payload: request }
+        payload: { type: 'readLocalBrowseItems', payload: request }
       },
       'snapshotRead',
-      'localBrowserChildren'
+      'localBrowseItems'
     )
   }
 

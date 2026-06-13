@@ -8,10 +8,10 @@ import {
 } from '../shared/library/viewState/persistence'
 import { type ReadRequest, type ReadResult } from '../shared/library/hierarchy/read'
 import type {
-  ReadLocalBrowserChildrenOutcome,
-  ReadLocalBrowserChildrenRequest
-} from '../shared/library/localBrowser/children'
-import type { ReadLocalBrowserEntryPointsOutcome } from '../shared/library/localBrowser/entryPoints'
+  ReadLocalBrowseItemsOutcome,
+  ReadLocalBrowseItemsRequest
+} from '../shared/library/localBrowse/items'
+import type { ReadLocalBrowseEntryPointsOutcome } from '../shared/library/localBrowse/entryPoints'
 import {
   type NavigationReadRowsRequest,
   type NavigationReadRowsResult
@@ -109,19 +109,19 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
           }
         }
       },
-      localBrowser: {
-        async readEntryPoints(): Promise<ReadLocalBrowserEntryPointsOutcome> {
+      localBrowse: {
+        async readEntryPoints(): Promise<ReadLocalBrowseEntryPointsOutcome> {
           return (await ipcRenderer.invoke(
-            libraryControlChannels.localBrowser.entryPoints.read
-          )) as ReadLocalBrowserEntryPointsOutcome
+            libraryControlChannels.localBrowse.entryPoints.read
+          )) as ReadLocalBrowseEntryPointsOutcome
         },
-        async readChildren(
-          request: ReadLocalBrowserChildrenRequest
-        ): Promise<ReadLocalBrowserChildrenOutcome> {
+        async readItems(
+          request: ReadLocalBrowseItemsRequest
+        ): Promise<ReadLocalBrowseItemsOutcome> {
           return (await ipcRenderer.invoke(
-            libraryControlChannels.localBrowser.children.read,
+            libraryControlChannels.localBrowse.items.read,
             request
-          )) as ReadLocalBrowserChildrenOutcome
+          )) as ReadLocalBrowseItemsOutcome
         }
       },
       navigation: {
