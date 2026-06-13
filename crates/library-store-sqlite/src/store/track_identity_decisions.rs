@@ -358,16 +358,14 @@ fn produce_track_identity_decisions_for_source(
     let skipped_existing_current_decisions =
         count_existing_current_system_decisions(write, source_id)?;
     let skipped_user_blocked_candidates = count_user_blocked_candidates(write, source_id)?;
-    let candidates = read_track_identity_decision_production_candidates(write, source_id)?;
     let mut result = ProduceTrackIdentityDecisionsForSourceResult {
         skipped_stale_candidates,
         skipped_existing_current_decisions,
         skipped_user_blocked_candidates,
-        remaining_candidates: candidates.len().saturating_sub(limit),
         ..Default::default()
     };
 
-    for candidate in candidates.into_iter().take(limit) {
+    for candidate in read_track_identity_decision_production_candidates(write, source_id, limit)? {
         let track_identity_decision_id =
             insert_system_exact_content_decision(write, &candidate, decided_at)?;
         result.decisions_created += 1;
@@ -394,7 +392,26 @@ fn count_track_identity_decision_production_candidates(
     connection: &rusqlite::Connection,
     source_id: i64,
 ) -> LibrarySqliteResult<usize> {
-    read_track_identity_decision_production_candidates(connection, source_id).map(|rows| rows.len())
+    let sql = track_identity_decision_production_candidates_sql(
+        "SELECT COUNT(DISTINCT candidate.track_identity_candidate_id)",
+        "",
+    );
+    connection
+        .query_row(
+            &sql,
+            params![
+                source_id,
+                SOURCE_FILE_BLAKE3_ALGORITHM,
+                TRACK_IDENTITY_CANDIDATE_KIND,
+                TRACK_IDENTITY_CANDIDATE_EVIDENCE_BASIS,
+                TRACK_IDENTITY_DECISION_SOURCE_SYSTEM_EXACT_CONTENT_V0,
+                TRACK_IDENTITY_DECISION_SOURCE_USER_LOCAL_V0,
+                TRACK_IDENTITY_DECISION_STATE_REJECTED,
+                TRACK_IDENTITY_DECISION_STATE_DEFERRED,
+            ],
+            |row| read_count(row, 0),
+        )
+        .map_err(Into::into)
 }
 
 fn read_track_identity_candidate_for_decision(
@@ -697,54 +714,22 @@ fn count_existing_current_system_decisions(
 fn read_track_identity_decision_production_candidates(
     connection: &rusqlite::Connection,
     source_id: i64,
+    limit: usize,
 ) -> LibrarySqliteResult<Vec<TrackIdentityDecisionProductionCandidate>> {
-    let current_evidence_predicate = current_track_identity_candidate_evidence_predicate("?2");
+    let limit_i64 =
+        i64::try_from(limit).map_err(|_| rusqlite::Error::IntegralValueOutOfRange(0, i64::MAX))?;
+    let sql = track_identity_decision_production_candidates_sql(
+        "SELECT DISTINCT candidate.track_identity_candidate_id,
+                candidate.candidate_kind,
+                candidate.evidence_basis,
+                candidate.evidence_key_algorithm,
+                candidate.evidence_key_value,
+                candidate.status",
+        "ORDER BY candidate.track_identity_candidate_id ASC
+         LIMIT ?9",
+    );
     connection
-        .prepare(&format!(
-            "SELECT DISTINCT candidate.track_identity_candidate_id,
-                    candidate.candidate_kind,
-                    candidate.evidence_basis,
-                    candidate.evidence_key_algorithm,
-                    candidate.evidence_key_value,
-                    candidate.status
-             FROM track_identity_candidates candidate
-             JOIN track_identity_candidate_evidence evidence
-               ON evidence.track_identity_candidate_id = candidate.track_identity_candidate_id
-             JOIN source_files file
-               ON file.source_file_id = evidence.source_file_id
-             LEFT JOIN SourceFacts facts
-               ON facts.source_file_id = evidence.source_file_id
-             LEFT JOIN source_file_attachment_links link
-               ON link.source_file_attachment_link_id =
-                  evidence.source_file_attachment_link_id
-             LEFT JOIN content_attachments attachment
-               ON attachment.attachment_id = evidence.attachment_id
-             WHERE evidence.source_id = ?1
-               AND candidate.status = 'active'
-               AND candidate.candidate_kind = ?3
-               AND candidate.evidence_basis = ?4
-               AND candidate.evidence_key_algorithm = ?2
-               AND {current_evidence_predicate}
-               AND NOT EXISTS (
-                   SELECT 1
-                   FROM track_identity_decisions decision
-                   WHERE decision.track_identity_candidate_id =
-                         candidate.track_identity_candidate_id
-                     AND decision.decision_source = ?5
-                     AND decision.superseded_by_decision_id IS NULL
-               )
-               AND NOT EXISTS (
-                   SELECT 1
-                   FROM track_identity_decisions user_decision
-                   WHERE user_decision.track_identity_candidate_id =
-                         candidate.track_identity_candidate_id
-                     AND user_decision.decision_source = ?6
-                     AND user_decision.decision_state IN (?7, ?8)
-                     AND user_decision.superseded_by_decision_id IS NULL
-               )
-             ORDER BY candidate.track_identity_candidate_id ASC",
-            current_evidence_predicate = current_evidence_predicate,
-        ))?
+        .prepare(&sql)?
         .query_map(
             params![
                 source_id,
@@ -755,6 +740,7 @@ fn read_track_identity_decision_production_candidates(
                 TRACK_IDENTITY_DECISION_SOURCE_USER_LOCAL_V0,
                 TRACK_IDENTITY_DECISION_STATE_REJECTED,
                 TRACK_IDENTITY_DECISION_STATE_DEFERRED,
+                limit_i64,
             ],
             |row| {
                 Ok(TrackIdentityDecisionProductionCandidate {
@@ -769,6 +755,49 @@ fn read_track_identity_decision_production_candidates(
         )?
         .collect::<Result<Vec<_>, _>>()
         .map_err(Into::into)
+}
+
+fn track_identity_decision_production_candidates_sql(select_clause: &str, suffix: &str) -> String {
+    let current_evidence_predicate = current_track_identity_candidate_evidence_predicate("?2");
+    format!(
+        "{select_clause}
+         FROM track_identity_candidates candidate
+         JOIN track_identity_candidate_evidence evidence
+           ON evidence.track_identity_candidate_id = candidate.track_identity_candidate_id
+         JOIN source_files file
+           ON file.source_file_id = evidence.source_file_id
+         LEFT JOIN SourceFacts facts
+           ON facts.source_file_id = evidence.source_file_id
+         LEFT JOIN source_file_attachment_links link
+           ON link.source_file_attachment_link_id =
+              evidence.source_file_attachment_link_id
+         LEFT JOIN content_attachments attachment
+           ON attachment.attachment_id = evidence.attachment_id
+         WHERE evidence.source_id = ?1
+           AND candidate.status = 'active'
+           AND candidate.candidate_kind = ?3
+           AND candidate.evidence_basis = ?4
+           AND candidate.evidence_key_algorithm = ?2
+           AND {current_evidence_predicate}
+           AND NOT EXISTS (
+               SELECT 1
+               FROM track_identity_decisions decision
+               WHERE decision.track_identity_candidate_id =
+                     candidate.track_identity_candidate_id
+                 AND decision.decision_source = ?5
+                 AND decision.superseded_by_decision_id IS NULL
+           )
+           AND NOT EXISTS (
+               SELECT 1
+               FROM track_identity_decisions user_decision
+               WHERE user_decision.track_identity_candidate_id =
+                     candidate.track_identity_candidate_id
+                 AND user_decision.decision_source = ?6
+                 AND user_decision.decision_state IN (?7, ?8)
+                 AND user_decision.superseded_by_decision_id IS NULL
+           )
+         {suffix}"
+    )
 }
 
 fn insert_system_exact_content_decision(
@@ -1018,6 +1047,7 @@ mod tests {
 
     const HASH_A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const HASH_B: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    const HASH_C: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 
     struct TrackIdentityDecisionFixture {
         _tempdir: TempDir,
@@ -1799,6 +1829,48 @@ mod tests {
             StoreTrackIdentityUserBlockingDecisionState::Deferred
         );
         assert_eq!(effective.masked_system_decision_id, None);
+    }
+
+    #[test]
+    fn bounded_decision_production_skips_user_blocked_candidates_before_limit() {
+        let fixture = TrackIdentityDecisionFixture::new();
+        for (source_file_id, path, hash) in [
+            (100, "Album/a-blocked.wav", HASH_A),
+            (101, "Album/b-open.wav", HASH_B),
+            (102, "Album/c-open.wav", HASH_C),
+        ] {
+            fixture.insert_source_file(source_file_id, path);
+            fixture.link_attachment(source_file_id, hash);
+            fixture.commit_current_facts(source_file_id, hash);
+        }
+        fixture.promote_and_candidate();
+        let blocked_candidate_id = fixture
+            .store
+            .open_read_connection()
+            .expect("open read")
+            .query_row(
+                "SELECT track_identity_candidate_id
+                 FROM track_identity_candidates
+                 WHERE evidence_key_value = ?1",
+                [HASH_A],
+                |row| row.get::<_, i64>(0),
+            )
+            .expect("read blocked candidate id");
+        let _deferred = TrackIdentityDecisionFixture::expect_written(
+            fixture.defer_candidate(blocked_candidate_id),
+        );
+
+        let result = fixture.produce_decisions(1);
+
+        assert_eq!(result.decisions_created, 1);
+        assert_eq!(result.decision_evidence_created, 1);
+        assert_eq!(result.skipped_user_blocked_candidates, 1);
+        assert_eq!(result.remaining_candidates, 1);
+        assert_eq!(
+            fixture.count_rows("track_identity_decisions"),
+            2,
+            "one user defer and one bounded system decision should exist"
+        );
     }
 
     #[test]

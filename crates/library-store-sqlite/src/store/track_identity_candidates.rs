@@ -79,16 +79,14 @@ fn produce_track_identity_candidates_for_source(
 ) -> LibrarySqliteResult<ProduceTrackIdentityCandidatesForSourceResult> {
     let skipped_stale_primary_media_candidates =
         count_stale_primary_media_candidates(write, source_id)?;
-    let production_candidates =
-        read_track_identity_candidate_production_candidates(write, source_id)?;
 
     let mut result = ProduceTrackIdentityCandidatesForSourceResult {
         skipped_stale_primary_media_candidates,
-        remaining_candidates: production_candidates.len().saturating_sub(limit),
         ..Default::default()
     };
 
-    for production in production_candidates.into_iter().take(limit) {
+    for production in read_track_identity_candidate_production_candidates(write, source_id, limit)?
+    {
         let (track_identity_candidate_id, candidate_change) =
             upsert_track_identity_candidate(write, &production, produced_at)?;
         match candidate_change {
@@ -128,8 +126,19 @@ fn count_track_identity_candidate_production_candidates(
     connection: &rusqlite::Connection,
     source_id: i64,
 ) -> LibrarySqliteResult<usize> {
-    read_track_identity_candidate_production_candidates(connection, source_id)
-        .map(|rows| rows.len())
+    let sql = track_identity_candidate_production_candidates_sql("SELECT COUNT(*)", "");
+    connection
+        .query_row(
+            &sql,
+            params![
+                source_id,
+                SOURCE_FILE_BLAKE3_ALGORITHM,
+                TRACK_IDENTITY_CANDIDATE_KIND,
+                TRACK_IDENTITY_CANDIDATE_EVIDENCE_BASIS,
+            ],
+            |row| read_count(row, 0),
+        )
+        .map_err(Into::into)
 }
 
 fn count_stale_primary_media_candidates(
@@ -163,10 +172,56 @@ fn count_stale_primary_media_candidates(
 fn read_track_identity_candidate_production_candidates(
     connection: &rusqlite::Connection,
     source_id: i64,
+    limit: usize,
 ) -> LibrarySqliteResult<Vec<TrackIdentityCandidateProductionRow>> {
+    let limit_i64 =
+        i64::try_from(limit).map_err(|_| rusqlite::Error::IntegralValueOutOfRange(0, i64::MAX))?;
+    let sql = track_identity_candidate_production_candidates_sql(
+        "SELECT evidence.primary_media_candidate_id,
+                evidence.attachment_id,
+                evidence.evidence_source_file_id,
+                evidence.evidence_basis_fingerprint,
+                evidence.content_hash_value,
+                evidence.source_file_attachment_link_id,
+                evidence.source_file_id,
+                evidence.source_id,
+                evidence.accepted_artifact_id",
+        "ORDER BY lower(evidence.relative_path) ASC,
+                 evidence.primary_media_candidate_id ASC,
+                 evidence.evidence_rank ASC
+         LIMIT ?5",
+    );
     connection
-        .prepare(&format!(
-            "WITH current_primary_media AS (
+        .prepare(&sql)?
+        .query_map(
+            params![
+                source_id,
+                SOURCE_FILE_BLAKE3_ALGORITHM,
+                TRACK_IDENTITY_CANDIDATE_KIND,
+                TRACK_IDENTITY_CANDIDATE_EVIDENCE_BASIS,
+                limit_i64,
+            ],
+            |row| {
+                Ok(TrackIdentityCandidateProductionRow {
+                    primary_media_candidate_id: row.get(0)?,
+                    attachment_id: row.get(1)?,
+                    evidence_source_file_id: row.get(2)?,
+                    evidence_basis_fingerprint: row.get(3)?,
+                    content_hash_value: row.get(4)?,
+                    source_file_attachment_link_id: row.get(5)?,
+                    source_file_id: row.get(6)?,
+                    source_id: row.get(7)?,
+                    probe_accepted_artifact_id: row.get(8)?,
+                })
+            },
+        )?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(Into::into)
+}
+
+fn track_identity_candidate_production_candidates_sql(select_clause: &str, suffix: &str) -> String {
+    format!(
+        "WITH current_primary_media AS (
                  SELECT pmc.primary_media_candidate_id,
                         pmc.attachment_id,
                         pmc.evidence_source_file_id,
@@ -213,15 +268,7 @@ fn read_track_identity_candidate_production_candidates(
                    ON attachment.attachment_id = link.attachment_id
                  WHERE {current_attachment_link_predicate}
              )
-             SELECT evidence.primary_media_candidate_id,
-                    evidence.attachment_id,
-                    evidence.evidence_source_file_id,
-                    evidence.evidence_basis_fingerprint,
-                    evidence.content_hash_value,
-                    evidence.source_file_attachment_link_id,
-                    evidence.source_file_id,
-                    evidence.source_id,
-                    evidence.accepted_artifact_id
+             {select_clause}
              FROM current_attachment_evidence evidence
              LEFT JOIN track_identity_candidates candidate
                ON candidate.candidate_kind = ?3
@@ -251,35 +298,10 @@ fn read_track_identity_candidate_production_candidates(
                 OR stored_evidence.content_hash_algorithm != ?2
                 OR stored_evidence.content_hash_value != evidence.content_hash_value
                 OR stored_evidence.probe_accepted_artifact_id != evidence.accepted_artifact_id
-             ORDER BY lower(evidence.relative_path) ASC,
-                      evidence.primary_media_candidate_id ASC,
-                      evidence.evidence_rank ASC",
+             {suffix}",
             current_primary_media_predicate = CURRENT_PRIMARY_MEDIA_PREDICATE,
             current_attachment_link_predicate = CURRENT_ATTACHMENT_LINK_PREDICATE,
-        ))?
-        .query_map(
-            params![
-                source_id,
-                SOURCE_FILE_BLAKE3_ALGORITHM,
-                TRACK_IDENTITY_CANDIDATE_KIND,
-                TRACK_IDENTITY_CANDIDATE_EVIDENCE_BASIS,
-            ],
-            |row| {
-                Ok(TrackIdentityCandidateProductionRow {
-                    primary_media_candidate_id: row.get(0)?,
-                    attachment_id: row.get(1)?,
-                    evidence_source_file_id: row.get(2)?,
-                    evidence_basis_fingerprint: row.get(3)?,
-                    content_hash_value: row.get(4)?,
-                    source_file_attachment_link_id: row.get(5)?,
-                    source_file_id: row.get(6)?,
-                    source_id: row.get(7)?,
-                    probe_accepted_artifact_id: row.get(8)?,
-                })
-            },
-        )?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(Into::into)
+    )
 }
 
 fn upsert_track_identity_candidate(

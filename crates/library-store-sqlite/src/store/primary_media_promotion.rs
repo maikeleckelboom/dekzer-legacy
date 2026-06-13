@@ -67,7 +67,7 @@ impl SqliteDurableStore {
         if !source_usable {
             return Ok(0);
         }
-        read_primary_media_promotion_candidates(&connection, source_id).map(|rows| rows.len())
+        count_primary_media_promotion_candidates(&connection, source_id)
     }
 }
 
@@ -91,10 +91,7 @@ fn promote_primary_media_for_source(
         return Ok(result);
     }
 
-    let candidates = read_primary_media_promotion_candidates(write, source_id)?;
-    result.remaining_candidates = candidates.len().saturating_sub(limit);
-
-    for candidate in candidates.into_iter().take(limit) {
+    for candidate in read_primary_media_promotion_candidates(write, source_id, limit)? {
         upsert_primary_media_candidate(write, &candidate, promoted_at)?;
         match candidate.change {
             PrimaryMediaPromotionChange::Create => result.promoted_count += 1,
@@ -102,6 +99,7 @@ fn promote_primary_media_for_source(
         }
     }
 
+    result.remaining_candidates = count_primary_media_promotion_candidates(write, source_id)?;
     Ok(result)
 }
 
@@ -241,8 +239,73 @@ fn read_primary_media_promotion_skip_summary(
 fn read_primary_media_promotion_candidates(
     connection: &rusqlite::Connection,
     source_id: i64,
+    limit: usize,
 ) -> LibrarySqliteResult<Vec<PrimaryMediaPromotionCandidate>> {
-    let sql = format!(
+    let limit_i64 =
+        i64::try_from(limit).map_err(|_| rusqlite::Error::IntegralValueOutOfRange(0, i64::MAX))?;
+    let sql = primary_media_promotion_candidates_sql(
+        "SELECT candidate.attachment_id,
+                candidate.source_file_id,
+                candidate.basis_fingerprint,
+                candidate.media_kind,
+                candidate.mime_type,
+                candidate.duration_ms,
+                candidate.sample_rate_hz,
+                candidate.channels,
+                candidate.bit_depth,
+                candidate.codec,
+                CASE
+                    WHEN existing.primary_media_candidate_id IS NULL THEN 'create'
+                    ELSE 'refresh'
+                END AS promotion_change",
+        "ORDER BY lower(candidate.relative_path) ASC,
+                  candidate.source_file_id ASC
+         LIMIT ?3",
+    );
+    connection
+        .prepare(&sql)?
+        .query_map(
+            params![source_id, SOURCE_FILE_BLAKE3_ALGORITHM, limit_i64],
+            |row| {
+                let change = match row.get::<_, String>(10)?.as_str() {
+                    "create" => PrimaryMediaPromotionChange::Create,
+                    _ => PrimaryMediaPromotionChange::Refresh,
+                };
+                Ok(PrimaryMediaPromotionCandidate {
+                    attachment_id: row.get(0)?,
+                    source_file_id: row.get(1)?,
+                    basis_fingerprint: row.get(2)?,
+                    media_kind: row.get(3)?,
+                    mime_type: row.get(4)?,
+                    duration_ms: row.get(5)?,
+                    sample_rate_hz: row.get(6)?,
+                    channels: row.get(7)?,
+                    bit_depth: row.get(8)?,
+                    codec: row.get(9)?,
+                    change,
+                })
+            },
+        )?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(Into::into)
+}
+
+fn count_primary_media_promotion_candidates(
+    connection: &rusqlite::Connection,
+    source_id: i64,
+) -> LibrarySqliteResult<usize> {
+    let sql = primary_media_promotion_candidates_sql("SELECT COUNT(*)", "");
+    connection
+        .query_row(
+            &sql,
+            params![source_id, SOURCE_FILE_BLAKE3_ALGORITHM],
+            |row| read_count(row, 0),
+        )
+        .map_err(Into::into)
+}
+
+fn primary_media_promotion_candidates_sql(select_clause: &str, suffix: &str) -> String {
+    format!(
         "WITH eligible AS (
              SELECT attachment.attachment_id,
                     file.source_file_id,
@@ -292,20 +355,7 @@ fn read_primary_media_promotion_candidates(
              FROM eligible
              WHERE attachment_rank = 1
          )
-         SELECT candidate.attachment_id,
-                candidate.source_file_id,
-                candidate.basis_fingerprint,
-                candidate.media_kind,
-                candidate.mime_type,
-                candidate.duration_ms,
-                candidate.sample_rate_hz,
-                candidate.channels,
-                candidate.bit_depth,
-                candidate.codec,
-                CASE
-                    WHEN existing.primary_media_candidate_id IS NULL THEN 'create'
-                    ELSE 'refresh'
-                END AS promotion_change
+         {select_clause}
          FROM candidates candidate
          LEFT JOIN primary_media_candidates existing
            ON existing.attachment_id = candidate.attachment_id
@@ -319,35 +369,11 @@ fn read_primary_media_promotion_candidates(
             OR existing.channels IS NOT candidate.channels
             OR existing.bit_depth IS NOT candidate.bit_depth
             OR existing.codec IS NOT candidate.codec
-         ORDER BY lower(candidate.relative_path) ASC,
-                  candidate.source_file_id ASC",
+         {suffix}",
         present_audio_predicate = PRESENT_AUDIO_PREDICATE,
         current_facts_predicate = CURRENT_FACTS_PREDICATE,
         playable_probe_predicate = PLAYABLE_AUDIO_PROBE_PREDICATE,
-    );
-    connection
-        .prepare(&sql)?
-        .query_map(params![source_id, SOURCE_FILE_BLAKE3_ALGORITHM], |row| {
-            let change = match row.get::<_, String>(10)?.as_str() {
-                "create" => PrimaryMediaPromotionChange::Create,
-                _ => PrimaryMediaPromotionChange::Refresh,
-            };
-            Ok(PrimaryMediaPromotionCandidate {
-                attachment_id: row.get(0)?,
-                source_file_id: row.get(1)?,
-                basis_fingerprint: row.get(2)?,
-                media_kind: row.get(3)?,
-                mime_type: row.get(4)?,
-                duration_ms: row.get(5)?,
-                sample_rate_hz: row.get(6)?,
-                channels: row.get(7)?,
-                bit_depth: row.get(8)?,
-                codec: row.get(9)?,
-                change,
-            })
-        })?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(Into::into)
+    )
 }
 
 fn upsert_primary_media_candidate(

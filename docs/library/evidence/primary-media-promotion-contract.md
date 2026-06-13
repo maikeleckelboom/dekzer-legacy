@@ -83,6 +83,9 @@ Source maintenance runs promotion after hashing, attachment materialization, and
 The command accepts an optional `promotionLimit`, applies backend bounds, reports promotion summary counts, and reports
 remaining promotion candidates. A bounded maintenance unit is allowed to finish partial when more promotion candidates
 remain.
+Promotion candidate reads and remaining-candidate counts are SQL-bounded/source-scoped. Promotion must not build a full
+source-wide candidate vector merely to take the requested limit. Deterministic representative selection for multiple
+source files pointing at one attachment remains lowercased relative path, then source-file id.
 
 Track identity candidate production has its own optional `identityCandidateLimit`, and decision production has its own
 optional `identityDecisionLimit`. Primary-media promotion does not create or refresh candidates or decisions directly.

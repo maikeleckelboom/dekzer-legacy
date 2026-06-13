@@ -44,6 +44,9 @@ layer:
 
 The link does not store a hash copy. Hash authority stays on the referenced `content_attachments` row. `file_kind`
 belongs on the link, not on the attachment/content row, because it is source-file interpretation context.
+`source_id` is copied source scope. The baseline schema rejects link inserts or updates where
+`source_file_attachment_links.source_id` does not match the linked `source_files.source_id`, and rejects source-file
+source moves that would drift an existing link.
 
 ## Relation To Observed File Facts / SourceFacts
 
@@ -172,6 +175,8 @@ Materialization is source-scoped through:
 
 Policy:
 
+- source-scoped materializable candidates are selected with deterministic SQL ordering and `LIMIT`; the store does not
+  collect the full source candidate set in Rust before applying the bound;
 - new BLAKE3 hash evidence inserts one `content_attachments` row;
 - already-known BLAKE3 hash evidence refreshes that `content_attachments.updated_at`;
 - same hash across source files reuses the existing attachment and inserts more source-file links;
@@ -192,7 +197,8 @@ the current source-file link.
 - `links_created` increments when a source file receives its first current attachment link;
 - `links_replaced` increments when a source file's old link is deleted and a new hash link is inserted;
 - `links_refreshed` increments when an existing same-hash source-file link is touched;
-- skipped counters report stale facts, non-BLAKE3 facts, and missing facts.
+- skipped counters report stale facts, non-BLAKE3 facts, and missing facts;
+- `remaining_candidates` reports materializable rows outside the bounded admission window for that run.
 
 Two source files with the same new BLAKE3 value in one run create one attachment and two links. A later run against the
 same BLAKE3 value refreshes the existing attachment instead of creating another one.

@@ -102,18 +102,12 @@ pub fn read_track_identity_review_candidates(
 
     // TODO(track-identity-review-cursor): add a V1 cursor with version,
     // scope/filter identity, and the last candidate_id position.
-    let mut candidates = read_factual_candidates(connection, source_id)?;
-    let mut review_candidates = Vec::new();
+    let candidates = read_factual_candidates(connection, source_id, review_state_filter, limit)?;
+    let mut review_candidates = Vec::with_capacity(candidates.len());
 
-    for candidate in candidates.drain(..) {
+    for candidate in candidates {
         let candidate = hydrate_review_candidate(connection, candidate)?;
-        if review_state_filter.is_none_or(|filter| candidate.review_state == filter) {
-            review_candidates.push(candidate);
-        }
-
-        if review_candidates.len() == limit {
-            break;
-        }
+        review_candidates.push(candidate);
     }
 
     Ok(review_candidates)
@@ -122,10 +116,57 @@ pub fn read_track_identity_review_candidates(
 fn read_factual_candidates(
     connection: &Connection,
     source_id: Option<i64>,
+    review_state_filter: Option<ReviewState>,
+    limit: usize,
 ) -> LibrarySqliteResult<Vec<FactualCandidate>> {
+    let limit_i64 =
+        i64::try_from(limit).map_err(|_| rusqlite::Error::IntegralValueOutOfRange(0, i64::MAX))?;
     let current_evidence_predicate = current_track_identity_candidate_evidence_predicate("?2");
+    let review_state_predicate = review_state_filter
+        .map(review_state_filter_predicate)
+        .unwrap_or("1");
     let mut statement = connection.prepare(&format!(
-        "SELECT candidate.track_identity_candidate_id,
+        "WITH decision_facts AS (
+             SELECT candidate.track_identity_candidate_id,
+                    user_decision.track_identity_decision_id AS user_decision_id,
+                    user_decision.decision_state AS user_decision_state,
+                    system_decision.track_identity_decision_id AS system_decision_id,
+                    system_decision.decision_state AS system_decision_state,
+                    CASE
+                        WHEN candidate.status = 'active'
+                         AND EXISTS (
+                            SELECT 1
+                            FROM track_identity_candidate_evidence evidence
+                            JOIN source_files file
+                              ON file.source_file_id = evidence.source_file_id
+                            LEFT JOIN SourceFacts facts
+                              ON facts.source_file_id = evidence.source_file_id
+                            LEFT JOIN source_file_attachment_links link
+                              ON link.source_file_attachment_link_id =
+                                 evidence.source_file_attachment_link_id
+                            LEFT JOIN content_attachments attachment
+                              ON attachment.attachment_id = evidence.attachment_id
+                            WHERE evidence.track_identity_candidate_id =
+                                  candidate.track_identity_candidate_id
+                              AND {current_evidence_predicate}
+                         )
+                        THEN 1 ELSE 0
+                    END AS has_current_effective_evidence
+             FROM track_identity_candidates candidate
+             LEFT JOIN track_identity_decisions user_decision
+               ON user_decision.track_identity_candidate_id =
+                  candidate.track_identity_candidate_id
+              AND user_decision.decision_source = ?3
+              AND user_decision.superseded_by_decision_id IS NULL
+              AND user_decision.decision_state != 'superseded'
+             LEFT JOIN track_identity_decisions system_decision
+               ON system_decision.track_identity_candidate_id =
+                  candidate.track_identity_candidate_id
+              AND system_decision.decision_source = ?4
+              AND system_decision.superseded_by_decision_id IS NULL
+              AND system_decision.decision_state != 'superseded'
+         )
+         SELECT candidate.track_identity_candidate_id,
                 candidate.candidate_kind,
                 candidate.evidence_basis,
                 candidate.status,
@@ -168,6 +209,9 @@ fn read_factual_candidates(
                 candidate.created_at,
                 candidate.updated_at
          FROM track_identity_candidates candidate
+         JOIN decision_facts
+           ON decision_facts.track_identity_candidate_id =
+              candidate.track_identity_candidate_id
          WHERE (?1 IS NULL
             OR EXISTS (
                 SELECT 1
@@ -176,10 +220,19 @@ fn read_factual_candidates(
                       candidate.track_identity_candidate_id
                   AND source_filter.source_id = ?1
             ))
-         ORDER BY candidate.track_identity_candidate_id ASC",
+           AND ({review_state_predicate})
+         ORDER BY candidate.track_identity_candidate_id ASC
+         LIMIT ?5",
         current_evidence_predicate = current_evidence_predicate,
+        review_state_predicate = review_state_predicate,
     ))?;
-    let mut rows = statement.query(params![source_id, SOURCE_FILE_BLAKE3_ALGORITHM])?;
+    let mut rows = statement.query(params![
+        source_id,
+        SOURCE_FILE_BLAKE3_ALGORITHM,
+        TRACK_IDENTITY_DECISION_SOURCE_USER_LOCAL_V0,
+        TRACK_IDENTITY_DECISION_SOURCE_SYSTEM_EXACT_CONTENT_V0,
+        limit_i64,
+    ])?;
     let mut candidates = Vec::new();
 
     while let Some(row) = rows.next()? {
@@ -187,6 +240,41 @@ fn read_factual_candidates(
     }
 
     Ok(candidates)
+}
+
+fn review_state_filter_predicate(review_state: ReviewState) -> &'static str {
+    match review_state {
+        ReviewState::NeedsUserDecision => {
+            "decision_facts.user_decision_id IS NULL
+             AND decision_facts.system_decision_id IS NULL"
+        }
+        ReviewState::SystemAccepted => {
+            "decision_facts.user_decision_id IS NULL
+             AND decision_facts.system_decision_id IS NOT NULL
+             AND decision_facts.system_decision_state = 'accepted'
+             AND decision_facts.has_current_effective_evidence = 1"
+        }
+        ReviewState::UserAccepted => {
+            "decision_facts.user_decision_id IS NOT NULL
+             AND decision_facts.user_decision_state = 'accepted'
+             AND decision_facts.has_current_effective_evidence = 1"
+        }
+        ReviewState::UserRejected => {
+            "decision_facts.user_decision_id IS NOT NULL
+             AND decision_facts.user_decision_state = 'rejected'
+             AND decision_facts.has_current_effective_evidence = 1"
+        }
+        ReviewState::UserDeferred => {
+            "decision_facts.user_decision_id IS NOT NULL
+             AND decision_facts.user_decision_state = 'deferred'
+             AND decision_facts.has_current_effective_evidence = 1"
+        }
+        ReviewState::StaleDecision => {
+            "(decision_facts.user_decision_id IS NOT NULL
+              OR decision_facts.system_decision_id IS NOT NULL)
+             AND decision_facts.has_current_effective_evidence = 0"
+        }
+    }
 }
 
 fn hydrate_review_candidate(

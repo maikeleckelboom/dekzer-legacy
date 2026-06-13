@@ -593,6 +593,35 @@ CREATE INDEX source_file_attachment_links_source_file
 CREATE INDEX source_file_attachment_links_attachment
     ON source_file_attachment_links (attachment_id);
 
+CREATE TRIGGER source_file_attachment_links_source_match_insert
+    BEFORE INSERT ON source_file_attachment_links
+    FOR EACH ROW
+    WHEN (SELECT source_id FROM source_files WHERE source_file_id = NEW.source_file_id) IS NOT NEW.source_id
+BEGIN
+    SELECT RAISE(ABORT, 'source_file_attachment_links.source_id must match source_files.source_id');
+END;
+
+CREATE TRIGGER source_file_attachment_links_source_match_update
+    BEFORE UPDATE OF source_file_id, source_id ON source_file_attachment_links
+    FOR EACH ROW
+    WHEN (SELECT source_id FROM source_files WHERE source_file_id = NEW.source_file_id) IS NOT NEW.source_id
+BEGIN
+    SELECT RAISE(ABORT, 'source_file_attachment_links.source_id must match source_files.source_id');
+END;
+
+CREATE TRIGGER source_files_attachment_link_source_match_update
+    BEFORE UPDATE OF source_id ON source_files
+    FOR EACH ROW
+    WHEN EXISTS (
+        SELECT 1
+        FROM source_file_attachment_links link
+        WHERE link.source_file_id = OLD.source_file_id
+          AND link.source_id IS NOT NEW.source_id
+    )
+BEGIN
+    SELECT RAISE(ABORT, 'source_files.source_id update would drift source_file_attachment_links.source_id');
+END;
+
 CREATE TABLE search_filter_index_metadata
 (
     search_filter_index_id INTEGER PRIMARY KEY CHECK (search_filter_index_id = 1),

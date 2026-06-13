@@ -57,6 +57,9 @@ candidates, candidate decisions, explicit user decision commands, and the review
 implemented. Their accepted contracts are narrower than the later canonical media-candidate, canonical-track,
 preparation, analysis, waveform, playlist/crate, workspace, and performance roadmap layers and do not satisfy those
 future gates by themselves.
+Current primary-media promotion and exact-content track-identity candidate/decision production are source-scoped bounded
+maintenance units. Candidate reads and remaining counts are SQL-level bounded reads/counts, not full source-wide
+candidate vectors truncated in Rust.
 
 ---
 
@@ -87,17 +90,20 @@ The following layers are canonical.
 no track columns. `first_observed_at` is frozen at first insert.
 
 `source_file_attachment_links` — links source files to attachments. `UNIQUE(source_file_id)` enforces one current
-materialized attachment per source file. Staleness computed by join against current `SourceFacts`, not stored as a flag.
+materialized attachment per source file. `source_id` is copied source scope and is schema-guarded to match the linked
+`source_files.source_id`. Staleness computed by join against current `SourceFacts`, not stored as a flag.
 
 Materialization: `materialize_attachments_for_source(source_id, limit)` — store authority, called by bounded
-service-owned scan/manual hash maintenance.
+service-owned scan/manual hash maintenance. Candidate admission applies source-scoped SQL ordering and limits before
+Rust mutation work.
 
 Read boundary: `readSourceFileAttachment`, `readAttachmentSourceFiles`, and `readSourceAttachmentSummary` — explicit
 read-only identity reads. They do not hash, materialize, populate product contents projections, or claim a maintained
 snapshot invalidation scope.
 
 Outcome fields: `attachments_created`, `attachments_refreshed`, `links_created`, `links_replaced`, `links_refreshed`,
-`skipped_stale_facts`, `skipped_no_blake3`, `skipped_no_facts`.
+`skipped_stale_facts`, `skipped_no_blake3`, `skipped_no_facts`; remaining counts report bounded maintenance backlog
+without requiring full source-wide candidate materialization in Rust.
 
 ### Deleted Non-Current Surfaces
 

@@ -758,6 +758,39 @@ mod tests {
     }
 
     #[test]
+    fn limit_is_applied_before_mapping_rows_outside_page() {
+        let fixture = Fixture::new();
+        fixture.insert_candidate_with_current_evidence(1, 1, 100, HASH_A);
+        fixture.insert_candidate_with_current_evidence(2, 1, 101, HASH_B);
+        fixture.insert_candidate_with_current_evidence(3, 1, 102, HASH_C);
+        fixture
+            .store
+            .with_write(|write| {
+                write.execute("PRAGMA ignore_check_constraints = ON", [])?;
+                write.execute(
+                    "UPDATE track_identity_candidates
+                     SET status = 'unknown'
+                     WHERE track_identity_candidate_id = 3",
+                    [],
+                )?;
+                write.execute("PRAGMA ignore_check_constraints = OFF", [])?;
+                Ok(())
+            })
+            .expect("corrupt candidate outside bounded page");
+
+        let candidates = fixture.read(None, 2);
+
+        assert_eq!(
+            candidates
+                .iter()
+                .map(|candidate| candidate.candidate_id)
+                .collect::<Vec<_>>(),
+            vec![1, 2],
+            "review reads must not map candidates outside the bounded page"
+        );
+    }
+
+    #[test]
     fn zero_limit_returns_no_candidates() {
         let fixture = Fixture::new();
         fixture.insert_candidate_with_current_evidence(1, 1, 100, HASH_A);
@@ -813,6 +846,31 @@ mod tests {
         );
 
         let candidates = fixture.read(Some(ReviewState::UserAccepted), 10);
+
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].candidate_id, 2);
+        assert_eq!(candidates[0].review_state, ReviewState::UserAccepted);
+    }
+
+    #[test]
+    fn review_state_filter_is_applied_before_nonmatching_candidate_hydration() {
+        let fixture = Fixture::new();
+        fixture.insert_candidate_with_current_evidence(1, 1, 100, HASH_A);
+        fixture.insert_candidate_with_current_evidence(2, 1, 101, HASH_B);
+        fixture.insert_decision(
+            1,
+            1,
+            "rejected",
+            TRACK_IDENTITY_DECISION_SOURCE_SYSTEM_EXACT_CONTENT_V0,
+        );
+        fixture.insert_decision(
+            2,
+            2,
+            "accepted",
+            TRACK_IDENTITY_DECISION_SOURCE_USER_LOCAL_V0,
+        );
+
+        let candidates = fixture.read(Some(ReviewState::UserAccepted), 1);
 
         assert_eq!(candidates.len(), 1);
         assert_eq!(candidates[0].candidate_id, 2);

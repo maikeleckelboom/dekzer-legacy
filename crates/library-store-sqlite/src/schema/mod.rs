@@ -198,6 +198,22 @@ mod tests {
             .expect("collect table indexes")
     }
 
+    fn table_trigger_names(connection: &Connection, table_name: &str) -> Vec<String> {
+        let mut stmt = connection
+            .prepare(
+                "SELECT name
+                 FROM sqlite_master
+                 WHERE type = 'trigger'
+                   AND tbl_name = ?1
+                 ORDER BY name",
+            )
+            .expect("prepare trigger-list query");
+        stmt.query_map([table_name], |row| row.get::<_, String>(0))
+            .expect("query table triggers")
+            .collect::<Result<Vec<_>, _>>()
+            .expect("collect table triggers")
+    }
+
     fn insert_schema_test_source(connection: &Connection) {
         connection
             .execute(
@@ -445,6 +461,17 @@ mod tests {
                 "created_at",
                 "updated_at",
             ]
+        );
+        assert_eq!(
+            table_trigger_names(&connection, "source_file_attachment_links"),
+            vec![
+                "source_file_attachment_links_source_match_insert".to_string(),
+                "source_file_attachment_links_source_match_update".to_string(),
+            ]
+        );
+        assert_eq!(
+            table_trigger_names(&connection, "source_files"),
+            vec!["source_files_attachment_link_source_match_update".to_string()]
         );
         assert_eq!(
             table_column_names(&connection, "search_filter_index_metadata"),
@@ -857,6 +884,114 @@ mod tests {
     }
 
     #[test]
+    fn source_file_attachment_links_reject_source_id_drift() {
+        let connection = install_test_baseline();
+        connection
+            .execute_batch("PRAGMA foreign_keys = ON;")
+            .expect("enable foreign keys");
+        insert_schema_test_source(&connection);
+        connection
+            .execute(
+                "INSERT INTO sources (
+                     source_id,
+                     source_class,
+                     authority,
+                     identity_key,
+                     display_name,
+                     is_user_visible,
+                     created_at,
+                     updated_at
+                 )
+                 VALUES (2, 'internal', 'system', 'schema:test:other', 'Other Source', 1, 1, 1)",
+                [],
+            )
+            .expect("insert other schema test source");
+        connection
+            .execute(
+                "INSERT INTO source_files (
+                     source_file_id,
+                     source_id,
+                     name,
+                     name_browse_sort_key,
+                     relative_path_browse_sort_key,
+                     relative_path,
+                     file_kind,
+                     file_class,
+                     presence_state,
+                     first_discovered_at,
+                     last_observed_at,
+                     last_presence_change_at,
+                     created_at,
+                     updated_at
+                 )
+                 VALUES (10, 1, 'track.wav', 'track.wav', 'album/track.wav',
+                         'Album/track.wav', 'audio', 'audio', 'present',
+                         1, 1, 1, 1, 1)",
+                [],
+            )
+            .expect("insert schema test source file");
+        connection
+            .execute(
+                "INSERT INTO content_attachments (
+                     attachment_id,
+                     content_hash_algorithm,
+                     content_hash_value,
+                     first_observed_at,
+                     updated_at
+                 )
+                 VALUES (20, 'blake3', 'schema-hash', 1, 1)",
+                [],
+            )
+            .expect("insert schema test attachment");
+
+        connection
+            .execute(
+                "INSERT INTO source_file_attachment_links (
+                     attachment_id,
+                     source_file_id,
+                     source_id,
+                     file_kind,
+                     created_at,
+                     updated_at
+                 )
+                 VALUES (20, 10, 2, 'audio', 1, 1)",
+                [],
+            )
+            .expect_err("link source_id must match linked source_files.source_id");
+
+        connection
+            .execute(
+                "INSERT INTO source_file_attachment_links (
+                     attachment_id,
+                     source_file_id,
+                     source_id,
+                     file_kind,
+                     created_at,
+                     updated_at
+                 )
+                 VALUES (20, 10, 1, 'audio', 1, 1)",
+                [],
+            )
+            .expect("insert matching link");
+        connection
+            .execute(
+                "UPDATE source_file_attachment_links
+                 SET source_id = 2
+                 WHERE source_file_id = 10",
+                [],
+            )
+            .expect_err("link source_id update must not drift");
+        connection
+            .execute(
+                "UPDATE source_files
+                 SET source_id = 2
+                 WHERE source_file_id = 10",
+                [],
+            )
+            .expect_err("source_file source_id update must not drift existing link");
+    }
+
+    #[test]
     fn browser_user_order_uses_partial_unique_indexes_and_legal_parent_shapes() {
         let connection = install_test_baseline();
         let index_names = table_index_names(&connection, "browser_user_order");
@@ -1106,10 +1241,18 @@ mod tests {
     fn internal_object_policy_only_ignores_sqlite_internal_objects() {
         let canonical = snapshot::canonical_snapshot().expect("build canonical snapshot");
 
-        assert!(
-            canonical.compared_triggers.is_empty(),
-            "the canonical baseline should not install compared triggers: {:?}",
-            canonical.compared_triggers.keys().collect::<Vec<_>>()
+        assert_eq!(
+            canonical
+                .compared_triggers
+                .keys()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            vec![
+                "source_file_attachment_links_source_match_insert",
+                "source_file_attachment_links_source_match_update",
+                "source_files_attachment_link_source_match_update",
+            ],
+            "only source-file attachment link invariant triggers should be compared"
         );
 
         assert!(

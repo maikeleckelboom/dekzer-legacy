@@ -96,6 +96,9 @@ V0 review states are exactly:
 
 The store fetches factual candidate, evidence, source, and effective-decision summary columns, then maps those facts to
 the `reviewState` enum in Rust. SQL must not compute `reviewState`.
+SQL may use the same backend-owned decision facts to select the bounded candidate id window for a requested
+`reviewState` filter before hydration. The Rust read model still derives and returns the `reviewState` enum for each
+returned row.
 
 `blockedByUserDecision` is not a V0 state. It remains a future product gap if the review loop needs to distinguish user
 reject/defer blocking semantics from the effective user decision itself.
@@ -133,6 +136,8 @@ metadata, or source participation.
 
 V0 ordering is stable backend ordering by `candidateId` ascending. `limit` must be between 1 and 200. V0 does not
 implement cursoring.
+Source and review-state filters are applied in SQL before the limit, and expensive effective-decision/source-sample
+hydration runs only for candidates in the returned bounded page.
 
 TODO for future cursoring:
 

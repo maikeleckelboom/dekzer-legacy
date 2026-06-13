@@ -23,23 +23,6 @@ pub struct MaterializeAttachmentsForSourceResult {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct AttachmentMaterializationRow {
-    source_file_id: i64,
-    source_id: i64,
-    file_kind: String,
-    content_hash_value: Option<String>,
-    disposition: AttachmentMaterializationDisposition,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum AttachmentMaterializationDisposition {
-    Materializable,
-    StaleFacts,
-    NoBlake3,
-    NoFacts,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
 struct AttachmentMaterializationCandidate {
     source_file_id: i64,
     source_id: i64,
@@ -94,42 +77,12 @@ fn materialize_attachments_for_source(
     limit: usize,
     materialized_at: i64,
 ) -> LibrarySqliteResult<MaterializeAttachmentsForSourceResult> {
-    let rows = read_attachment_materialization_rows(write, source_id)?;
-    let mut result = MaterializeAttachmentsForSourceResult::default();
-    let mut candidates = Vec::new();
-
-    for row in rows {
-        match row.disposition {
-            AttachmentMaterializationDisposition::Materializable => {
-                let content_hash_value = row.content_hash_value.ok_or_else(|| {
-                    LibrarySqliteError::MalformedSchemaState(
-                        "materializable attachment row is missing content_hash_value".to_string(),
-                    )
-                })?;
-                candidates.push(AttachmentMaterializationCandidate {
-                    source_file_id: row.source_file_id,
-                    source_id: row.source_id,
-                    file_kind: row.file_kind,
-                    content_hash_value,
-                });
-            }
-            AttachmentMaterializationDisposition::StaleFacts => {
-                result.skipped_stale_facts += 1;
-            }
-            AttachmentMaterializationDisposition::NoBlake3 => {
-                result.skipped_no_blake3 += 1;
-            }
-            AttachmentMaterializationDisposition::NoFacts => {
-                result.skipped_no_facts += 1;
-            }
-        }
-    }
-
-    let materializable_count = candidates.len();
+    let mut result = read_attachment_materialization_skip_summary(write, source_id)?;
+    let materializable_count = count_attachment_materialization_candidates(write, source_id)?;
     result.remaining_candidates = materializable_count.saturating_sub(limit);
 
     let mut attachment_ids_by_hash = BTreeMap::new();
-    for candidate in candidates.into_iter().take(limit) {
+    for candidate in read_attachment_materialization_candidates(write, source_id, limit)? {
         let attachment_id = match attachment_ids_by_hash.get(&candidate.content_hash_value) {
             Some(attachment_id) => *attachment_id,
             None => {
@@ -165,77 +118,139 @@ fn materialize_attachments_for_source(
     Ok(result)
 }
 
-fn read_attachment_materialization_rows(
+fn read_attachment_materialization_skip_summary(
     write: &AdmittedWrite<'_>,
     source_id: i64,
-) -> LibrarySqliteResult<Vec<AttachmentMaterializationRow>> {
+) -> LibrarySqliteResult<MaterializeAttachmentsForSourceResult> {
+    write
+        .query_row(
+            "SELECT COALESCE(SUM(CASE
+                    WHEN facts.source_file_id IS NULL THEN 1
+                    ELSE 0
+                END), 0),
+                COALESCE(SUM(CASE
+                    WHEN facts.source_file_id IS NOT NULL
+                     AND NOT (
+                         file.source_id = facts.basis_source_id
+                         AND file.relative_path = facts.basis_relative_path
+                         AND file.size_bytes IS facts.basis_size_bytes
+                         AND file.mtime_ns IS facts.basis_mtime_ns
+                         AND file.presence_state = facts.basis_presence_state
+                     )
+                    THEN 1 ELSE 0
+                END), 0),
+                COALESCE(SUM(CASE
+                    WHEN facts.source_file_id IS NOT NULL
+                     AND (
+                         file.source_id = facts.basis_source_id
+                         AND file.relative_path = facts.basis_relative_path
+                         AND file.size_bytes IS facts.basis_size_bytes
+                         AND file.mtime_ns IS facts.basis_mtime_ns
+                         AND file.presence_state = facts.basis_presence_state
+                     )
+                     AND NOT (
+                         facts.content_hash_algorithm = ?2
+                         AND facts.content_hash_value IS NOT NULL
+                     )
+                    THEN 1 ELSE 0
+                END), 0)
+             FROM source_files file
+             LEFT JOIN SourceFacts facts
+               ON facts.source_file_id = file.source_file_id
+             WHERE file.source_id = ?1",
+            params![source_id, SOURCE_FILE_BLAKE3_ALGORITHM],
+            |row| {
+                Ok(MaterializeAttachmentsForSourceResult {
+                    skipped_no_facts: read_count(row, 0)?,
+                    skipped_stale_facts: read_count(row, 1)?,
+                    skipped_no_blake3: read_count(row, 2)?,
+                    ..Default::default()
+                })
+            },
+        )
+        .map_err(Into::into)
+}
+
+fn count_attachment_materialization_candidates(
+    write: &AdmittedWrite<'_>,
+    source_id: i64,
+) -> LibrarySqliteResult<usize> {
+    write
+        .query_row(
+            "SELECT COUNT(*)
+             FROM source_files file
+             JOIN SourceFacts facts
+               ON facts.source_file_id = file.source_file_id
+             WHERE file.source_id = ?1
+               AND file.source_id = facts.basis_source_id
+               AND file.relative_path = facts.basis_relative_path
+               AND file.size_bytes IS facts.basis_size_bytes
+               AND file.mtime_ns IS facts.basis_mtime_ns
+               AND file.presence_state = facts.basis_presence_state
+               AND facts.content_hash_algorithm = ?2
+               AND facts.content_hash_value IS NOT NULL",
+            params![source_id, SOURCE_FILE_BLAKE3_ALGORITHM],
+            |row| read_count(row, 0),
+        )
+        .map_err(Into::into)
+}
+
+fn read_attachment_materialization_candidates(
+    write: &AdmittedWrite<'_>,
+    source_id: i64,
+    limit: usize,
+) -> LibrarySqliteResult<Vec<AttachmentMaterializationCandidate>> {
+    let limit_i64 =
+        i64::try_from(limit).map_err(|_| rusqlite::Error::IntegralValueOutOfRange(0, i64::MAX))?;
     let mut statement = write.prepare(
         "SELECT file.source_file_id,
                 file.source_id,
                 file.file_kind,
-                facts.content_hash_value,
-                CASE
-                    WHEN facts.source_file_id IS NULL THEN 3
-                    WHEN NOT (
-                        file.source_id = facts.basis_source_id
-                        AND file.relative_path = facts.basis_relative_path
-                        AND file.size_bytes IS facts.basis_size_bytes
-                        AND file.mtime_ns IS facts.basis_mtime_ns
-                        AND file.presence_state = facts.basis_presence_state
-                    ) THEN 3
-                    WHEN NOT (
-                        facts.content_hash_algorithm = ?2
-                        AND facts.content_hash_value IS NOT NULL
-                    ) THEN 3
-                    WHEN link.source_file_id IS NULL THEN 0
-                    WHEN attachment.content_hash_value != facts.content_hash_value THEN 1
-                    ELSE 2
-                END AS materialization_priority,
-                CASE
-                    WHEN facts.source_file_id IS NULL THEN 'no_facts'
-                    WHEN NOT (
-                        file.source_id = facts.basis_source_id
-                        AND file.relative_path = facts.basis_relative_path
-                        AND file.size_bytes IS facts.basis_size_bytes
-                        AND file.mtime_ns IS facts.basis_mtime_ns
-                        AND file.presence_state = facts.basis_presence_state
-                    ) THEN 'stale_facts'
-                    WHEN facts.content_hash_algorithm = ?2
-                     AND facts.content_hash_value IS NOT NULL THEN 'materializable'
-                    ELSE 'no_blake3'
-                END AS attachment_materialization_disposition
+                facts.content_hash_value
          FROM source_files file
-         LEFT JOIN SourceFacts facts
+         JOIN SourceFacts facts
            ON facts.source_file_id = file.source_file_id
          LEFT JOIN source_file_attachment_links link
            ON link.source_file_id = file.source_file_id
          LEFT JOIN content_attachments attachment
            ON attachment.attachment_id = link.attachment_id
          WHERE file.source_id = ?1
-         ORDER BY materialization_priority ASC,
+           AND file.source_id = facts.basis_source_id
+           AND file.relative_path = facts.basis_relative_path
+           AND file.size_bytes IS facts.basis_size_bytes
+           AND file.mtime_ns IS facts.basis_mtime_ns
+           AND file.presence_state = facts.basis_presence_state
+           AND facts.content_hash_algorithm = ?2
+           AND facts.content_hash_value IS NOT NULL
+         ORDER BY CASE
+                    WHEN link.source_file_id IS NULL THEN 0
+                    WHEN attachment.content_hash_value != facts.content_hash_value THEN 1
+                    ELSE 2
+                  END ASC,
                   lower(file.relative_path) ASC,
-                  file.source_file_id ASC",
+                  file.source_file_id ASC
+         LIMIT ?3",
     )?;
 
     statement
-        .query_map(params![source_id, SOURCE_FILE_BLAKE3_ALGORITHM], |row| {
-            let raw_disposition = row.get::<_, String>(5)?;
-            let disposition = match raw_disposition.as_str() {
-                "materializable" => AttachmentMaterializationDisposition::Materializable,
-                "stale_facts" => AttachmentMaterializationDisposition::StaleFacts,
-                "no_blake3" => AttachmentMaterializationDisposition::NoBlake3,
-                _ => AttachmentMaterializationDisposition::NoFacts,
-            };
-            Ok(AttachmentMaterializationRow {
-                source_file_id: row.get(0)?,
-                source_id: row.get(1)?,
-                file_kind: row.get(2)?,
-                content_hash_value: row.get(3)?,
-                disposition,
-            })
-        })?
+        .query_map(
+            params![source_id, SOURCE_FILE_BLAKE3_ALGORITHM, limit_i64],
+            |row| {
+                Ok(AttachmentMaterializationCandidate {
+                    source_file_id: row.get(0)?,
+                    source_id: row.get(1)?,
+                    file_kind: row.get(2)?,
+                    content_hash_value: row.get(3)?,
+                })
+            },
+        )?
         .collect::<Result<Vec<_>, _>>()
         .map_err(Into::into)
+}
+
+fn read_count(row: &rusqlite::Row<'_>, index: usize) -> rusqlite::Result<usize> {
+    let count = row.get::<_, i64>(index)?;
+    usize::try_from(count).map_err(|_| rusqlite::Error::IntegralValueOutOfRange(index, count))
 }
 
 fn upsert_content_attachment(
@@ -1048,6 +1063,36 @@ mod tests {
     }
 
     #[test]
+    fn bounded_materialization_counts_skips_without_consuming_candidate_window() {
+        let mut fixture = AttachmentIdentityFixture::new();
+        fixture.record_source_file(100, "Album/a.flac", 10, 100);
+        fixture.record_source_file(101, "Album/b.flac", 11, 101);
+        fixture.record_source_file(102, "Album/no-facts.flac", 12, 102);
+        fixture.record_source_file(103, "Album/no-blake3.flac", 13, 103);
+        fixture.record_source_file(104, "Album/stale.flac", 14, 104);
+        fixture.commit_blake3_fact(100, HASH_A, "audio");
+        fixture.commit_blake3_fact(101, HASH_B, "audio");
+        fixture.commit_source_fact(103, Some(("sha256", "fixture-sha")), "audio");
+        fixture.commit_blake3_fact(104, HASH_C, "audio");
+        fixture.record_source_file(104, "Album/stale.flac", 15, 105);
+
+        let result = fixture.materialize(1);
+
+        assert_eq!(result.links_created, 1);
+        assert_eq!(result.remaining_candidates, 1);
+        assert_eq!(result.skipped_no_facts, 1);
+        assert_eq!(result.skipped_no_blake3, 1);
+        assert_eq!(result.skipped_stale_facts, 1);
+        assert_eq!(fixture.link_count_for_source_file(100), 1);
+        assert_eq!(fixture.link_count_for_source_file(101), 0);
+        assert_eq!(
+            fixture.count_rows("source_file_attachment_links"),
+            1,
+            "bounded materialization must process only the requested candidate window"
+        );
+    }
+
+    #[test]
     fn stale_observed_fact_is_skipped_without_creating_a_link() {
         let mut fixture = AttachmentIdentityFixture::new();
         fixture.record_source_file(100, "Album/stale.flac", 10, 100);
@@ -1166,6 +1211,62 @@ mod tests {
             )
             .expect_err("source_file_id must have only one attachment link");
         assert_eq!(fixture.link_count_for_source_file(100), 1);
+    }
+
+    #[test]
+    fn store_rejects_attachment_link_source_id_drift() {
+        let mut fixture = AttachmentIdentityFixture::new();
+        fixture.record_source_file(100, "Album/track.flac", 10, 100);
+        let error = fixture
+            .store
+            .with_write(|write| {
+                write.execute(
+                    "INSERT INTO sources (
+                         source_id,
+                         source_class,
+                         authority,
+                         identity_key,
+                         display_name,
+                         created_at,
+                         updated_at
+                     )
+                     VALUES (2, 'internal', 'system', 'source:attachment-drift',
+                             'Attachment Drift Source', 1, 1)",
+                    [],
+                )?;
+                write.execute(
+                    "INSERT INTO content_attachments (
+                         attachment_id,
+                         content_hash_algorithm,
+                         content_hash_value,
+                         first_observed_at,
+                         updated_at
+                     )
+                     VALUES (999, 'blake3', ?1, 1, 1)",
+                    [HASH_A],
+                )?;
+                write.execute(
+                    "INSERT INTO source_file_attachment_links (
+                         attachment_id,
+                         source_file_id,
+                         source_id,
+                         file_kind,
+                         created_at,
+                         updated_at
+                     )
+                     VALUES (999, 100, 2, 'audio', 1, 1)",
+                    [],
+                )?;
+                Ok(())
+            })
+            .expect_err("store must reject mismatched source-file attachment link source_id");
+
+        let detail = format!("{error:?}");
+        assert!(
+            detail.contains("source_file_attachment_links.source_id must match"),
+            "unexpected mismatch error: {detail}"
+        );
+        assert_eq!(fixture.link_count_for_source_file(100), 0);
     }
 
     #[test]
