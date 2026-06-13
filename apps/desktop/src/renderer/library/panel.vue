@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 
 import { Icon } from '../icons'
 import { profileLabel, profileOptions, type ProfileKey } from './browseProfile/types'
@@ -15,6 +15,7 @@ import {
 } from './boundary/sourceLifecycleRead'
 import ContentsTable from './contents/table.vue'
 import { projectContents, type ContentRow } from './contents/projection'
+import { projectSearchFilterContents } from './searchFilter/contentsProjection'
 import {
   buildGapPlan,
   buildInvalidationPlan,
@@ -23,6 +24,7 @@ import {
   type RefreshPlanDeps
 } from './runtime/invalidationRefresh'
 import { createDisclosureReconciler } from './runtime/disclosureReconciliation'
+import { createLibrarySearchController } from './runtime/librarySearch'
 import { useSearchFilterRead } from './runtime/searchFilterState'
 import { useRootLifecycle } from './runtime/rootLifecycle'
 import {
@@ -64,6 +66,10 @@ const rootActions = useLocalRootActions()
 const boundaryEvents = useBoundaryEvents()
 const sourceLifecycleRead = useSourceLifecycleRead()
 const searchFilterRead = useSearchFilterRead()
+const librarySearch = createLibrarySearchController({
+  profile: browseProfile.profile,
+  searchFilterRead
+})
 const disclosureReconciler = createDisclosureReconciler({
   requestNodeChildren: (nodeId) => requestBrowserNodeChildren(nodeId)
 })
@@ -86,6 +92,7 @@ const sourceRevealRequest = ref<{
 }>()
 const browseProfileMenuOpen = ref(false)
 const browseProfileMenuRef = ref<HTMLElement>()
+const searchInputRef = ref<HTMLInputElement>()
 let sourceRevealSequence = 0
 
 const restoreState = {
@@ -165,6 +172,14 @@ const treeRootProps = computed(() => ({
 }))
 
 const contentsProjection = computed(() => {
+  if (librarySearch.searchActive.value) {
+    return projectSearchFilterContents({
+      state: searchFilterRead.state.value,
+      activeQuery: librarySearch.activeQuery.value,
+      profile: browseProfile.profile.value
+    })
+  }
+
   const projection = browserProjection.value
 
   return projectContents({
@@ -303,6 +318,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.removeEventListener('pointerdown', handleBrowseProfileOutsidePointerDown)
+  librarySearch.dispose()
 })
 
 watch(
@@ -409,6 +425,17 @@ function selectBrowseProfile(profile: ProfileKey): void {
 
 function closeBrowseProfileMenu(): void {
   browseProfileMenuOpen.value = false
+}
+
+function openSearch(): void {
+  librarySearch.openSearch()
+  void nextTick(() => {
+    searchInputRef.value?.focus()
+  })
+}
+
+function handleSearchEscape(): void {
+  librarySearch.handleEscape()
 }
 
 function handleBrowseProfileOutsidePointerDown(event: PointerEvent): void {
@@ -678,6 +705,8 @@ function activateContentRowAction(row: ContentRow): void {
     void contentsRead.readForBinding(browserProjection.value?.bindingsById.get(action.nodeId), {
       cursor: action.cursor
     })
+  } else if (action.kind === 'loadSearchPage') {
+    void searchFilterRead.loadNext()
   }
 }
 
@@ -707,6 +736,39 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
       </h2>
 
       <div class="flex flex-wrap items-center justify-end gap-2">
+        <button
+          v-if="!librarySearch.searchOpen.value"
+          type="button"
+          :class="iconButtonClass"
+          aria-label="Search library"
+          title="Search library"
+          @click="openSearch"
+        >
+          <Icon role="action.search" size="md" />
+        </button>
+
+        <div v-else class="inline-flex items-center gap-1">
+          <input
+            ref="searchInputRef"
+            v-model="librarySearch.searchText.value"
+            type="search"
+            class="h-9 w-44 rounded-sm border border-(--color-border) bg-(--color-background) px-3 py-2 text-sm font-semibold text-(--color-text) outline-none transition placeholder:text-(--color-text-muted) hover:border-(--color-accent) focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background)"
+            aria-label="Search library"
+            placeholder="Search library"
+            @keydown.escape.stop.prevent="handleSearchEscape"
+          />
+          <button
+            v-if="librarySearch.searchText.value.length > 0"
+            type="button"
+            :class="iconButtonClass"
+            aria-label="Clear search"
+            title="Clear search"
+            @click="librarySearch.clearSearch()"
+          >
+            <Icon role="action.clear" size="md" />
+          </button>
+        </div>
+
         <div ref="browseProfileMenuRef" class="relative inline-flex">
           <button
             type="button"

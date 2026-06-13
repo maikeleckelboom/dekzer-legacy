@@ -66,6 +66,11 @@ export type ContentRowAction =
       readonly label: string
     }
   | {
+      readonly kind: 'loadSearchPage'
+      readonly label: string
+      readonly cursor: string
+    }
+  | {
       readonly kind: 'requestLocalBrowseAdmission'
       readonly resolvedPath: string
       readonly requestKind: Extract<

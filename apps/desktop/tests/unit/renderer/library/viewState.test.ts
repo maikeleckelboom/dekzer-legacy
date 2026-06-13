@@ -70,6 +70,25 @@ describe('createViewStateStore', () => {
     })
   })
 
+  it('does not persist search text as durable view state', async () => {
+    const { api, writes, resolveAll } = createQueuedWriteApi()
+    const store = createViewStateStore(api)
+
+    store.save({
+      version: 1,
+      expandedNodeIds: [],
+      profile: 'audio',
+      searchText: 'amen'
+    } as unknown as PersistedLibraryViewState)
+    await resolveAll()
+
+    expect(writes[0]?.state).toEqual({
+      version: 1,
+      expandedNodeIds: [],
+      profile: 'audio'
+    })
+  })
+
   it('does not let a failed write block later writes', async () => {
     const writes: PersistedLibraryViewState[] = []
     let callCount = 0

@@ -29,6 +29,20 @@ describe('library browser surface containment', () => {
     expect(panel).toContain('role="listbox"')
     expect(panel).toContain(':aria-selected="browseProfile.profile.value === option.key"')
   })
+
+  it('keeps library search control compact, icon-first, and accessible', () => {
+    const panel = readRendererSource('panel.vue')
+
+    expect(panel).toContain('aria-label="Search library"')
+    expect(panel).toContain('title="Search library"')
+    expect(panel).toContain('<Icon role="action.search" size="md" />')
+    expect(panel).toContain('placeholder="Search library"')
+    expect(panel).toContain('@keydown.escape.stop.prevent="handleSearchEscape"')
+    expect(panel).toContain('aria-label="Clear search"')
+    expect(panel).toContain("action.kind === 'loadSearchPage'")
+    expect(panel).toContain('searchFilterRead.loadNext()')
+    expect(panel).not.toContain('Search:')
+  })
 })
 
 function readRendererSource(relativePath: string): string {
