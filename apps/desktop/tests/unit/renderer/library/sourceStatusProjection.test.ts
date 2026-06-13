@@ -27,7 +27,7 @@ describe('source status projection', () => {
       projectStatusContext({ projection: sourceProjection(), selectedTitle: 'Library contents' })
     )
 
-    expect(view.kind).toBe('none')
+    expect(view.role).toBe('none')
     expect(view.actions).toEqual([])
   })
 
@@ -203,7 +203,7 @@ describe('source status projection', () => {
     })
     const view = statusView(context, { sourceIntegrity: integrity({ coverage: 'complete' }) })
 
-    expect(view.kind).toBe('registeredSource')
+    expect(view.role).toBe('registeredSource')
     expect(view.title).toBe('Source Fixture')
     expect(view.title).not.toBe('Search results')
   })
@@ -262,13 +262,13 @@ function statusView(
 ): ReturnType<typeof projectStatusView> {
   return projectStatusView({
     context,
-    localAddEnabled: true,
+    canAddLocalPath: true,
     scanStatus: 'idle',
     removeSourceStatus: 'idle',
     refreshStatus: 'idle',
-    scanSupported: true,
-    removeSupported: true,
-    maintenanceSupported: true,
+    canScan: true,
+    canRemove: true,
+    canRunMaintenance: true,
     ...options
   })
 }

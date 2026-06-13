@@ -58,10 +58,10 @@ export type StatusAction =
     }
 
 export type StatusView = {
-  readonly kind: StatusContext['kind']
+  readonly role: StatusContext['kind']
   readonly title: string
   readonly badge?: StatusBadge
-  readonly badgeTone: 'ready' | 'active' | 'warning' | 'danger' | 'muted'
+  readonly tone: 'ready' | 'active' | 'warning' | 'danger' | 'muted'
   readonly detail?: string
   readonly actions: readonly StatusAction[]
 }
@@ -72,14 +72,14 @@ export type StatusViewInput = {
   readonly sourceReadiness?: SourceReadiness
   readonly sourceIntegrity?: ReadSourceIntegrityReply
   readonly sourceMaintenance?: ReadSourceMaintenanceReply
-  readonly localAddEnabled: boolean
+  readonly canAddLocalPath: boolean
   readonly scanStatus: LocalRootScanStatus
   readonly maintenanceRunState?: 'idle' | 'running' | 'completed' | 'failed'
   readonly removeSourceStatus: RemoveSourceStatus
   readonly refreshStatus: RootLifecycleRefreshStatus
-  readonly scanSupported: boolean
-  readonly removeSupported: boolean
-  readonly maintenanceSupported: boolean
+  readonly canScan: boolean
+  readonly canRemove: boolean
+  readonly canRunMaintenance: boolean
 }
 
 export function projectStatusView(input: StatusViewInput): StatusView {
@@ -88,9 +88,9 @@ export function projectStatusView(input: StatusViewInput): StatusView {
   switch (context.kind) {
     case 'none':
       return {
-        kind: 'none',
+        role: 'none',
         title: 'Library contents',
-        badgeTone: 'muted',
+        tone: 'muted',
         actions: []
       }
     case 'localBrowse':
@@ -101,19 +101,19 @@ export function projectStatusView(input: StatusViewInput): StatusView {
       return registeredStatus(input, context)
     case 'navigation':
       return {
-        kind: 'navigation',
+        role: 'navigation',
         title: context.title,
         badge: 'Unknown',
-        badgeTone: 'muted',
+        tone: 'muted',
         detail: context.detail ?? 'Navigation row.',
         actions: []
       }
     case 'readState':
       return {
-        kind: 'readState',
+        role: 'readState',
         title: context.title,
         badge: 'Unknown',
-        badgeTone: 'muted',
+        tone: 'muted',
         detail: context.detail,
         actions: []
       }
@@ -127,10 +127,10 @@ function localBrowseStatus(
   const admission = context.admission
 
   return {
-    kind: 'localBrowse',
+    role: 'localBrowse',
     title: context.title,
     badge: 'Unknown',
-    badgeTone: 'muted',
+    tone: 'muted',
     detail:
       admission === undefined
         ? 'Local browse only. Add a folder before scan or maintenance.'
@@ -143,8 +143,8 @@ function localBrowseStatus(
               kind: 'addLocalPath',
               label: admission.label,
               resolvedPath: admission.resolvedPath,
-              enabled: input.localAddEnabled,
-              ...(input.localAddEnabled ? {} : { reason: 'A source action is already running.' })
+              enabled: input.canAddLocalPath,
+              ...(input.canAddLocalPath ? {} : { reason: 'A source action is already running.' })
             }
           ]
   }
@@ -159,7 +159,7 @@ function registeredStatus(
 ): StatusView {
   const badge = registeredBadge(input)
   const sourceId = context.sourceId
-  const sourceScopedDetail =
+  const inheritanceDetail =
     context.kind === 'registeredDirectory'
       ? 'Folder status follows its registered source.'
       : context.kind === 'registeredFile'
@@ -167,11 +167,11 @@ function registeredStatus(
         : undefined
 
   return {
-    kind: context.kind,
+    role: context.kind,
     title: context.title,
     badge,
-    badgeTone: badgeTone(badge),
-    detail: compactDetail(input, sourceScopedDetail),
+    tone: toneForBadge(badge),
+    detail: compactDetail(input, inheritanceDetail),
     actions: registeredActions(input, sourceId)
   }
 }
@@ -350,7 +350,7 @@ function registeredActions(input: StatusViewInput, sourceId: string): readonly S
 }
 
 function scanAction(input: StatusViewInput, sourceId: string): StatusAction | undefined {
-  if (!input.scanSupported) {
+  if (!input.canScan) {
     return undefined
   }
 
@@ -372,7 +372,7 @@ function scanAction(input: StatusViewInput, sourceId: string): StatusAction | un
 }
 
 function maintenanceAction(input: StatusViewInput, sourceId: string): StatusAction | undefined {
-  if (!input.maintenanceSupported) {
+  if (!input.canRunMaintenance) {
     return undefined
   }
 
@@ -394,7 +394,7 @@ function maintenanceAction(input: StatusViewInput, sourceId: string): StatusActi
 }
 
 function removeAction(input: StatusViewInput, sourceId: string): StatusAction | undefined {
-  if (!input.removeSupported) {
+  if (!input.canRemove) {
     return undefined
   }
 
@@ -426,7 +426,7 @@ function refreshAction(input: StatusViewInput, sourceId: string): StatusAction {
   }
 }
 
-function badgeTone(badge: StatusBadge): StatusView['badgeTone'] {
+function toneForBadge(badge: StatusBadge): StatusView['tone'] {
   switch (badge) {
     case 'Ready':
       return 'ready'

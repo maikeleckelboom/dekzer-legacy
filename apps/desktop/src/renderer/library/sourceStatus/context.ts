@@ -10,7 +10,7 @@ export type StatusContext =
   | {
       readonly kind: 'localBrowse'
       readonly title: string
-      readonly rowKind: 'folder' | 'file'
+      readonly itemRole: 'folder' | 'file'
       readonly detail?: string
       readonly admission?: StatusAdmission
     }
@@ -122,7 +122,7 @@ function contextForBinding(
       return {
         kind: 'localBrowse',
         title,
-        rowKind: 'folder',
+        itemRole: 'folder',
         ...(entryDetail === undefined ? {} : { detail: entryDetail }),
         ...admissionField(binding.entry.availableOperations)
       }
@@ -131,7 +131,7 @@ function contextForBinding(
       return {
         kind: 'localBrowse',
         title,
-        rowKind: binding.target === undefined ? 'file' : 'folder',
+        itemRole: binding.target === undefined ? 'file' : 'folder',
         detail: binding.item.identity.resolvedItemPath,
         ...admissionField(binding.item.availableOperations)
       }

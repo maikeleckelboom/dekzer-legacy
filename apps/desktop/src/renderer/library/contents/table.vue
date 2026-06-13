@@ -133,7 +133,7 @@ function resolveContentActionIcon(): IconRole {
 }
 
 function statusBadgeClass(view: StatusView): string {
-  switch (view.badgeTone) {
+  switch (view.tone) {
     case 'ready':
       return 'border-(--color-border) text-(--color-text)'
     case 'active':

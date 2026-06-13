@@ -13,8 +13,8 @@ import {
   sourceLifecycleIdsForBrowserContext,
   useSourceLifecycleRead
 } from './boundary/sourceLifecycleRead'
-import { useSourceIntegrityRead } from './boundary/sourceIntegrityRead'
-import { useSourceMaintenanceRead } from './boundary/sourceMaintenanceRead'
+import { useRead as useIntegrityRead } from './sourceIntegrity/read'
+import { useRead as useMaintenanceRead } from './sourceMaintenance/read'
 import ContentsTable from './contents/table.vue'
 import { projectContents, type ContentRow } from './contents/projection'
 import { projectSearchFilterContents } from './searchFilter/contentsProjection'
@@ -69,8 +69,8 @@ const contentsRead = useContentsRead(undefined, { profile: browseProfile.profile
 const rootActions = useLocalRootActions()
 const boundaryEvents = useBoundaryEvents()
 const sourceLifecycleRead = useSourceLifecycleRead()
-const sourceIntegrityRead = useSourceIntegrityRead()
-const sourceMaintenanceRead = useSourceMaintenanceRead()
+const integrityRead = useIntegrityRead()
+const maintenanceRead = useMaintenanceRead()
 const searchFilterRead = useSearchFilterRead()
 const librarySearch = createLibrarySearchController({
   profile: browseProfile.profile,
@@ -245,17 +245,11 @@ const sourceStatusView = computed(() => {
       ? undefined
       : sourceLifecycleRead.sourceLifecycleBySourceId.value.get(sourceId)
   const sourceIntegrity =
-    sourceId === undefined
-      ? undefined
-      : sourceIntegrityRead.sourceIntegrityBySourceId.value.get(sourceId)
+    sourceId === undefined ? undefined : integrityRead.snapshotBySourceId.value.get(sourceId)
   const sourceMaintenance =
-    sourceId === undefined
-      ? undefined
-      : sourceMaintenanceRead.sourceMaintenanceBySourceId.value.get(sourceId)
+    sourceId === undefined ? undefined : maintenanceRead.snapshotBySourceId.value.get(sourceId)
   const maintenanceRunState =
-    sourceId === undefined
-      ? undefined
-      : sourceMaintenanceRead.sourceMaintenanceRunStateBySourceId.value.get(sourceId)
+    sourceId === undefined ? undefined : maintenanceRead.runStateBySourceId.value.get(sourceId)
   const sourceReadiness =
     selectedNodeId.value === undefined
       ? undefined
@@ -268,13 +262,13 @@ const sourceStatusView = computed(() => {
     ...(sourceMaintenance === undefined ? {} : { sourceMaintenance }),
     ...(maintenanceRunState === undefined ? {} : { maintenanceRunState }),
     ...(sourceReadiness === undefined ? {} : { sourceReadiness }),
-    localAddEnabled: rootLifecycle.canAddMusicFolder.value,
+    canAddLocalPath: rootLifecycle.canAddMusicFolder.value,
     scanStatus: rootActions.scanStatus.value,
     removeSourceStatus: rootActions.removeSourceStatus.value,
     refreshStatus: rootLifecycle.refreshStatus.value,
-    scanSupported: sourceId !== undefined && rootLifecycle.canScanSourceRoot(sourceId),
-    removeSupported: sourceId !== undefined && rootActions.canUnregisterLocalRootId(sourceId),
-    maintenanceSupported: sourceId !== undefined
+    canScan: sourceId !== undefined && rootLifecycle.canScanSourceRoot(sourceId),
+    canRemove: sourceId !== undefined && rootActions.canUnregisterLocalRootId(sourceId),
+    canRunMaintenance: sourceId !== undefined
   })
 })
 
@@ -415,8 +409,8 @@ watch(
       return
     }
 
-    void sourceIntegrityRead.refreshSourceIntegrities(sourceIds)
-    void sourceMaintenanceRead.refreshSourceMaintenances(sourceIds)
+    void integrityRead.refresh(sourceIds)
+    void maintenanceRead.refresh(sourceIds)
   },
   { immediate: true }
 )
@@ -737,7 +731,7 @@ async function handleStatusAction(action: StatusAction): Promise<void> {
       await rootLifecycle.scanRoot(action.sourceId)
       break
     case 'runMaintenance':
-      await sourceMaintenanceRead.runSourceMaintenance(action.sourceId)
+      await maintenanceRead.run(action.sourceId)
       await refreshSourceStatus(action.sourceId)
       await refreshContentsForCurrentSelection()
       await searchFilterRead.invalidationSignal()
@@ -763,8 +757,8 @@ async function refreshSelectedSourceStatus(): Promise<boolean> {
 async function refreshSourceStatus(sourceId: string): Promise<boolean> {
   const [lifecycle, integrity, maintenance] = await Promise.all([
     sourceLifecycleRead.readSourceLifecycle(sourceId),
-    sourceIntegrityRead.readSourceIntegrity(sourceId),
-    sourceMaintenanceRead.readSourceMaintenance(sourceId)
+    integrityRead.read(sourceId),
+    maintenanceRead.read(sourceId)
   ])
 
   return lifecycle && integrity && maintenance
