@@ -24,6 +24,9 @@ export const libraryControlChannels = {
   localBrowser: {
     entryPoints: {
       read: 'desktop:library-local-browser-entry-points:read'
+    },
+    children: {
+      read: 'desktop:library-local-browser-children:read'
     }
   },
   navigation: {

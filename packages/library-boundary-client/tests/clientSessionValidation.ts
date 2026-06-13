@@ -704,6 +704,82 @@ async function validatesLocalBrowserEntryPointReadRequestAndReply(): Promise<voi
   )
 }
 
+async function validatesLocalBrowserChildReadRequestAndReply(): Promise<void> {
+  const transport = new RecordingTransport()
+  transport.enqueueOutcome(
+    success({
+      type: 'snapshotRead',
+      payload: {
+        type: 'localBrowserChildren',
+        payload: {
+          status: 'complete',
+          windowIdentity: {
+            entryPointKind: 'music',
+            rootCanonicalPath: 'C:\\Users\\DJ\\Music',
+            parentCanonicalPath: 'C:\\Users\\DJ\\Music'
+          },
+          offset: 0,
+          limit: 50,
+          totalRows: 1,
+          rows: [
+            {
+              identity: {
+                entryPointKind: 'music',
+                rootCanonicalPath: 'C:\\Users\\DJ\\Music',
+                candidateCanonicalPath: 'C:\\Users\\DJ\\Music\\Track.flac'
+              },
+              rowKind: 'mediaFileCandidate',
+              displayName: 'Track.flac',
+              status: 'available',
+              platform: 'windows',
+              fileKind: 'audio',
+              mediaRelevance: 'mediaRelevant',
+              admissionHint: 'chooseParentDirectory',
+              affordances: {
+                canBrowse: false,
+                canRequestAdmission: false,
+                canChooseDescendant: false,
+                canRequestParentAdmission: true,
+                requiresConfirmation: false
+              },
+              failure: null
+            }
+          ],
+          failure: null
+        }
+      }
+    })
+  )
+  const client = new LibraryBoundaryClient(transport)
+
+  const request = {
+    entryPointKind: 'music',
+    rootCanonicalPath: 'C:\\Users\\DJ\\Music',
+    parentCanonicalPath: 'C:\\Users\\DJ\\Music',
+    offset: 0,
+    limit: 50
+  } as const
+  const reply = await client.readLocalBrowserChildren(request)
+
+  deepEqual(
+    transport.sentRequests[0],
+    {
+      type: 'snapshotRead',
+      payload: {
+        type: 'readLocalBrowserChildren',
+        payload: request
+      }
+    } satisfies CommandRequest,
+    'readLocalBrowserChildren sends the generated snapshot command'
+  )
+  equal(reply.rows[0]?.rowKind, 'mediaFileCandidate', 'child row kind is preserved')
+  equal(
+    reply.rows[0]?.admissionHint,
+    'chooseParentDirectory',
+    'media file admission handoff hint is preserved'
+  )
+}
+
 async function validatesTrackIdentityDecisionRequestsAndReplies(): Promise<void> {
   const transport = new RecordingTransport()
   transport.enqueueOutcome(
@@ -1471,6 +1547,7 @@ await validatesHashSourceFilesBlake3RequestAndReply()
 await validatesSourceMaintenanceRequestsAndReplies()
 await validatesSourceIntegrityReadRequestAndReply()
 await validatesLocalBrowserEntryPointReadRequestAndReply()
+await validatesLocalBrowserChildReadRequestAndReply()
 await validatesTrackIdentityDecisionRequestsAndReplies()
 await validatesTrackIdentityReviewCandidateReads()
 await validatesAttachmentIdentityReadRequestsAndReplies()

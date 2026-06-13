@@ -6,6 +6,7 @@ import {
 } from '../attachmentIdentity/read'
 import { readContentsThroughHost } from '../contents/read'
 import { readThroughHost } from '../hierarchy/read'
+import { readLocalBrowserChildrenThroughHost } from '../localBrowser/children'
 import { readLocalBrowserEntryPointsThroughHost } from '../localBrowser/entryPoints'
 import { readNavigationRowsThroughHost } from '../navigation/read'
 import { readSearchFilterThroughHost } from '../searchFilter/read'
@@ -38,6 +39,7 @@ import {
 } from './eventPump'
 import type { LibraryBoundaryHost } from './host'
 import type { HostStatusController } from './status'
+import type { ReadLocalBrowserChildrenRequest } from '../../../shared/library/localBrowser/children'
 import type { UnregisterLocalRootRequest } from '../../../shared/library/roots/unregister'
 
 export type LibraryControlPlaneIpcMain = {
@@ -91,6 +93,9 @@ export function registerLibraryIpcCommands(options: RegisterLibraryIpcCommandsOp
   )
   ipcMain.handle(libraryControlChannels.localBrowser.entryPoints.read, () =>
     readLocalBrowserEntryPointsThroughHost(host)
+  )
+  ipcMain.handle(libraryControlChannels.localBrowser.children.read, (_event, request) =>
+    readLocalBrowserChildrenThroughHost(host, request as ReadLocalBrowserChildrenRequest)
   )
   ipcMain.handle(libraryControlChannels.hierarchy.read, (_event, request) =>
     readThroughHost(host, request)

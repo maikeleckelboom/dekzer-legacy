@@ -15,10 +15,14 @@ locations, not source scan roots, not scan plans, and not durable library invent
 This contract owns:
 
 - local filesystem entry point classes;
-- browse candidate identity;
-- browse candidate status;
-- the browse-versus-scan boundary before admission;
+- entry point candidate identity;
+- entry point candidate status;
+- the entry point browse-versus-scan boundary before admission;
 - the handoff from a selected path to source root admission.
+
+[`local-browser-candidate-rows-contract.md`](local-browser-candidate-rows-contract.md) owns bounded local child row
+classes, local child selector identity, local child read windowing, candidate affordances, and renderer projection
+distinctions after an entry point or descendant path is selected.
 
 ## Non-Goals
 
@@ -46,6 +50,10 @@ other local drives, removable drives, home, Desktop, Downloads, and Music withou
 
 Broad paths remain safe because browsing is not scanning. A bounded local browse read may show a user what is nearby,
 but source registration remains explicit and scanning remains explicit.
+
+Bounded child rows are defined separately by
+[`local-browser-candidate-rows-contract.md`](local-browser-candidate-rows-contract.md). Entry points and child candidates
+are both pre-admission local browser rows, but their row classes and windowing are not source hierarchy contracts.
 
 Admission remains service-owned. The renderer may display entry points, local candidate rows, admission results, warning
 copy, and action states, but it does not classify source roots or decide whether a path may persist.
@@ -183,7 +191,8 @@ not persistence authority.
 entry point class. This contract owns the general local browser entry point model.
 
 The Music companion owns only platform Music path resolution, Music-specific candidate production, Music-specific
-deduplication application, and admission handoff for `defaultMusicFolder`.
+deduplication application, and admission handoff for `defaultMusicFolder`. Local child candidate rows under Music remain
+owned by [`local-browser-candidate-rows-contract.md`](local-browser-candidate-rows-contract.md).
 
 ## Navigation and Tree Relationship
 
@@ -197,6 +206,10 @@ sources, source locations, and directories remain source hierarchy rows.
 Current tree selection and contents reads operate on admitted source selectors: source, source location, or source
 directory. They do not operate on local browser candidate selectors.
 
+Local child selectors and local child read windows are owned by
+[`local-browser-candidate-rows-contract.md`](local-browser-candidate-rows-contract.md). They must remain distinct from
+tree and contents selectors.
+
 ## Local Browser Read Model Expectations
 
 Implemented V0 backend read:
@@ -208,22 +221,13 @@ Implemented V0 backend read:
   navigation rows, start scans, or materialize inventory/facts/work.
 - Exact admitted source canonical path matches are marked as `duplicateOfAdmittedSource` while preserving the candidate
   versus source distinction.
-- The implemented read resolves only entry point candidates. It does not implement local child browsing, local browser
-  UI, source admission, source registration, or scan start.
-
-Future backend reads should satisfy these constraints:
-
-- Read the available local browser entry points for the current platform.
-- Read local entry point children with bounded windows.
-- Classify child rows as directory, media-relevant file, admissible candidate, warning candidate, rejected root, or unknown.
-- Perform no recursive traversal by default.
-- Apply strict timeout budgets.
-- Avoid cloud download triggers.
-- Refuse symlink or junction escape traversal.
-- Represent permission and access failures as row states.
-- Return enough admission target information for the service to run source root admission on user action.
-
-This section is a placeholder for future read boundaries, not an implementation specification.
+- `readLocalBrowserChildren` returns bounded immediate local child candidate rows for an entry point root and selected
+  parent candidate path.
+- Child rows are classified as local candidates, not source rows. Directory candidates, media file candidates,
+  unsupported file candidates, rejected root candidates, inaccessible candidates, and unknown candidates are owned by
+  [`local-browser-candidate-rows-contract.md`](local-browser-candidate-rows-contract.md).
+- The child read does not implement visible local browser UI, source admission, source registration, scan start, or
+  source inventory creation.
 
 ## Deduplication and Overlap
 

@@ -58,6 +58,12 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::LocalBrowserEntryPointPlatform>(&cfg, &mut output);
     push_ts_decl::<crate::LocalBrowserEntryPointAdmissionHint>(&cfg, &mut output);
     push_ts_decl::<crate::LocalBrowserEntryPointFailureCode>(&cfg, &mut output);
+    push_ts_decl::<crate::ReadLocalBrowserChildrenRequest>(&cfg, &mut output);
+    push_ts_decl::<crate::LocalBrowserCandidateRowKind>(&cfg, &mut output);
+    push_ts_decl::<crate::LocalBrowserCandidateStatus>(&cfg, &mut output);
+    push_ts_decl::<crate::LocalBrowserCandidateMediaRelevance>(&cfg, &mut output);
+    push_ts_decl::<crate::LocalBrowserCandidateAdmissionHint>(&cfg, &mut output);
+    push_ts_decl::<crate::LocalBrowserChildFailureCode>(&cfg, &mut output);
     push_ts_decl::<crate::ReadLibraryTreeChildrenRequest>(&cfg, &mut output);
     push_ts_decl::<crate::NavigableChildScopeState>(&cfg, &mut output);
     push_ts_decl::<crate::ReadSourceLifecycleRequest>(&cfg, &mut output);
@@ -125,6 +131,13 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::LocalBrowserEntryPointIdentity>(&cfg, &mut output);
     push_ts_decl::<crate::LocalBrowserEntryPointAffordances>(&cfg, &mut output);
     push_ts_decl::<crate::LocalBrowserEntryPointFailure>(&cfg, &mut output);
+    push_ts_decl::<crate::ReadLocalBrowserChildrenReply>(&cfg, &mut output);
+    push_ts_decl::<crate::LocalBrowserChildrenReadStatus>(&cfg, &mut output);
+    push_ts_decl::<crate::LocalBrowserChildWindowIdentity>(&cfg, &mut output);
+    push_ts_decl::<crate::LocalBrowserChildRow>(&cfg, &mut output);
+    push_ts_decl::<crate::LocalBrowserCandidateIdentity>(&cfg, &mut output);
+    push_ts_decl::<crate::LocalBrowserCandidateAffordances>(&cfg, &mut output);
+    push_ts_decl::<crate::LocalBrowserChildFailure>(&cfg, &mut output);
     push_ts_decl::<crate::ReadLibraryTreeChildrenReply>(&cfg, &mut output);
     push_ts_decl::<crate::ReadSourceLifecycleReply>(&cfg, &mut output);
     push_ts_decl::<crate::ReadSourceIntegrityReply>(&cfg, &mut output);

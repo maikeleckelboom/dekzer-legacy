@@ -6,6 +6,10 @@ import type {
   PersistedLibraryViewState
 } from '../viewState/persistence'
 import type { ReadRequest, ReadResult } from '../hierarchy/read'
+import type {
+  ReadLocalBrowserChildrenOutcome,
+  ReadLocalBrowserChildrenRequest
+} from '../localBrowser/children'
 import type { ReadLocalBrowserEntryPointsOutcome } from '../localBrowser/entryPoints'
 import type { NavigationReadRowsRequest, NavigationReadRowsResult } from '../navigation/read'
 import type { ContentsReadRequest, ContentsReadResult } from '../contents/read'
@@ -71,6 +75,7 @@ export type LibraryHostApi = {
 
 export type LibraryLocalBrowserApi = {
   readEntryPoints(): Promise<ReadLocalBrowserEntryPointsOutcome>
+  readChildren(request: ReadLocalBrowserChildrenRequest): Promise<ReadLocalBrowserChildrenOutcome>
 }
 
 export type LibraryHierarchyApi = {

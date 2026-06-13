@@ -237,6 +237,34 @@ async function validatesLocalBrowserEntryPointSnapshotResponse(): Promise<void> 
   }
 }
 
+async function validatesLocalBrowserChildrenSnapshotResponse(): Promise<void> {
+  const transport = createTransport();
+  try {
+    const client = createLibraryBoundaryClient(transport);
+    const reply = await client.readLocalBrowserChildren({
+      entryPointKind: "music",
+      rootCanonicalPath: "C:\\Users\\DJ\\Music",
+      parentCanonicalPath: "C:\\Users\\DJ\\Music",
+      offset: 0,
+      limit: 50
+    });
+
+    equal(reply.status, "complete", "local browser child read status is preserved");
+    equal(
+      reply.rows[0]?.rowKind,
+      "mediaFileCandidate",
+      "local browser child fixture routes through stdio transport"
+    );
+    equal(
+      reply.rows[0]?.admissionHint,
+      "chooseParentDirectory",
+      "local browser child admission handoff hint is preserved"
+    );
+  } finally {
+    await transport.close();
+  }
+}
+
 async function validatesProtocolErrorOutcomeIsPreserved(): Promise<void> {
   const transport = createTransport();
   try {
@@ -653,6 +681,7 @@ await validatesProcessExitBeforeReadyRejectsReady();
 await validatesMalformedStdoutBeforeReadyRejectsReady();
 await validatesSuccessResponseResolution();
 await validatesLocalBrowserEntryPointSnapshotResponse();
+await validatesLocalBrowserChildrenSnapshotResponse();
 await validatesProtocolErrorOutcomeIsPreserved();
 await validatesClientTurnsProtocolErrorOutcomeIntoClientError();
 await validatesRemoteTransportErrorCodeParsing();

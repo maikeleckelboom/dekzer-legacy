@@ -15,6 +15,9 @@ use library_store_sqlite::{
     UnregisterLocalRootInput,
 };
 
+use crate::local_browser_children::{
+    LocalBrowserChildReader, production_local_browser_child_reader,
+};
 use crate::local_browser_entry_points::{
     LocalBrowserEntryPointResolution, LocalBrowserEntryPointResolveFailure,
     LocalBrowserEntryPointResolver, ResolvedLocalBrowserEntryPoint,
@@ -87,6 +90,7 @@ pub struct LibraryBoundaryService {
     durable_store: SqliteDurableStore,
     session_events: LibraryBoundaryEventStream,
     local_browser_entry_point_resolver: Arc<dyn LocalBrowserEntryPointResolver>,
+    local_browser_child_reader: Arc<dyn LocalBrowserChildReader>,
     scan_registry: Mutex<ScanJobRegistry>,
     source_maintenance: SourceMaintenanceController,
 }
@@ -111,15 +115,29 @@ impl LibraryBoundaryService {
     }
 
     pub fn from_store(durable_store: SqliteDurableStore) -> protocol::ProtocolResult<Self> {
-        Self::from_store_with_local_browser_entry_point_resolver(
+        Self::from_store_with_local_browser_resolvers(
             durable_store,
             production_local_browser_entry_point_resolver(),
+            production_local_browser_child_reader(),
         )
     }
 
+    #[cfg(test)]
     pub(crate) fn from_store_with_local_browser_entry_point_resolver(
         durable_store: SqliteDurableStore,
         local_browser_entry_point_resolver: Arc<dyn LocalBrowserEntryPointResolver>,
+    ) -> protocol::ProtocolResult<Self> {
+        Self::from_store_with_local_browser_resolvers(
+            durable_store,
+            local_browser_entry_point_resolver,
+            production_local_browser_child_reader(),
+        )
+    }
+
+    pub(crate) fn from_store_with_local_browser_resolvers(
+        durable_store: SqliteDurableStore,
+        local_browser_entry_point_resolver: Arc<dyn LocalBrowserEntryPointResolver>,
+        local_browser_child_reader: Arc<dyn LocalBrowserChildReader>,
     ) -> protocol::ProtocolResult<Self> {
         let initial_revisions = durable_store
             .read_maintained_read_model_revisions()
@@ -131,6 +149,7 @@ impl LibraryBoundaryService {
             durable_store,
             session_events,
             local_browser_entry_point_resolver,
+            local_browser_child_reader,
             scan_registry: Mutex::new(ScanJobRegistry::default()),
             source_maintenance: SourceMaintenanceController::new(),
         })
@@ -419,6 +438,23 @@ impl LibraryBoundaryService {
             resolution,
             &admitted_source_path_keys,
         ))
+    }
+
+    pub fn read_local_browser_children(
+        &self,
+        request: protocol::ReadLocalBrowserChildrenRequest,
+    ) -> protocol::ProtocolResult<protocol::ReadLocalBrowserChildrenReply> {
+        let admitted_source_path_keys = self
+            .durable_store
+            .read_local_roots()
+            .map_err(map_store_error)?
+            .roots
+            .into_iter()
+            .map(|root| normalize_local_browser_path_key(&root.canonical_path))
+            .collect::<HashSet<_>>();
+
+        self.local_browser_child_reader
+            .read_children(request, &admitted_source_path_keys)
     }
 
     pub fn read_navigation_rows(
@@ -855,6 +891,9 @@ impl LibraryBoundaryService {
             protocol::SnapshotReadCommand::ReadLocalBrowserEntryPoints(request) => self
                 .read_local_browser_entry_points(request)
                 .map(protocol::SnapshotReadReply::LocalBrowserEntryPoints),
+            protocol::SnapshotReadCommand::ReadLocalBrowserChildren(request) => self
+                .read_local_browser_children(request)
+                .map(protocol::SnapshotReadReply::LocalBrowserChildren),
             protocol::SnapshotReadCommand::ReadLibraryTreeChildren(request) => self
                 .read_library_tree_children(request)
                 .map(protocol::SnapshotReadReply::LibraryTreeChildren),

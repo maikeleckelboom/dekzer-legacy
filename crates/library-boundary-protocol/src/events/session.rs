@@ -43,6 +43,7 @@ impl MaintainedSnapshotScope {
             | SnapshotReadCommand::ReadAttachmentSourceFiles(_)
             | SnapshotReadCommand::ReadSourceAttachmentSummary(_)
             | SnapshotReadCommand::ReadLocalBrowserEntryPoints(_)
+            | SnapshotReadCommand::ReadLocalBrowserChildren(_)
             | SnapshotReadCommand::SearchFilterRead(_) => None,
         }
     }

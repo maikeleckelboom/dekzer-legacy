@@ -7,6 +7,10 @@ import {
   type PersistedLibraryViewState
 } from '../shared/library/viewState/persistence'
 import { type ReadRequest, type ReadResult } from '../shared/library/hierarchy/read'
+import type {
+  ReadLocalBrowserChildrenOutcome,
+  ReadLocalBrowserChildrenRequest
+} from '../shared/library/localBrowser/children'
 import type { ReadLocalBrowserEntryPointsOutcome } from '../shared/library/localBrowser/entryPoints'
 import {
   type NavigationReadRowsRequest,
@@ -110,6 +114,14 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
           return (await ipcRenderer.invoke(
             libraryControlChannels.localBrowser.entryPoints.read
           )) as ReadLocalBrowserEntryPointsOutcome
+        },
+        async readChildren(
+          request: ReadLocalBrowserChildrenRequest
+        ): Promise<ReadLocalBrowserChildrenOutcome> {
+          return (await ipcRenderer.invoke(
+            libraryControlChannels.localBrowser.children.read,
+            request
+          )) as ReadLocalBrowserChildrenOutcome
         }
       },
       navigation: {

@@ -362,6 +362,294 @@ pub enum LocalBrowserEntryPointFailureCode {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
+pub struct ReadLocalBrowserChildrenRequest {
+    pub entry_point_kind: LocalBrowserEntryPointKind,
+    pub root_canonical_path: String,
+    pub parent_canonical_path: String,
+    pub offset: usize,
+    pub limit: usize,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct ReadLocalBrowserChildrenReply {
+    pub status: LocalBrowserChildrenReadStatus,
+    pub window_identity: LocalBrowserChildWindowIdentity,
+    pub offset: usize,
+    pub limit: usize,
+    pub total_rows: usize,
+    pub rows: Vec<LocalBrowserChildRow>,
+    pub failure: Option<LocalBrowserChildFailure>,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum LocalBrowserChildrenReadStatus {
+    Complete,
+    PartialFailure,
+    Failed,
+    UnsupportedPlatform,
+    Missing,
+    PermissionBlocked,
+    Unavailable,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct LocalBrowserChildWindowIdentity {
+    pub entry_point_kind: LocalBrowserEntryPointKind,
+    pub root_canonical_path: String,
+    pub parent_canonical_path: String,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct LocalBrowserChildRow {
+    pub identity: LocalBrowserCandidateIdentity,
+    pub row_kind: LocalBrowserCandidateRowKind,
+    pub display_name: String,
+    pub status: LocalBrowserCandidateStatus,
+    pub platform: LocalBrowserEntryPointPlatform,
+    pub file_kind: Option<ContentsFileKind>,
+    pub media_relevance: Option<LocalBrowserCandidateMediaRelevance>,
+    pub admission_hint: LocalBrowserCandidateAdmissionHint,
+    pub affordances: LocalBrowserCandidateAffordances,
+    pub failure: Option<LocalBrowserChildFailure>,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct LocalBrowserCandidateIdentity {
+    pub entry_point_kind: LocalBrowserEntryPointKind,
+    pub root_canonical_path: String,
+    pub candidate_canonical_path: String,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum LocalBrowserCandidateRowKind {
+    DirectoryCandidate,
+    MediaFileCandidate,
+    UnsupportedFileCandidate,
+    RejectedRootCandidate,
+    InaccessibleCandidate,
+    UnknownCandidate,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum LocalBrowserCandidateStatus {
+    Available,
+    Unavailable,
+    PermissionBlocked,
+    Missing,
+    UnsupportedPlatform,
+    DuplicateOfAdmittedSource,
+    Rejected,
+    Unknown,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum LocalBrowserCandidateMediaRelevance {
+    MediaRelevant,
+    CompanionMetadata,
+    Unsupported,
+    Unknown,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum LocalBrowserCandidateAdmissionHint {
+    CanRequestAdmission,
+    RequiresConfirmation,
+    ChooseParentDirectory,
+    NotDirectlyAdmissible,
+    DuplicateOfAdmittedSource,
+    Unavailable,
+    UnsupportedPlatform,
+    Rejected,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct LocalBrowserCandidateAffordances {
+    pub can_browse: bool,
+    pub can_request_admission: bool,
+    pub can_choose_descendant: bool,
+    pub can_request_parent_admission: bool,
+    pub requires_confirmation: bool,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct LocalBrowserChildFailure {
+    pub code: LocalBrowserChildFailureCode,
+    pub detail: String,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum LocalBrowserChildFailureCode {
+    UnsupportedPlatform,
+    RootPathUnavailable,
+    ParentPathUnavailable,
+    ParentMissing,
+    ParentNotDirectory,
+    ParentOutsideRoot,
+    PermissionDenied,
+    MetadataUnavailable,
+    EnumerationUnavailable,
+    ReparsePointSkipped,
+    RejectedRoot,
+    UnknownFileType,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
 pub struct NavigationRow {
     #[serde(with = "crate::wire::i64_string")]
     #[schemars(with = "String")]
@@ -2198,6 +2486,7 @@ pub enum SnapshotReadCommand {
     LoadNavigationRow(LoadNavigationRowRequest),
     LoadNavigationRowByStableKey(LoadNavigationRowByStableKeyRequest),
     ReadLocalBrowserEntryPoints(ReadLocalBrowserEntryPointsRequest),
+    ReadLocalBrowserChildren(ReadLocalBrowserChildrenRequest),
     ReadLibraryTreeChildren(ReadLibraryTreeChildrenRequest),
     ReadSourceLifecycle(ReadSourceLifecycleRequest),
     ReadSourceIntegrity(ReadSourceIntegrityRequest),
@@ -2220,6 +2509,7 @@ pub enum SnapshotReadReply {
     NavigationRow(LoadNavigationRowReply),
     NavigationRowByStableKey(LoadNavigationRowByStableKeyReply),
     LocalBrowserEntryPoints(ReadLocalBrowserEntryPointsReply),
+    LocalBrowserChildren(ReadLocalBrowserChildrenReply),
     LibraryTreeChildren(ReadLibraryTreeChildrenReply),
     SourceLifecycle(ReadSourceLifecycleReply),
     SourceIntegrity(Box<ReadSourceIntegrityReply>),
@@ -2242,14 +2532,19 @@ mod tests {
         DirectoryScanState, LibraryTreeCoverage, LibraryTreeCoverageState, LibraryTreeEntryPoint,
         LibraryTreeFileClass, LibraryTreeNode, LibraryTreeNodeKind, LibraryTreePresenceState,
         LibraryTreeWindow, LoadNavigationRowByStableKeyRequest, LoadNavigationRowRequest,
-        LocalBrowserEntryPoint, LocalBrowserEntryPointAdmissionHint,
-        LocalBrowserEntryPointAffordances, LocalBrowserEntryPointFailure,
-        LocalBrowserEntryPointFailureCode, LocalBrowserEntryPointIdentity,
-        LocalBrowserEntryPointKind, LocalBrowserEntryPointPlatform, LocalBrowserEntryPointStatus,
-        LocalBrowserEntryPointsReadStatus, NavigableChildScopeState, NavigationRow,
-        NavigationRowFamily, NavigationRowKind, NavigationRowSelectorKind, PrimaryMediaKind,
-        ReadAttachmentSourceFilesReply, ReadAttachmentSourceFilesRequest,
+        LocalBrowserCandidateAdmissionHint, LocalBrowserCandidateAffordances,
+        LocalBrowserCandidateIdentity, LocalBrowserCandidateMediaRelevance,
+        LocalBrowserCandidateRowKind, LocalBrowserCandidateStatus, LocalBrowserChildFailure,
+        LocalBrowserChildFailureCode, LocalBrowserChildRow, LocalBrowserChildWindowIdentity,
+        LocalBrowserChildrenReadStatus, LocalBrowserEntryPoint,
+        LocalBrowserEntryPointAdmissionHint, LocalBrowserEntryPointAffordances,
+        LocalBrowserEntryPointFailure, LocalBrowserEntryPointFailureCode,
+        LocalBrowserEntryPointIdentity, LocalBrowserEntryPointKind, LocalBrowserEntryPointPlatform,
+        LocalBrowserEntryPointStatus, LocalBrowserEntryPointsReadStatus, NavigableChildScopeState,
+        NavigationRow, NavigationRowFamily, NavigationRowKind, NavigationRowSelectorKind,
+        PrimaryMediaKind, ReadAttachmentSourceFilesReply, ReadAttachmentSourceFilesRequest,
         ReadLibraryTreeChildrenReply, ReadLibraryTreeChildrenRequest,
+        ReadLocalBrowserChildrenReply, ReadLocalBrowserChildrenRequest,
         ReadLocalBrowserEntryPointsReply, ReadLocalBrowserEntryPointsRequest,
         ReadNavigationRowsRequest, ReadSourceAttachmentSummaryReply,
         ReadSourceAttachmentSummaryRequest, ReadSourceFileAttachmentReply,
@@ -2277,6 +2572,14 @@ mod tests {
         });
         let entry_points =
             SnapshotReadCommand::ReadLocalBrowserEntryPoints(ReadLocalBrowserEntryPointsRequest);
+        let local_children =
+            SnapshotReadCommand::ReadLocalBrowserChildren(ReadLocalBrowserChildrenRequest {
+                entry_point_kind: LocalBrowserEntryPointKind::Music,
+                root_canonical_path: "C:\\Users\\DJ\\Music".to_string(),
+                parent_canonical_path: "C:\\Users\\DJ\\Music\\Albums".to_string(),
+                offset: 5,
+                limit: 25,
+            });
         let library_tree =
             SnapshotReadCommand::ReadLibraryTreeChildren(ReadLibraryTreeChildrenRequest {
                 entry_point: LibraryTreeEntryPoint::Source { source_id: 7 },
@@ -2294,6 +2597,17 @@ mod tests {
         assert!(matches!(
             entry_points,
             SnapshotReadCommand::ReadLocalBrowserEntryPoints(ReadLocalBrowserEntryPointsRequest)
+        ));
+        assert!(matches!(
+            local_children,
+            SnapshotReadCommand::ReadLocalBrowserChildren(ReadLocalBrowserChildrenRequest {
+                entry_point_kind: LocalBrowserEntryPointKind::Music,
+                ref root_canonical_path,
+                ref parent_canonical_path,
+                offset: 5,
+                limit: 25,
+            }) if root_canonical_path == "C:\\Users\\DJ\\Music"
+                && parent_canonical_path == "C:\\Users\\DJ\\Music\\Albums"
         ));
         assert!(matches!(
             library_tree,
@@ -2375,6 +2689,123 @@ mod tests {
                     "failure": {
                         "code": "volumeEnumerationUnavailable",
                         "detail": "volume enumeration failed"
+                    }
+                }
+            })
+        );
+        assert_eq!(
+            serde_json::from_value::<SnapshotReadReply>(reply_json).expect("deserialize reply"),
+            reply
+        );
+    }
+
+    #[test]
+    fn local_browser_children_serialize_candidate_boundary_shape() {
+        let command =
+            SnapshotReadCommand::ReadLocalBrowserChildren(ReadLocalBrowserChildrenRequest {
+                entry_point_kind: LocalBrowserEntryPointKind::Music,
+                root_canonical_path: "C:\\Users\\DJ\\Music".to_string(),
+                parent_canonical_path: "C:\\Users\\DJ\\Music".to_string(),
+                offset: 0,
+                limit: 50,
+            });
+        let command_json = serde_json::to_value(&command).expect("serialize command");
+        assert_eq!(
+            command_json,
+            json!({
+                "type": "readLocalBrowserChildren",
+                "payload": {
+                    "entryPointKind": "music",
+                    "rootCanonicalPath": "C:\\Users\\DJ\\Music",
+                    "parentCanonicalPath": "C:\\Users\\DJ\\Music",
+                    "offset": 0,
+                    "limit": 50
+                }
+            })
+        );
+        assert_eq!(
+            serde_json::from_value::<SnapshotReadCommand>(command_json)
+                .expect("deserialize command"),
+            command
+        );
+
+        let reply = SnapshotReadReply::LocalBrowserChildren(ReadLocalBrowserChildrenReply {
+            status: LocalBrowserChildrenReadStatus::Complete,
+            window_identity: LocalBrowserChildWindowIdentity {
+                entry_point_kind: LocalBrowserEntryPointKind::Music,
+                root_canonical_path: "C:\\Users\\DJ\\Music".to_string(),
+                parent_canonical_path: "C:\\Users\\DJ\\Music".to_string(),
+            },
+            offset: 0,
+            limit: 50,
+            total_rows: 1,
+            rows: vec![LocalBrowserChildRow {
+                identity: LocalBrowserCandidateIdentity {
+                    entry_point_kind: LocalBrowserEntryPointKind::Music,
+                    root_canonical_path: "C:\\Users\\DJ\\Music".to_string(),
+                    candidate_canonical_path: "C:\\Users\\DJ\\Music\\Track.flac".to_string(),
+                },
+                row_kind: LocalBrowserCandidateRowKind::MediaFileCandidate,
+                display_name: "Track.flac".to_string(),
+                status: LocalBrowserCandidateStatus::Available,
+                platform: LocalBrowserEntryPointPlatform::Windows,
+                file_kind: Some(ContentsFileKind::Audio),
+                media_relevance: Some(LocalBrowserCandidateMediaRelevance::MediaRelevant),
+                admission_hint: LocalBrowserCandidateAdmissionHint::ChooseParentDirectory,
+                affordances: LocalBrowserCandidateAffordances {
+                    can_browse: false,
+                    can_request_admission: false,
+                    can_choose_descendant: false,
+                    can_request_parent_admission: true,
+                    requires_confirmation: false,
+                },
+                failure: None,
+            }],
+            failure: Some(LocalBrowserChildFailure {
+                code: LocalBrowserChildFailureCode::EnumerationUnavailable,
+                detail: "one child failed".to_string(),
+            }),
+        });
+        let reply_json = serde_json::to_value(&reply).expect("serialize reply");
+        assert_eq!(
+            reply_json,
+            json!({
+                "type": "localBrowserChildren",
+                "payload": {
+                    "status": "complete",
+                    "windowIdentity": {
+                        "entryPointKind": "music",
+                        "rootCanonicalPath": "C:\\Users\\DJ\\Music",
+                        "parentCanonicalPath": "C:\\Users\\DJ\\Music"
+                    },
+                    "offset": 0,
+                    "limit": 50,
+                    "totalRows": 1,
+                    "rows": [{
+                        "identity": {
+                            "entryPointKind": "music",
+                            "rootCanonicalPath": "C:\\Users\\DJ\\Music",
+                            "candidateCanonicalPath": "C:\\Users\\DJ\\Music\\Track.flac"
+                        },
+                        "rowKind": "mediaFileCandidate",
+                        "displayName": "Track.flac",
+                        "status": "available",
+                        "platform": "windows",
+                        "fileKind": "audio",
+                        "mediaRelevance": "mediaRelevant",
+                        "admissionHint": "chooseParentDirectory",
+                        "affordances": {
+                            "canBrowse": false,
+                            "canRequestAdmission": false,
+                            "canChooseDescendant": false,
+                            "canRequestParentAdmission": true,
+                            "requiresConfirmation": false
+                        },
+                        "failure": null
+                    }],
+                    "failure": {
+                        "code": "enumerationUnavailable",
+                        "detail": "one child failed"
                     }
                 }
             })

@@ -58,6 +58,11 @@ stdin.on("line", (line) => {
     return;
   }
 
+  if (commandFamily === "snapshotRead" && commandType === "readLocalBrowserChildren") {
+    writeLocalBrowserChildrenSuccess(envelope);
+    return;
+  }
+
   const absolutePath = String(
     envelope.request.payload.payload.absolutePath ?? ""
   );
@@ -227,6 +232,60 @@ function writeLocalBrowserEntryPointsSuccess(envelope: RequestEnvelope): void {
                     canBrowse: true,
                     canRequestAdmission: true,
                     canChooseDescendant: true,
+                    requiresConfirmation: false
+                  },
+                  failure: null
+                }
+              ],
+              failure: null
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+function writeLocalBrowserChildrenSuccess(envelope: RequestEnvelope): void {
+  writeEnvelope({
+    type: "commandOutcome",
+    requestId: envelope.requestId,
+    outcome: {
+      type: "success",
+      payload: {
+        reply: {
+          type: "snapshotRead",
+          payload: {
+            type: "localBrowserChildren",
+            payload: {
+              status: "complete",
+              windowIdentity: {
+                entryPointKind: "music",
+                rootCanonicalPath: "C:\\Users\\DJ\\Music",
+                parentCanonicalPath: "C:\\Users\\DJ\\Music"
+              },
+              offset: 0,
+              limit: 50,
+              totalRows: 1,
+              rows: [
+                {
+                  identity: {
+                    entryPointKind: "music",
+                    rootCanonicalPath: "C:\\Users\\DJ\\Music",
+                    candidateCanonicalPath: "C:\\Users\\DJ\\Music\\Track.flac"
+                  },
+                  rowKind: "mediaFileCandidate",
+                  displayName: "Track.flac",
+                  status: "available",
+                  platform: "windows",
+                  fileKind: "audio",
+                  mediaRelevance: "mediaRelevant",
+                  admissionHint: "chooseParentDirectory",
+                  affordances: {
+                    canBrowse: false,
+                    canRequestAdmission: false,
+                    canChooseDescendant: false,
+                    canRequestParentAdmission: true,
                     requiresConfirmation: false
                   },
                   failure: null

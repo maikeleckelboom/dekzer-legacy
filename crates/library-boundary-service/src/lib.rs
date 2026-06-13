@@ -1,5 +1,8 @@
 #![deny(unsafe_code)]
 
+mod local_browser_children;
+#[cfg(test)]
+mod local_browser_children_tests;
 mod local_browser_entry_points;
 #[cfg(test)]
 mod local_browser_entry_points_tests;

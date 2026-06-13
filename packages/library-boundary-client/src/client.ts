@@ -15,6 +15,8 @@ import type {
   ReadAttachmentSourceFilesRequest,
   ReadLibraryBoundaryEventsAfterReply,
   ReadLibraryBoundaryEventsAfterRequest,
+  ReadLocalBrowserChildrenReply,
+  ReadLocalBrowserChildrenRequest,
   ReadLocalBrowserEntryPointsReply,
   ReadLocalBrowserEntryPointsRequest,
   ReadLibraryTreeChildrenReply,
@@ -209,6 +211,19 @@ export class LibraryBoundaryClient {
       },
       'snapshotRead',
       'localBrowserEntryPoints'
+    )
+  }
+
+  readLocalBrowserChildren(
+    request: ReadLocalBrowserChildrenRequest
+  ): Promise<ReadLocalBrowserChildrenReply> {
+    return this.sendAndExpect(
+      {
+        type: 'snapshotRead',
+        payload: { type: 'readLocalBrowserChildren', payload: request }
+      },
+      'snapshotRead',
+      'localBrowserChildren'
     )
   }
 

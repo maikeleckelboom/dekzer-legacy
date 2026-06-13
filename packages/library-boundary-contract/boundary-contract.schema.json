@@ -2068,6 +2068,226 @@
         "navigationRowId"
       ]
     },
+    "LocalBrowserCandidateAdmissionHint": {
+      "type": "string",
+      "enum": [
+        "canRequestAdmission",
+        "requiresConfirmation",
+        "chooseParentDirectory",
+        "notDirectlyAdmissible",
+        "duplicateOfAdmittedSource",
+        "unavailable",
+        "unsupportedPlatform",
+        "rejected"
+      ]
+    },
+    "LocalBrowserCandidateAffordances": {
+      "type": "object",
+      "properties": {
+        "canBrowse": {
+          "type": "boolean"
+        },
+        "canChooseDescendant": {
+          "type": "boolean"
+        },
+        "canRequestAdmission": {
+          "type": "boolean"
+        },
+        "canRequestParentAdmission": {
+          "type": "boolean"
+        },
+        "requiresConfirmation": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "canBrowse",
+        "canRequestAdmission",
+        "canChooseDescendant",
+        "canRequestParentAdmission",
+        "requiresConfirmation"
+      ]
+    },
+    "LocalBrowserCandidateIdentity": {
+      "type": "object",
+      "properties": {
+        "candidateCanonicalPath": {
+          "type": "string"
+        },
+        "entryPointKind": {
+          "$ref": "#/$defs/LocalBrowserEntryPointKind"
+        },
+        "rootCanonicalPath": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "entryPointKind",
+        "rootCanonicalPath",
+        "candidateCanonicalPath"
+      ]
+    },
+    "LocalBrowserCandidateMediaRelevance": {
+      "type": "string",
+      "enum": [
+        "mediaRelevant",
+        "companionMetadata",
+        "unsupported",
+        "unknown"
+      ]
+    },
+    "LocalBrowserCandidateRowKind": {
+      "type": "string",
+      "enum": [
+        "directoryCandidate",
+        "mediaFileCandidate",
+        "unsupportedFileCandidate",
+        "rejectedRootCandidate",
+        "inaccessibleCandidate",
+        "unknownCandidate"
+      ]
+    },
+    "LocalBrowserCandidateStatus": {
+      "type": "string",
+      "enum": [
+        "available",
+        "unavailable",
+        "permissionBlocked",
+        "missing",
+        "unsupportedPlatform",
+        "duplicateOfAdmittedSource",
+        "rejected",
+        "unknown"
+      ]
+    },
+    "LocalBrowserChildFailure": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/LocalBrowserChildFailureCode"
+        },
+        "detail": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "detail"
+      ]
+    },
+    "LocalBrowserChildFailureCode": {
+      "type": "string",
+      "enum": [
+        "unsupportedPlatform",
+        "rootPathUnavailable",
+        "parentPathUnavailable",
+        "parentMissing",
+        "parentNotDirectory",
+        "parentOutsideRoot",
+        "permissionDenied",
+        "metadataUnavailable",
+        "enumerationUnavailable",
+        "reparsePointSkipped",
+        "rejectedRoot",
+        "unknownFileType"
+      ]
+    },
+    "LocalBrowserChildRow": {
+      "type": "object",
+      "properties": {
+        "admissionHint": {
+          "$ref": "#/$defs/LocalBrowserCandidateAdmissionHint"
+        },
+        "affordances": {
+          "$ref": "#/$defs/LocalBrowserCandidateAffordances"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "failure": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LocalBrowserChildFailure"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fileKind": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ContentsFileKind"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "identity": {
+          "$ref": "#/$defs/LocalBrowserCandidateIdentity"
+        },
+        "mediaRelevance": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LocalBrowserCandidateMediaRelevance"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "platform": {
+          "$ref": "#/$defs/LocalBrowserEntryPointPlatform"
+        },
+        "rowKind": {
+          "$ref": "#/$defs/LocalBrowserCandidateRowKind"
+        },
+        "status": {
+          "$ref": "#/$defs/LocalBrowserCandidateStatus"
+        }
+      },
+      "required": [
+        "identity",
+        "rowKind",
+        "displayName",
+        "status",
+        "platform",
+        "admissionHint",
+        "affordances"
+      ]
+    },
+    "LocalBrowserChildWindowIdentity": {
+      "type": "object",
+      "properties": {
+        "entryPointKind": {
+          "$ref": "#/$defs/LocalBrowserEntryPointKind"
+        },
+        "parentCanonicalPath": {
+          "type": "string"
+        },
+        "rootCanonicalPath": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "entryPointKind",
+        "rootCanonicalPath",
+        "parentCanonicalPath"
+      ]
+    },
+    "LocalBrowserChildrenReadStatus": {
+      "type": "string",
+      "enum": [
+        "complete",
+        "partialFailure",
+        "failed",
+        "unsupportedPlatform",
+        "missing",
+        "permissionBlocked",
+        "unavailable"
+      ]
+    },
     "LocalBrowserEntryPoint": {
       "type": "object",
       "properties": {
@@ -2742,6 +2962,87 @@
       },
       "required": [
         "entryPoint",
+        "offset",
+        "limit"
+      ]
+    },
+    "ReadLocalBrowserChildrenReply": {
+      "type": "object",
+      "properties": {
+        "failure": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LocalBrowserChildFailure"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "limit": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "offset": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/LocalBrowserChildRow"
+          }
+        },
+        "status": {
+          "$ref": "#/$defs/LocalBrowserChildrenReadStatus"
+        },
+        "totalRows": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "windowIdentity": {
+          "$ref": "#/$defs/LocalBrowserChildWindowIdentity"
+        }
+      },
+      "required": [
+        "status",
+        "windowIdentity",
+        "offset",
+        "limit",
+        "totalRows",
+        "rows"
+      ]
+    },
+    "ReadLocalBrowserChildrenRequest": {
+      "type": "object",
+      "properties": {
+        "entryPointKind": {
+          "$ref": "#/$defs/LocalBrowserEntryPointKind"
+        },
+        "limit": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "offset": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "parentCanonicalPath": {
+          "type": "string"
+        },
+        "rootCanonicalPath": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "entryPointKind",
+        "rootCanonicalPath",
+        "parentCanonicalPath",
         "offset",
         "limit"
       ]
@@ -4020,6 +4321,22 @@
           "type": "object",
           "properties": {
             "payload": {
+              "$ref": "#/$defs/ReadLocalBrowserChildrenRequest"
+            },
+            "type": {
+              "type": "string",
+              "const": "readLocalBrowserChildren"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
               "$ref": "#/$defs/ReadLibraryTreeChildrenRequest"
             },
             "type": {
@@ -4237,6 +4554,22 @@
             "type": {
               "type": "string",
               "const": "localBrowserEntryPoints"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ReadLocalBrowserChildrenReply"
+            },
+            "type": {
+              "type": "string",
+              "const": "localBrowserChildren"
             }
           },
           "required": [
