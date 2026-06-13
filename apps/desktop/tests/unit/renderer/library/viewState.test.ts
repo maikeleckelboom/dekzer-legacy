@@ -32,66 +32,66 @@ describe('createViewStateStore', () => {
 
     await expect(store.load()).resolves.toEqual({ state: 'empty' })
     store.save({
-      version: 2,
+      version: 3,
       activeSurface: 'addSource',
       selectedLibraryNodeId: 'node-a',
       selectedAddSourceNodeId: 'local-a',
       expandedLibraryNodeIds,
       expandedAddSourceNodeIds,
       libraryBrowseProfile: 'playable',
-      localPreviewMode: 'musicEvidence'
+      addSourceView: 'preview'
     })
     expandedLibraryNodeIds.push('node-b')
     expandedAddSourceNodeIds.push('local-b')
     await resolveAll()
 
     expect(writes[0]?.state).toEqual({
-      version: 2,
+      version: 3,
       activeSurface: 'addSource',
       selectedLibraryNodeId: 'node-a',
       selectedAddSourceNodeId: 'local-a',
       expandedLibraryNodeIds: ['node-a'],
       expandedAddSourceNodeIds: ['local-a'],
       libraryBrowseProfile: 'playable',
-      localPreviewMode: 'musicEvidence'
+      addSourceView: 'preview'
     })
   })
 
-  it('persists valid library profile and local preview mode independently', async () => {
+  it('persists valid library profile and Add Source view independently', async () => {
     const { api, writes, resolveAll } = createQueuedWriteApi()
     const store = createViewStateStore(api)
 
     store.save({
-      version: 2,
+      version: 3,
       activeSurface: 'libraryBrowse',
       expandedLibraryNodeIds: [],
       expandedAddSourceNodeIds: [],
       libraryBrowseProfile: 'allFiles',
-      localPreviewMode: 'advancedInventory'
+      addSourceView: 'inventory'
     })
     await resolveAll()
 
     expect(writes[0]?.state).toEqual({
-      version: 2,
+      version: 3,
       activeSurface: 'libraryBrowse',
       expandedLibraryNodeIds: [],
       expandedAddSourceNodeIds: [],
       libraryBrowseProfile: 'allFiles',
-      localPreviewMode: 'advancedInventory'
+      addSourceView: 'inventory'
     })
 
     store.save({
-      version: 2,
+      version: 3,
       activeSurface: 'libraryBrowse',
       expandedLibraryNodeIds: [],
       expandedAddSourceNodeIds: [],
       libraryBrowseProfile: 'invalid',
-      localPreviewMode: 'invalid'
+      addSourceView: 'invalid'
     } as unknown as PersistedLibraryViewState)
     await resolveAll()
 
     expect(writes[1]?.state).toEqual({
-      version: 2,
+      version: 3,
       activeSurface: 'libraryBrowse',
       expandedLibraryNodeIds: [],
       expandedAddSourceNodeIds: []
@@ -103,23 +103,23 @@ describe('createViewStateStore', () => {
     const store = createViewStateStore(api)
 
     store.save({
-      version: 2,
+      version: 3,
       activeSurface: 'libraryBrowse',
       expandedLibraryNodeIds: [],
       expandedAddSourceNodeIds: [],
       libraryBrowseProfile: 'audio',
-      localPreviewMode: 'musicEvidence',
+      addSourceView: 'preview',
       searchText: 'amen'
     } as unknown as PersistedLibraryViewState)
     await resolveAll()
 
     expect(writes[0]?.state).toEqual({
-      version: 2,
+      version: 3,
       activeSurface: 'libraryBrowse',
       expandedLibraryNodeIds: [],
       expandedAddSourceNodeIds: [],
       libraryBrowseProfile: 'audio',
-      localPreviewMode: 'musicEvidence'
+      addSourceView: 'preview'
     })
   })
 
@@ -141,7 +141,7 @@ describe('createViewStateStore', () => {
     const store = createViewStateStore(api)
 
     store.save({
-      version: 2,
+      version: 3,
       activeSurface: 'libraryBrowse',
       selectedLibraryNodeId: 'will-fail',
       expandedLibraryNodeIds: ['will-fail'],
@@ -150,7 +150,7 @@ describe('createViewStateStore', () => {
     await waitForMicrotasks()
 
     store.save({
-      version: 2,
+      version: 3,
       activeSurface: 'addSource',
       selectedLibraryNodeId: 'will-succeed',
       selectedAddSourceNodeId: 'local-succeed',
@@ -162,7 +162,7 @@ describe('createViewStateStore', () => {
     expect(callCount).toBe(2)
     expect(writes).toEqual([
       {
-        version: 2,
+        version: 3,
         activeSurface: 'addSource',
         selectedLibraryNodeId: 'will-succeed',
         selectedAddSourceNodeId: 'local-succeed',
@@ -239,7 +239,7 @@ function waitForWrites(): Promise<void> {
 
 function viewState(overrides: Partial<PersistedLibraryViewState> = {}): PersistedLibraryViewState {
   return {
-    version: 2,
+    version: 3,
     activeSurface: 'libraryBrowse',
     expandedLibraryNodeIds: [],
     expandedAddSourceNodeIds: [],

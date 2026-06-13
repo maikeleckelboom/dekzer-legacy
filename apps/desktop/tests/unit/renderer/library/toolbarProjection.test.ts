@@ -22,7 +22,7 @@ describe('library toolbar projection', () => {
     })
     expect(toolbar.search.visible).toBe(true)
     expect(toolbar.libraryBrowseProfile.visible).toBe(true)
-    expect(toolbar.localPreviewMode.visible).toBe(false)
+    expect(toolbar.addSourceView.visible).toBe(false)
   })
 
   it('scopes Add Source root to local preview controls without indexed search', () => {
@@ -39,10 +39,10 @@ describe('library toolbar projection', () => {
     expect(toolbar.addMusicFolder.kind).toBe('chooseMusicFolder')
     expect(toolbar.search.visible).toBe(false)
     expect(toolbar.libraryBrowseProfile.visible).toBe(false)
-    expect(toolbar.localPreviewMode).toMatchObject({
+    expect(toolbar.addSourceView).toMatchObject({
       visible: true,
-      label: 'Local preview mode',
-      title: 'Local preview mode: Music Preview'
+      label: 'Add Source view',
+      title: 'Add Source view: Preview'
     })
   })
 
@@ -52,8 +52,8 @@ describe('library toolbar projection', () => {
         activeSurface: 'addSource',
         selectedNodeId: 'selected',
         binding: { kind: 'addSourceSection' },
-        localPreviewMode: 'advancedInventory',
-        selectedLocalPreviewModeLabel: 'Inventory'
+        addSourceView: 'inventory',
+        selectedAddSourceViewLabel: 'Inventory'
       })
     )
 
@@ -61,9 +61,9 @@ describe('library toolbar projection', () => {
     expect(toolbar.addMusicFolder.visible).toBe(false)
     expect(toolbar.search.visible).toBe(false)
     expect(toolbar.libraryBrowseProfile.visible).toBe(false)
-    expect(toolbar.localPreviewMode).toMatchObject({
+    expect(toolbar.addSourceView).toMatchObject({
       visible: true,
-      title: 'Local preview mode: Inventory'
+      title: 'Add Source view: Inventory'
     })
   })
 
@@ -104,7 +104,7 @@ describe('library toolbar projection', () => {
 
     expect(toolbar.scope).toBe('addSource')
     expect(toolbar.addMusicFolder.visible).toBe(false)
-    expect(toolbar.localPreviewMode.visible).toBe(true)
+    expect(toolbar.addSourceView.visible).toBe(true)
   })
 
   it('scopes admitted source rows to indexed controls only', () => {
@@ -130,7 +130,7 @@ describe('library toolbar projection', () => {
       visible: true,
       label: 'Indexed contents view'
     })
-    expect(toolbar.localPreviewMode.visible).toBe(false)
+    expect(toolbar.addSourceView.visible).toBe(false)
   })
 
   it('hides scoped controls for neutral read-state selections', () => {
@@ -151,7 +151,7 @@ describe('library toolbar projection', () => {
     expect(toolbar.addMusicFolder.visible).toBe(true)
     expect(toolbar.search.visible).toBe(false)
     expect(toolbar.libraryBrowseProfile.visible).toBe(false)
-    expect(toolbar.localPreviewMode.visible).toBe(true)
+    expect(toolbar.addSourceView.visible).toBe(true)
   })
 })
 
@@ -166,8 +166,8 @@ function input(
     activeSurface: 'libraryBrowse',
     selectedNodeId: 'selected',
     selectedLibraryBrowseProfileLabel: 'Audio',
-    selectedLocalPreviewModeLabel: 'Music Preview',
-    localPreviewMode: 'musicEvidence',
+    selectedAddSourceViewLabel: 'Preview',
+    addSourceView: 'preview',
     addMusicFolderLabel: 'Add music folder',
     canAddMusicFolder: true,
     ...overrides

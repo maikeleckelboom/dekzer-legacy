@@ -18,7 +18,7 @@ import {
   type LocalBrowseItemState,
   type LocalBrowseMoreTarget
 } from './types'
-import { defaultLocalPreviewMode, type LocalPreviewMode } from './previewMode'
+import { defaultAddSourceView, type AddSourceView } from '../addSource/view'
 
 const readLimit = 50
 const safeEntryPointsReadFailure = 'Unable to read local browse entry points.'
@@ -49,7 +49,7 @@ export type LocalBrowseController = {
 
 export function useLocalBrowseController(
   libraryApi: LocalBrowseReadApi = getRendererApi().library,
-  options: { readonly localPreviewMode?: Ref<LocalPreviewMode> } = {}
+  options: { readonly addSourceView?: Ref<AddSourceView> } = {}
 ): LocalBrowseController {
   const controller = createLocalBrowseController(libraryApi, options)
 
@@ -66,12 +66,11 @@ export function useLocalBrowseController(
 
 export function createLocalBrowseController(
   libraryApi: LocalBrowseReadApi,
-  options: { readonly localPreviewMode?: Ref<LocalPreviewMode> } = {}
+  options: { readonly addSourceView?: Ref<AddSourceView> } = {}
 ): LocalBrowseController {
   const entryPointsState = ref<LocalBrowseEntryPointsState>({ kind: 'unread' })
   const itemStates = shallowRef<ReadonlyMap<string, LocalBrowseItemState>>(new Map())
-  const localPreviewMode =
-    options.localPreviewMode ?? ref<LocalPreviewMode>(defaultLocalPreviewMode)
+  const addSourceView = options.addSourceView ?? ref<AddSourceView>(defaultAddSourceView)
   let started = false
   let entryPointReadSequence = 0
   let itemReadSequence = 0
@@ -172,7 +171,7 @@ export function createLocalBrowseController(
 
     switch (binding.kind) {
       case 'localBrowseEntryPoint':
-        return readItems(localBrowseRootTarget(binding.target, localPreviewMode.value))
+        return readItems(localBrowseRootTarget(binding.target, addSourceView.value))
       case 'localBrowseItem':
         return binding.target === undefined ? false : readItems(binding.target)
       case 'localBrowseMore':
@@ -192,7 +191,7 @@ export function createLocalBrowseController(
 
     const binding = projection.bindingsById.get(nodeId)
     const target =
-      binding === undefined ? undefined : windowTargetFromBinding(binding, localPreviewMode.value)
+      binding === undefined ? undefined : windowTargetFromBinding(binding, addSourceView.value)
 
     if (target === undefined) {
       return false
@@ -249,7 +248,7 @@ export function createLocalBrowseController(
 
     for (const binding of projection.bindingsById.values()) {
       if (binding.kind === 'localBrowseEntryPoint') {
-        const target = localBrowseRootTarget(binding.target, localPreviewMode.value)
+        const target = localBrowseRootTarget(binding.target, addSourceView.value)
         const state = itemStates.value.get(localBrowseWindowKey(target))
 
         if (state?.kind === 'loaded') {
@@ -268,7 +267,7 @@ export function createLocalBrowseController(
       const binding = projection.bindingsById.get(nodeId)
 
       if (binding?.kind === 'localBrowseEntryPoint') {
-        addTarget(localBrowseRootTarget(binding.target, localPreviewMode.value))
+        addTarget(localBrowseRootTarget(binding.target, addSourceView.value))
       } else if (binding?.kind === 'localBrowseItem' && binding.target !== undefined) {
         addTarget(binding.target)
       }
@@ -550,7 +549,7 @@ function loadedWindowFromResult(
       : undefined
 
   return {
-    previewMode: target.previewMode,
+    addSourceView: target.addSourceView,
     identity: result.windowIdentity,
     label: target.label,
     items: result.items,
@@ -572,7 +571,7 @@ function appendLoadedWindow(
       : undefined
 
   return {
-    previewMode: current.previewMode,
+    addSourceView: current.addSourceView,
     identity: current.identity,
     label: current.label,
     items: [...current.items, ...next.items],
@@ -604,10 +603,10 @@ function isExpectedWindow(
 
 function windowTargetFromBinding(
   binding: RowBinding,
-  localPreviewMode: LocalPreviewMode = defaultLocalPreviewMode
+  addSourceView: AddSourceView = defaultAddSourceView
 ): LocalBrowseDirectoryTarget | undefined {
   if (binding.kind === 'localBrowseEntryPoint') {
-    return localBrowseRootTarget(binding.target, localPreviewMode)
+    return localBrowseRootTarget(binding.target, addSourceView)
   }
 
   if (binding.kind === 'localBrowseItem') {
@@ -620,16 +619,16 @@ function windowTargetFromBinding(
 export function localBrowseStateForBinding(
   itemStates: ReadonlyMap<string, LocalBrowseItemState>,
   binding: RowBinding,
-  localPreviewMode: LocalPreviewMode = defaultLocalPreviewMode
+  addSourceView: AddSourceView = defaultAddSourceView
 ): LocalBrowseItemState | undefined {
-  const target = windowTargetFromBinding(binding, localPreviewMode)
+  const target = windowTargetFromBinding(binding, addSourceView)
 
   return target === undefined ? undefined : itemStates.get(localBrowseWindowKey(target))
 }
 
 export function localBrowseWindowKeyForIdentity(
   identity: LoadedLocalBrowseItems['identity'],
-  localPreviewMode: LocalPreviewMode = defaultLocalPreviewMode
+  addSourceView: AddSourceView = defaultAddSourceView
 ): string {
-  return localBrowseWindowKeyFromIdentity(identity, localPreviewMode)
+  return localBrowseWindowKeyFromIdentity(identity, addSourceView)
 }

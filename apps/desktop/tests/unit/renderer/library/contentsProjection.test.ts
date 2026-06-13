@@ -43,7 +43,7 @@ import {
   type LocalBrowseItemState
 } from '../../../../src/renderer/library/localBrowse/types'
 import type { LibraryBrowseProfile } from '../../../../src/renderer/library/libraryBrowseProfile/types'
-import type { LocalPreviewMode } from '../../../../src/renderer/library/localBrowse/previewMode'
+import type { AddSourceView } from '../../../../src/renderer/library/addSource/view'
 
 describe('projectContents', () => {
   it('projects selected source contents from contents state', () => {
@@ -225,7 +225,7 @@ describe('projectContents', () => {
 
     expect(rootContents.kind).toBe('ready')
     expect(rootContents.surfaceLabel).toBe('Source Preview')
-    expect(rootContents.surfaceKind).toBe('localPreview')
+    expect(rootContents.surfaceKind).toBe('sourcePreview')
     expect(rootContents.title).toBe('Music')
     expect(rootContents.rows.map((row) => row.label)).toEqual(['Albums', 'loose.flac'])
     expect(
@@ -268,7 +268,7 @@ describe('projectContents', () => {
     expect(contents.kind).toBe('notLoaded')
     expect(contents.surfaceLabel).toBe('Source Preview')
     expect(contents.title).toBe('Music')
-    expect(contents.detail).toContain('Preview local folders and media evidence')
+    expect(contents.detail).toContain('Preview local folders and media signals')
     expect(contents.rows.map((row) => row.label)).toEqual(['Folder preview not loaded'])
     expect(contents.rows[0]).toMatchObject({
       state: 'notLoaded',
@@ -288,7 +288,7 @@ describe('projectContents', () => {
     const projection = browserProjection(state)
     const contents = projectContents({
       state,
-      selectedNodeId: 'local-browse:section',
+      selectedNodeId: 'add-source:section',
       bindingsById: projection.bindingsById
     })
 
@@ -397,7 +397,7 @@ describe('projectContents', () => {
       items
     })
     const inventoryWindow = localBrowseWindow({
-      previewMode: 'advancedInventory',
+      addSourceView: 'inventory',
       label: 'Music',
       resolvedParentPath: 'C:\\Users\\Maikel\\Music',
       items
@@ -422,7 +422,7 @@ describe('projectContents', () => {
     expect(audioContents.surfaceLabel).toBe('Source Preview')
 
     const inventoryState = browserState({
-      localPreviewMode: 'advancedInventory',
+      addSourceView: 'inventory',
       navigationReadResult: emptyNavigation(),
       entries: [localBrowseEntryPoint()],
       localBrowseItemStates: new Map([
@@ -438,7 +438,7 @@ describe('projectContents', () => {
     })
 
     expect(inventoryContents.surfaceLabel).toBe('Source Inventory')
-    expect(inventoryContents.surfaceKind).toBe('localInventory')
+    expect(inventoryContents.surfaceKind).toBe('sourceInventory')
     expect(inventoryContents.detail).toContain('local inventory items shown')
     expect(inventoryContents.rows.map((row) => row.label)).toEqual([
       'Albums',
@@ -1453,7 +1453,7 @@ function browserProjection(state: BrowserState): BrowserProjection {
     state.localBrowseEntryPointsState === undefined
       ? projectState(state)
       : projectAddSourceState({
-          localPreviewMode: state.localPreviewMode ?? 'musicEvidence',
+          addSourceView: state.addSourceView ?? 'preview',
           entryPointsState: state.localBrowseEntryPointsState,
           itemStates: state.localBrowseItemStates
         })
@@ -1473,7 +1473,7 @@ function browserState(options: {
   readonly entries?: readonly LocalBrowseEntryPoint[]
   readonly localBrowseItemStates?: ReadonlyMap<string, LocalBrowseItemState>
   readonly libraryBrowseProfile?: LibraryBrowseProfile
-  readonly localPreviewMode?: LocalPreviewMode
+  readonly addSourceView?: AddSourceView
 }): BrowserState {
   const sourceStates = new Map<string, SourceState>()
 
@@ -1485,9 +1485,7 @@ function browserState(options: {
     ...(options.libraryBrowseProfile === undefined
       ? {}
       : { libraryBrowseProfile: options.libraryBrowseProfile }),
-    ...(options.localPreviewMode === undefined
-      ? {}
-      : { localPreviewMode: options.localPreviewMode }),
+    ...(options.addSourceView === undefined ? {} : { addSourceView: options.addSourceView }),
     navigationReadResult: options.navigationReadResult ?? {
       state: 'ready',
       rows: [sourceNavigationRow()]
@@ -1694,7 +1692,7 @@ function localBrowseItem(
 }
 
 function localBrowseWindow(options: {
-  readonly previewMode?: LocalPreviewMode
+  readonly addSourceView?: AddSourceView
   readonly entryPointKind?: LoadedLocalBrowseItems['identity']['entryPointKind']
   readonly resolvedRootPath?: string
   readonly label: string
@@ -1705,7 +1703,7 @@ function localBrowseWindow(options: {
 }): LoadedLocalBrowseItems {
   const resolvedRootPath = options.resolvedRootPath ?? 'C:\\Users\\Maikel\\Music'
   return {
-    previewMode: options.previewMode ?? 'musicEvidence',
+    addSourceView: options.addSourceView ?? 'preview',
     identity: {
       entryPointKind: options.entryPointKind ?? 'music',
       resolvedRootPath,
@@ -1723,7 +1721,7 @@ function localBrowseWindow(options: {
 
 function localBrowseWindowStateKey(window: LoadedLocalBrowseItems): string {
   return localBrowseWindowKey({
-    previewMode: window.previewMode,
+    addSourceView: window.addSourceView,
     entryPointKind: window.identity.entryPointKind,
     resolvedRootPath: window.identity.resolvedRootPath,
     resolvedParentPath: window.identity.resolvedParentPath,
@@ -1734,7 +1732,7 @@ function localBrowseWindowStateKey(window: LoadedLocalBrowseItems): string {
 function firstLocalBrowseEntryNode(
   projection: BrowserProjection
 ): BrowserProjection['nodes'][number] {
-  const section = projection.nodes.find((node) => node.id === 'local-browse:section')
+  const section = projection.nodes.find((node) => node.id === 'add-source:section')
   const node = section?.children.kind === 'loaded' ? section.children.nodes[0] : undefined
 
   if (node === undefined) {

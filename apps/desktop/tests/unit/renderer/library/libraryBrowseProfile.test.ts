@@ -8,13 +8,13 @@ import {
   libraryBrowseProfileOptions
 } from '../../../../src/renderer/library/libraryBrowseProfile/types'
 import {
-  createLocalPreviewModeController,
-  defaultLocalPreviewMode,
-  localPreviewModeLabel,
-  localPreviewModeOptions,
-  localPreviewSurfaceLabel,
-  mapLocalPreviewModeToLocalBrowseItemFilter
-} from '../../../../src/renderer/library/localBrowse/previewMode'
+  createAddSourceViewController,
+  defaultAddSourceView,
+  addSourceViewLabel,
+  addSourceViewOptions,
+  addSourceSurfaceLabel,
+  mapAddSourceViewToLocalBrowseItemFilter
+} from '../../../../src/renderer/library/addSource/view'
 
 describe('library browse profile', () => {
   it('defaults to audio and switches to playable and allFiles', () => {
@@ -57,27 +57,24 @@ describe('library browse profile', () => {
   })
 })
 
-describe('local preview mode', () => {
-  it('defaults to Music Preview and keeps Inventory explicit', () => {
-    const controller = createLocalPreviewModeController()
+describe('Add Source view', () => {
+  it('defaults to Preview and keeps Inventory explicit', () => {
+    const controller = createAddSourceViewController()
 
-    expect(defaultLocalPreviewMode).toBe('musicEvidence')
-    expect(controller.mode.value).toBe('musicEvidence')
-    expect(controller.setMode('advancedInventory')).toBe(true)
-    expect(controller.mode.value).toBe('advancedInventory')
-    expect(controller.setMode('advancedInventory')).toBe(false)
+    expect(defaultAddSourceView).toBe('preview')
+    expect(controller.view.value).toBe('preview')
+    expect(controller.setView('inventory')).toBe(true)
+    expect(controller.view.value).toBe('inventory')
+    expect(controller.setView('inventory')).toBe(false)
   })
 
   it('uses Add Source language and maps to local browse item filter only at the boundary', () => {
-    expect(localPreviewModeOptions.map((option) => option.label)).toEqual([
-      'Music Preview',
-      'Inventory'
-    ])
-    expect(localPreviewModeLabel('musicEvidence')).toBe('Music Preview')
-    expect(localPreviewModeLabel('advancedInventory')).toBe('Inventory')
-    expect(localPreviewSurfaceLabel('musicEvidence')).toBe('Source Preview')
-    expect(localPreviewSurfaceLabel('advancedInventory')).toBe('Source Inventory')
-    expect(mapLocalPreviewModeToLocalBrowseItemFilter('musicEvidence')).toBe('audio')
-    expect(mapLocalPreviewModeToLocalBrowseItemFilter('advancedInventory')).toBe('allFiles')
+    expect(addSourceViewOptions.map((option) => option.label)).toEqual(['Preview', 'Inventory'])
+    expect(addSourceViewLabel('preview')).toBe('Preview')
+    expect(addSourceViewLabel('inventory')).toBe('Inventory')
+    expect(addSourceSurfaceLabel('preview')).toBe('Source Preview')
+    expect(addSourceSurfaceLabel('inventory')).toBe('Source Inventory')
+    expect(mapAddSourceViewToLocalBrowseItemFilter('preview')).toBe('audio')
+    expect(mapAddSourceViewToLocalBrowseItemFilter('inventory')).toBe('allFiles')
   })
 })

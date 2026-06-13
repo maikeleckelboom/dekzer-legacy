@@ -17,7 +17,7 @@ const viewStateKeys = new Set([
   'expandedLibraryNodeIds',
   'expandedAddSourceNodeIds',
   'libraryBrowseProfile',
-  'localPreviewMode'
+  'addSourceView'
 ])
 
 export async function readViewStateFromHost(
@@ -47,9 +47,7 @@ export async function readViewStateFromHost(
         ...(parsed.libraryBrowseProfile === undefined
           ? {}
           : { libraryBrowseProfile: parsed.libraryBrowseProfile }),
-        ...(parsed.localPreviewMode === undefined
-          ? {}
-          : { localPreviewMode: parsed.localPreviewMode })
+        ...(parsed.addSourceView === undefined ? {} : { addSourceView: parsed.addSourceView })
       }
     }
   } catch {
@@ -78,9 +76,7 @@ export async function writeViewStateToHost(
       ...(viewState.libraryBrowseProfile === undefined
         ? {}
         : { libraryBrowseProfile: viewState.libraryBrowseProfile }),
-      ...(viewState.localPreviewMode === undefined
-        ? {}
-        : { localPreviewMode: viewState.localPreviewMode })
+      ...(viewState.addSourceView === undefined ? {} : { addSourceView: viewState.addSourceView })
     })
     const filePath = viewStateFilePath(host)
     const tempPath = `${filePath}.tmp`
@@ -121,7 +117,7 @@ export function isValidViewState(value: unknown): value is PersistedLibraryViewS
   if (value === null || typeof value !== 'object') return false
   const obj = value as Record<string, unknown>
   if (!Object.keys(obj).every((key) => viewStateKeys.has(key))) return false
-  if (obj.version !== 2) return false
+  if (obj.version !== 3) return false
   if (obj.activeSurface !== 'libraryBrowse' && obj.activeSurface !== 'addSource') return false
   if ('selectedLibraryNodeId' in obj && obj.selectedLibraryNodeId !== undefined) {
     if (typeof obj.selectedLibraryNodeId !== 'string') return false
@@ -142,8 +138,8 @@ export function isValidViewState(value: unknown): value is PersistedLibraryViewS
       return false
     }
   }
-  if ('localPreviewMode' in obj && obj.localPreviewMode !== undefined) {
-    return obj.localPreviewMode === 'musicEvidence' || obj.localPreviewMode === 'advancedInventory'
+  if ('addSourceView' in obj && obj.addSourceView !== undefined) {
+    return obj.addSourceView === 'preview' || obj.addSourceView === 'inventory'
   }
   return true
 }

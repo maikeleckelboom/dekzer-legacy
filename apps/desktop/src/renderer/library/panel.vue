@@ -14,11 +14,11 @@ import { useLocalRootActions } from './boundary/localRootActions'
 import { useLocalBrowseController } from './localBrowse/controller'
 import { addSourceSectionNodeId, projectAddSourceState } from './localBrowse/projection'
 import {
-  createLocalPreviewModeController,
-  localPreviewModeLabel,
-  localPreviewModeOptions,
-  type LocalPreviewMode
-} from './localBrowse/previewMode'
+  createAddSourceViewController,
+  addSourceViewLabel,
+  addSourceViewOptions,
+  type AddSourceView
+} from './addSource/view'
 import { useBoundaryEvents, type ScanProgressState } from './boundary/boundaryEvents'
 import {
   sourceLifecycleIdsForBrowserContext,
@@ -74,12 +74,12 @@ const iconButtonClass = `${buttonBaseClass} h-9 w-9 min-w-0 border border-(--col
 
 const viewStateStore = createViewStateStore()
 const libraryBrowseProfile = createLibraryBrowseProfileController()
-const localPreviewMode = createLocalPreviewModeController()
+const addSourceView = createAddSourceViewController()
 const hierarchyRead = useLibraryHierarchyRead(undefined, {
   profile: libraryBrowseProfile.profile
 })
 const localBrowse = useLocalBrowseController(undefined, {
-  localPreviewMode: localPreviewMode.mode
+  addSourceView: addSourceView.view
 })
 const contentsRead = useContentsRead(undefined, { profile: libraryBrowseProfile.profile })
 const rootActions = useLocalRootActions()
@@ -123,8 +123,8 @@ const sourceRevealRequest = ref<{
 }>()
 const libraryBrowseProfileMenuOpen = ref(false)
 const libraryBrowseProfileMenuRef = ref<HTMLElement>()
-const localPreviewModeMenuOpen = ref(false)
-const localPreviewModeMenuRef = ref<HTMLElement>()
+const addSourceViewMenuOpen = ref(false)
+const addSourceViewMenuRef = ref<HTMLElement>()
 const searchInputRef = ref<HTMLInputElement>()
 let sourceRevealSequence = 0
 let maintenanceRefreshTimer: ReturnType<typeof setTimeout> | undefined
@@ -153,7 +153,7 @@ const sourceReadinessByNodeId = computed(() =>
 
 const browserState = computed<BrowserState>(() => ({
   libraryBrowseProfile: libraryBrowseProfile.profile.value,
-  localPreviewMode: localPreviewMode.mode.value,
+  addSourceView: addSourceView.view.value,
   sourceReadinessByNodeId: sourceReadinessByNodeId.value,
   sourceReadStates: hierarchyRead.sourceReadStates.value,
   directoryReadStates: hierarchyRead.directoryReadStates.value,
@@ -170,14 +170,12 @@ const browserState = computed<BrowserState>(() => ({
 const selectedLibraryBrowseProfileLabel = computed(() =>
   libraryBrowseProfileLabel(libraryBrowseProfile.profile.value)
 )
-const selectedLocalPreviewModeLabel = computed(() =>
-  localPreviewModeLabel(localPreviewMode.mode.value)
-)
+const selectedAddSourceViewLabel = computed(() => addSourceViewLabel(addSourceView.view.value))
 
 const libraryBrowseProjection = computed(() => projectState(browserState.value))
 const addSourceProjection = computed(() =>
   projectAddSourceState({
-    localPreviewMode: localPreviewMode.mode.value,
+    addSourceView: addSourceView.view.value,
     entryPointsState: localBrowse.entryPointsState.value,
     itemStates: localBrowse.itemStates.value
   })
@@ -203,8 +201,8 @@ const toolbarModel = computed(() =>
     projection: activeProjection.value,
     selectedNodeId: activeSelectedNodeId.value,
     selectedLibraryBrowseProfileLabel: selectedLibraryBrowseProfileLabel.value,
-    selectedLocalPreviewModeLabel: selectedLocalPreviewModeLabel.value,
-    localPreviewMode: localPreviewMode.mode.value,
+    selectedAddSourceViewLabel: selectedAddSourceViewLabel.value,
+    addSourceView: addSourceView.view.value,
     addMusicFolderLabel: rootActions.rootChoiceButtonLabel.value,
     canAddMusicFolder: rootLifecycle.canAddMusicFolder.value
   })
@@ -417,7 +415,7 @@ watch(
 )
 
 watch(
-  () => localPreviewMode.mode.value,
+  () => addSourceView.view.value,
   async () => {
     await localBrowse.refreshBrowserWindows(
       expandedAddSourceNodeIds.value,
@@ -618,12 +616,12 @@ watch(
 
 function saveViewState(): void {
   viewStateStore.save({
-    version: 2,
+    version: 3,
     activeSurface: activeSurface.value,
     expandedLibraryNodeIds: [...expandedLibraryNodeIds.value],
     expandedAddSourceNodeIds: [...expandedAddSourceNodeIds.value],
     libraryBrowseProfile: libraryBrowseProfile.profile.value,
-    localPreviewMode: localPreviewMode.mode.value,
+    addSourceView: addSourceView.view.value,
     ...(selectedLibraryNodeId.value === undefined
       ? {}
       : { selectedLibraryNodeId: selectedLibraryNodeId.value }),
@@ -673,7 +671,7 @@ async function restoreViewState(): Promise<void> {
       addSource?.bindingsById
     )
     libraryBrowseProfile.restoreProfile(result.viewState.libraryBrowseProfile)
-    localPreviewMode.restoreMode(result.viewState.localPreviewMode)
+    addSourceView.restoreView(result.viewState.addSourceView)
   } catch {
     restoreState.readCompleted = true
   }
@@ -692,17 +690,17 @@ function closeLibraryBrowseProfileMenu(): void {
   libraryBrowseProfileMenuOpen.value = false
 }
 
-function toggleLocalPreviewModeMenu(): void {
-  localPreviewModeMenuOpen.value = !localPreviewModeMenuOpen.value
+function toggleAddSourceViewMenu(): void {
+  addSourceViewMenuOpen.value = !addSourceViewMenuOpen.value
 }
 
-function selectLocalPreviewMode(mode: LocalPreviewMode): void {
-  localPreviewMode.setMode(mode)
-  localPreviewModeMenuOpen.value = false
+function selectAddSourceView(mode: AddSourceView): void {
+  addSourceView.setView(mode)
+  addSourceViewMenuOpen.value = false
 }
 
-function closeLocalPreviewModeMenu(): void {
-  localPreviewModeMenuOpen.value = false
+function closeAddSourceViewMenu(): void {
+  addSourceViewMenuOpen.value = false
 }
 
 function openSearch(): void {
@@ -757,10 +755,10 @@ function handleLibraryBrowseProfileOutsidePointerDown(event: PointerEvent): void
   }
 
   if (
-    localPreviewModeMenuOpen.value &&
-    (!(target instanceof Node) || !localPreviewModeMenuRef.value?.contains(target))
+    addSourceViewMenuOpen.value &&
+    (!(target instanceof Node) || !addSourceViewMenuRef.value?.contains(target))
   ) {
-    localPreviewModeMenuOpen.value = false
+    addSourceViewMenuOpen.value = false
   }
 }
 
@@ -1174,10 +1172,10 @@ function clearBrowserView(): void {
   restoreState.initialNodeApplied = false
 
   viewStateStore.save({
-    version: 2,
+    version: 3,
     activeSurface: activeSurface.value,
     libraryBrowseProfile: libraryBrowseProfile.profile.value,
-    localPreviewMode: localPreviewMode.mode.value,
+    addSourceView: addSourceView.view.value,
     expandedLibraryNodeIds: [],
     expandedAddSourceNodeIds: [...expandedAddSourceNodeIds.value],
     ...(selectedAddSourceNodeId.value === undefined
@@ -1346,41 +1344,41 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
         </div>
 
         <div
-          v-if="toolbarModel.localPreviewMode.visible"
-          ref="localPreviewModeMenuRef"
+          v-if="toolbarModel.addSourceView.visible"
+          ref="addSourceViewMenuRef"
           class="relative inline-flex"
         >
           <button
             type="button"
             :class="iconButtonClass"
-            :aria-label="toolbarModel.localPreviewMode.label"
-            :aria-expanded="localPreviewModeMenuOpen"
+            :aria-label="toolbarModel.addSourceView.label"
+            :aria-expanded="addSourceViewMenuOpen"
             aria-haspopup="listbox"
-            :title="toolbarModel.localPreviewMode.title"
-            :disabled="!toolbarModel.localPreviewMode.enabled"
-            @click="toggleLocalPreviewModeMenu"
-            @keydown.escape.stop.prevent="closeLocalPreviewModeMenu"
+            :title="toolbarModel.addSourceView.title"
+            :disabled="!toolbarModel.addSourceView.enabled"
+            @click="toggleAddSourceViewMenu"
+            @keydown.escape.stop.prevent="closeAddSourceViewMenu"
           >
             <Icon role="action.browseView" size="md" />
           </button>
 
           <div
-            v-if="localPreviewModeMenuOpen"
+            v-if="addSourceViewMenuOpen"
             class="absolute right-0 top-full z-20 mt-1 min-w-48 border border-(--color-border) bg-(--color-background) py-1 shadow-lg"
             role="listbox"
-            :aria-label="toolbarModel.localPreviewMode.label"
+            :aria-label="toolbarModel.addSourceView.label"
             tabindex="-1"
-            @keydown.escape.stop.prevent="closeLocalPreviewModeMenu"
+            @keydown.escape.stop.prevent="closeAddSourceViewMenu"
           >
             <button
-              v-for="option in localPreviewModeOptions"
+              v-for="option in addSourceViewOptions"
               :key="option.key"
               type="button"
               class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm text-(--color-text) hover:bg-(--color-surface) focus-visible:bg-(--color-surface) focus-visible:outline-none"
-              :class="localPreviewMode.mode.value === option.key ? 'font-bold' : 'font-normal'"
+              :class="addSourceView.view.value === option.key ? 'font-bold' : 'font-normal'"
               role="option"
-              :aria-selected="localPreviewMode.mode.value === option.key"
-              @click="selectLocalPreviewMode(option.key)"
+              :aria-selected="addSourceView.view.value === option.key"
+              @click="selectAddSourceView(option.key)"
             >
               <span>{{ option.label }}</span>
             </button>

@@ -20,11 +20,7 @@ import {
   type LocalBrowseItemState
 } from '../localBrowse/types'
 import { libraryBrowseEmptyStateLabel } from '../libraryBrowseProfile/types'
-import {
-  defaultLocalPreviewMode,
-  localPreviewSurfaceLabel,
-  type LocalPreviewMode
-} from '../localBrowse/previewMode'
+import { defaultAddSourceView, addSourceSurfaceLabel, type AddSourceView } from '../addSource/view'
 import type { BrowserProjection } from '../tree/projection'
 import type { BrowserState, RowBinding } from '../state'
 import type { BrowserTreeNodeId } from '../tree/types'
@@ -44,8 +40,8 @@ export type ContentSurfaceKind =
   | 'indexedContents'
   | 'libraryStart'
   | 'addSource'
-  | 'localPreview'
-  | 'localInventory'
+  | 'sourcePreview'
+  | 'sourceInventory'
   | 'sourceStatus'
   | 'readState'
 
@@ -158,15 +154,15 @@ const sourceStatusSurface = {
   surfaceLabel: 'Source Status'
 } satisfies ContentSurface
 
-function localSurface(mode: LocalPreviewMode): ContentSurface {
-  return mode === 'advancedInventory'
+function localSurface(mode: AddSourceView): ContentSurface {
+  return mode === 'inventory'
     ? {
-        surfaceKind: 'localInventory',
-        surfaceLabel: localPreviewSurfaceLabel(mode)
+        surfaceKind: 'sourceInventory',
+        surfaceLabel: addSourceSurfaceLabel(mode)
       }
     : {
-        surfaceKind: 'localPreview',
-        surfaceLabel: localPreviewSurfaceLabel(mode)
+        surfaceKind: 'sourcePreview',
+        surfaceLabel: addSourceSurfaceLabel(mode)
       }
 }
 
@@ -316,14 +312,14 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
         title: binding.entry.displayName,
         targetNodeId: selectedNodeId,
         folderDetail: binding.entry.identity.resolvedPath ?? binding.entry.displayName,
-        localPreviewMode: options.state.localPreviewMode ?? defaultLocalPreviewMode,
+        addSourceView: options.state.addSourceView ?? defaultAddSourceView,
         entryPointKind: binding.entry.identity.entryPointKind,
         localStatus: binding.entry.status,
         windowState: options.state.localBrowseItemStates?.get(
           localBrowseWindowKey(
             localBrowseRootTarget(
               binding.target,
-              options.state.localPreviewMode ?? defaultLocalPreviewMode
+              options.state.addSourceView ?? defaultAddSourceView
             )
           )
         )
@@ -335,7 +331,7 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
           title: binding.item.displayName,
           targetNodeId: selectedNodeId,
           folderDetail: localBrowseItemDetail(binding.item),
-          localPreviewMode: binding.target.previewMode,
+          addSourceView: binding.target.addSourceView,
           entryPointKind: binding.item.identity.entryPointKind,
           localStatus: binding.item.status,
           windowState: options.state.localBrowseItemStates?.get(
@@ -347,18 +343,15 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
       return projectLocalBrowseFileContents(
         selectedNodeId,
         binding.item,
-        options.state.localPreviewMode ?? defaultLocalPreviewMode
+        options.state.addSourceView ?? defaultAddSourceView
       )
     case 'localBrowseMore':
-      return contentProjection(
-        localSurface(options.state.localPreviewMode ?? defaultLocalPreviewMode),
-        {
-          kind: 'ready',
-          title: 'More local items',
-          detail: binding.detail,
-          rows: [localBrowseMoreRow(selectedNodeId, binding)]
-        }
-      )
+      return contentProjection(localSurface(options.state.addSourceView ?? defaultAddSourceView), {
+        kind: 'ready',
+        title: 'More local items',
+        detail: binding.detail,
+        rows: [localBrowseMoreRow(selectedNodeId, binding)]
+      })
   }
 }
 
@@ -851,14 +844,14 @@ function projectLocalBrowseFolderContents(options: {
   readonly title: string
   readonly targetNodeId: BrowserTreeNodeId
   readonly folderDetail: string
-  readonly localPreviewMode: LocalPreviewMode
+  readonly addSourceView: AddSourceView
   readonly entryPointKind: LocalBrowseEntryPointKind
   readonly localStatus: LocalBrowseEntryPointStatus | LocalBrowseItem['status']
   readonly windowState: LocalBrowseItemState | undefined
 }): ContentProjection {
   const state = options.windowState
   const selectionDetail = localBrowseSelectionDetail(options)
-  const surface = localSurface(options.localPreviewMode)
+  const surface = localSurface(options.addSourceView)
 
   if (state === undefined) {
     return contentProjection(surface, {
@@ -927,7 +920,7 @@ function projectLocalBrowseFolderContents(options: {
   const rows = [...contentRows, ...(moreRow === undefined ? [] : [moreRow])]
 
   if (rows.length > 0) {
-    return contentProjection(localSurface(window.previewMode), {
+    return contentProjection(localSurface(window.addSourceView), {
       kind: 'ready',
       title: options.title,
       detail:
@@ -938,7 +931,7 @@ function projectLocalBrowseFolderContents(options: {
     })
   }
 
-  return contentProjection(localSurface(window.previewMode), {
+  return contentProjection(localSurface(window.addSourceView), {
     kind: 'ready',
     title: options.title,
     detail: localBrowseWindowDetail(window, contentRows.length),
@@ -956,11 +949,11 @@ function projectLocalBrowseFolderContents(options: {
 function projectLocalBrowseFileContents(
   ownerId: BrowserTreeNodeId,
   item: LocalBrowseItem,
-  localPreviewMode: LocalPreviewMode
+  addSourceView: AddSourceView
 ): ContentProjection {
   if (isTerminalLocalBrowseItem(item)) {
     return stateProjection({
-      surface: localSurface(localPreviewMode),
+      surface: localSurface(addSourceView),
       kind: localBrowseTerminalProjectionKind(item),
       ownerId,
       title: item.displayName,
@@ -972,7 +965,7 @@ function projectLocalBrowseFileContents(
 
   const selectedRow = localBrowseItemRow(item)
 
-  return contentProjection(localSurface(localPreviewMode), {
+  return contentProjection(localSurface(addSourceView), {
     kind: 'ready',
     title: item.displayName,
     detail: localBrowseItemDetail(item),
@@ -997,7 +990,7 @@ function localBrowseItemRow(item: LocalBrowseItem): ContentRow {
 
 function localBrowseSelectionDetail(options: {
   readonly folderDetail: string
-  readonly localPreviewMode: LocalPreviewMode
+  readonly addSourceView: AddSourceView
   readonly entryPointKind: LocalBrowseEntryPointKind
   readonly localStatus: LocalBrowseEntryPointStatus | LocalBrowseItem['status']
 }): string {
@@ -1009,18 +1002,18 @@ function localBrowseSelectionDetail(options: {
     return 'Broad filesystem root. Choose a specific music folder before adding it as a source.'
   }
 
-  if (options.localPreviewMode === 'advancedInventory') {
+  if (options.addSourceView === 'inventory') {
     return `Inventory shows local inventory for diagnostics. ${options.folderDetail}`
   }
 
-  return `Preview local folders and media evidence before adding a managed source. ${options.folderDetail}`
+  return `Preview local folders and media signals before adding a managed source. ${options.folderDetail}`
 }
 
 function isVisibleLocalBrowsePreviewItem(
   item: LocalBrowseItem,
   window: LoadedLocalBrowseItems
 ): boolean {
-  if (window.previewMode === 'advancedInventory') {
+  if (window.addSourceView === 'inventory') {
     return true
   }
 
@@ -1145,7 +1138,7 @@ function localBrowseWindowDetail(window: LoadedLocalBrowseItems, visibleRowCount
     return window.failure.detail
   }
 
-  if (window.previewMode === 'advancedInventory') {
+  if (window.addSourceView === 'inventory') {
     if (window.totalItems === 0) {
       return 'No local inventory items are available in this folder.'
     }
@@ -1164,7 +1157,7 @@ function localBrowseWindowDetail(window: LoadedLocalBrowseItems, visibleRowCount
   }
 
   if (window.totalItems === 0) {
-    return 'No local music-source evidence is available in this folder.'
+    return 'No source preview items is available in this folder.'
   }
 
   return `${visibleRowCount} of ${window.totalItems} local preview items shown.`
@@ -1190,9 +1183,9 @@ function localBrowseWindowState(
 function localBrowseWindowStateLabel(window: LoadedLocalBrowseItems): string {
   switch (window.status) {
     case 'complete':
-      return window.previewMode === 'advancedInventory'
+      return window.addSourceView === 'inventory'
         ? 'No local inventory items'
-        : 'No preview evidence'
+        : 'No source preview items'
     case 'partialFailure':
       return 'Local items partially unavailable'
     case 'failed':

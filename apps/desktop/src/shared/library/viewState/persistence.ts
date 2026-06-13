@@ -1,14 +1,14 @@
 export type LibraryPanelSurface = 'libraryBrowse' | 'addSource'
 
 export type PersistedLibraryViewState = {
-  readonly version: 2
+  readonly version: 3
   readonly activeSurface: LibraryPanelSurface
   readonly selectedLibraryNodeId?: string
   readonly selectedAddSourceNodeId?: string
   readonly expandedLibraryNodeIds: readonly string[]
   readonly expandedAddSourceNodeIds: readonly string[]
   readonly libraryBrowseProfile?: 'audio' | 'playable' | 'allFiles'
-  readonly localPreviewMode?: 'musicEvidence' | 'advancedInventory'
+  readonly addSourceView?: 'preview' | 'inventory'
 }
 
 export type LibraryViewStateReadResult =

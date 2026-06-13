@@ -102,7 +102,7 @@ describe('source status projection', () => {
           status: 'duplicateOfAdmittedSource'
         },
         target: {
-          previewMode: 'musicEvidence',
+          addSourceView: 'preview',
           entryPointKind: 'music',
           resolvedRootPath: 'C:/Music',
           resolvedParentPath: 'C:/Music/Duplicate',
@@ -128,7 +128,7 @@ describe('source status projection', () => {
           matchedSourceId: '7'
         },
         target: {
-          previewMode: 'musicEvidence',
+          addSourceView: 'preview',
           entryPointKind: 'music',
           resolvedRootPath: 'C:/Music',
           resolvedParentPath: 'C:/Music/Duplicate',
@@ -279,7 +279,7 @@ describe('source status projection', () => {
         kind: 'localBrowseItem',
         item: localItem([], 'directory'),
         target: {
-          previewMode: 'musicEvidence',
+          addSourceView: 'preview',
           entryPointKind: 'music',
           resolvedRootPath: 'C:/Music',
           resolvedParentPath: 'C:/Music/Albums',

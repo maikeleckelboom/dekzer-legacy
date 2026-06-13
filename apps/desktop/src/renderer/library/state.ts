@@ -12,7 +12,7 @@ import type {
 } from './localBrowse/types'
 import type { SourceReadiness } from './runtime/sourceReadiness'
 import type { LibraryBrowseProfile } from './libraryBrowseProfile/types'
-import type { LocalPreviewMode } from './localBrowse/previewMode'
+import type { AddSourceView } from './addSource/view'
 
 export type DirectoryTarget = {
   readonly entryPoint: EntryPoint
@@ -176,7 +176,7 @@ export type RowBinding =
 
 export type BrowserState = {
   readonly libraryBrowseProfile?: LibraryBrowseProfile
-  readonly localPreviewMode?: LocalPreviewMode
+  readonly addSourceView?: AddSourceView
   readonly hostStatus?: LibraryBoundaryHostStatus
   readonly navigationReadResult?: NavigationReadRowsResult
   readonly sourceReadinessByNodeId?: ReadonlyMap<string, SourceReadiness>

@@ -3,22 +3,22 @@ import { describe, expect, it } from 'vitest'
 import { isValidViewState } from '../../../../src/main/library/viewState/persistence'
 
 describe('library view-state persistence', () => {
-  it('accepts only strict version 2 canonical view state', () => {
+  it('accepts only strict version 3 canonical view state', () => {
     expect(
       isValidViewState({
-        version: 2,
+        version: 3,
         activeSurface: 'libraryBrowse',
         selectedLibraryNodeId: 'node-1',
-        selectedAddSourceNodeId: 'local-browse:section',
+        selectedAddSourceNodeId: 'add-source:section',
         expandedLibraryNodeIds: ['node-1'],
-        expandedAddSourceNodeIds: ['local-browse:section'],
+        expandedAddSourceNodeIds: ['add-source:section'],
         libraryBrowseProfile: 'audio',
-        localPreviewMode: 'musicEvidence'
+        addSourceView: 'preview'
       })
     ).toBe(true)
   })
 
-  it('rejects stale version 1 and generic profile residue', () => {
+  it('rejects stale versions and generic profile residue', () => {
     expect(
       isValidViewState({
         version: 1,
@@ -26,13 +26,24 @@ describe('library view-state persistence', () => {
         expandedLibraryNodeIds: [],
         expandedAddSourceNodeIds: [],
         libraryBrowseProfile: 'audio',
-        localPreviewMode: 'musicEvidence'
+        addSourceView: 'preview'
       })
     ).toBe(false)
 
     expect(
       isValidViewState({
         version: 2,
+        activeSurface: 'libraryBrowse',
+        expandedLibraryNodeIds: [],
+        expandedAddSourceNodeIds: [],
+        libraryBrowseProfile: 'audio',
+        addSourceView: 'preview'
+      })
+    ).toBe(false)
+
+    expect(
+      isValidViewState({
+        version: 3,
         activeSurface: 'libraryBrowse',
         expandedLibraryNodeIds: [],
         expandedAddSourceNodeIds: [],
@@ -42,11 +53,43 @@ describe('library view-state persistence', () => {
 
     expect(
       isValidViewState({
-        version: 2,
+        version: 3,
         selectedNodeId: 'node-1',
         expandedNodeIds: ['node-1'],
         libraryBrowseProfile: 'audio',
+        addSourceView: 'preview'
+      })
+    ).toBe(false)
+  })
+
+  it('rejects stale Add Source view-state vocabulary', () => {
+    expect(
+      isValidViewState({
+        version: 3,
+        activeSurface: 'addSource',
+        expandedLibraryNodeIds: [],
+        expandedAddSourceNodeIds: [],
         localPreviewMode: 'musicEvidence'
+      })
+    ).toBe(false)
+
+    expect(
+      isValidViewState({
+        version: 3,
+        activeSurface: 'addSource',
+        expandedLibraryNodeIds: [],
+        expandedAddSourceNodeIds: [],
+        addSourceView: 'musicEvidence'
+      })
+    ).toBe(false)
+
+    expect(
+      isValidViewState({
+        version: 3,
+        activeSurface: 'addSource',
+        expandedLibraryNodeIds: [],
+        expandedAddSourceNodeIds: [],
+        addSourceView: 'advancedInventory'
       })
     ).toBe(false)
   })

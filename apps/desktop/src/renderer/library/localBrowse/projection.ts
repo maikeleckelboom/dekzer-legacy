@@ -29,12 +29,12 @@ import {
   type LocalBrowseItemState,
   type LocalBrowseMoreTarget
 } from './types'
-import type { LocalPreviewMode } from './previewMode'
+import type { AddSourceView } from '../addSource/view'
 
-export const addSourceSectionNodeId = 'local-browse:section'
+export const addSourceSectionNodeId = 'add-source:section'
 
 type LocalBrowseProjectionOptions = {
-  readonly localPreviewMode: LocalPreviewMode
+  readonly addSourceView: AddSourceView
   readonly entryPointsState?: LocalBrowseEntryPointsState
   readonly itemStates?: ReadonlyMap<string, LocalBrowseItemState>
   readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
@@ -98,7 +98,7 @@ export function projectAddSourceSection(
       entries.map((entry) =>
         projectEntryPoint({
           entry,
-          localPreviewMode: options.localPreviewMode,
+          addSourceView: options.addSourceView,
           itemStates: options.itemStates ?? new Map(),
           bindingsById: options.bindingsById
         })
@@ -115,7 +115,7 @@ export function projectAddSourceState(
 ): BrowserProjection | undefined {
   const bindingsById = new Map<BrowserTreeNodeId, RowBinding>()
   const addSourceSection = projectAddSourceSection({
-    localPreviewMode: state.localPreviewMode,
+    addSourceView: state.addSourceView,
     ...(state.entryPointsState === undefined ? {} : { entryPointsState: state.entryPointsState }),
     ...(state.itemStates === undefined ? {} : { itemStates: state.itemStates }),
     bindingsById
@@ -148,7 +148,7 @@ function addSourceSectionNode(
 
 function projectEntryPoint(options: {
   readonly entry: LocalBrowseEntryPoint
-  readonly localPreviewMode: LocalPreviewMode
+  readonly addSourceView: AddSourceView
   readonly itemStates: ReadonlyMap<string, LocalBrowseItemState>
   readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
 }): BrowserTreeNode {
@@ -174,7 +174,7 @@ function projectEntryPoint(options: {
     ...projectEntryPointChildren({
       ownerId: nodeId,
       entry: options.entry,
-      localPreviewMode: options.localPreviewMode,
+      addSourceView: options.addSourceView,
       target,
       itemStates: options.itemStates,
       bindingsById: options.bindingsById
@@ -185,7 +185,7 @@ function projectEntryPoint(options: {
 function projectEntryPointChildren(options: {
   readonly ownerId: string
   readonly entry: LocalBrowseEntryPoint
-  readonly localPreviewMode: LocalPreviewMode
+  readonly addSourceView: AddSourceView
   readonly target: LocalBrowseEntryPointTarget | undefined
   readonly itemStates: ReadonlyMap<string, LocalBrowseItemState>
   readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
@@ -199,7 +199,7 @@ function projectEntryPointChildren(options: {
     return { children: { kind: 'none' } }
   }
 
-  const rootTarget = localBrowseRootTarget(target, options.localPreviewMode)
+  const rootTarget = localBrowseRootTarget(target, options.addSourceView)
 
   return projectLocalBrowseChildren({
     ownerId: options.ownerId,
@@ -212,14 +212,14 @@ function projectEntryPointChildren(options: {
 
 function projectLocalBrowseItem(options: {
   readonly item: LocalBrowseItem
-  readonly localPreviewMode: LocalPreviewMode
+  readonly addSourceView: AddSourceView
   readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
   readonly itemStates: ReadonlyMap<string, LocalBrowseItemState>
 }): BrowserTreeNode {
   const item = options.item
   const nodeId = localBrowseItemNodeId(item)
   const target = hasLocalBrowseOperation(item.availableOperations, 'browseChildren')
-    ? directoryTargetForItem(item, options.localPreviewMode)
+    ? directoryTargetForItem(item, options.addSourceView)
     : undefined
 
   options.bindingsById.set(nodeId, {
@@ -333,7 +333,7 @@ function projectLoadedLocalBrowseWindow(options: {
   const projectedItems = options.window.items.map((item) =>
     projectLocalBrowseItem({
       item,
-      localPreviewMode: options.window.previewMode,
+      addSourceView: options.window.addSourceView,
       itemStates: options.itemStates,
       bindingsById: options.bindingsById
     })
@@ -525,7 +525,7 @@ function trackedMoreNode(
 
   const target: LocalBrowseMoreTarget = {
     ownerNodeId: options.ownerId,
-    previewMode: options.window.previewMode,
+    addSourceView: options.window.addSourceView,
     entryPointKind: options.window.identity.entryPointKind,
     resolvedRootPath: options.window.identity.resolvedRootPath,
     resolvedParentPath: options.window.identity.resolvedParentPath,
@@ -613,14 +613,14 @@ function entryPointPriority(entry: LocalBrowseEntryPoint): string {
 
 function directoryTargetForItem(
   item: LocalBrowseItem,
-  localPreviewMode: LocalPreviewMode
+  addSourceView: AddSourceView
 ): LocalBrowseDirectoryTarget | undefined {
   if (!hasLocalBrowseOperation(item.availableOperations, 'browseChildren')) {
     return undefined
   }
 
   return {
-    previewMode: localPreviewMode,
+    addSourceView: addSourceView,
     entryPointKind: item.identity.entryPointKind,
     resolvedRootPath: item.identity.resolvedRootPath,
     resolvedParentPath: item.identity.resolvedItemPath,

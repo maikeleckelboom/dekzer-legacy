@@ -4,7 +4,7 @@ import type {
   PersistedLibraryViewState
 } from '../../../shared/library/viewState/persistence'
 import { isLibraryBrowseProfile } from '../libraryBrowseProfile/types'
-import { isLocalPreviewMode } from '../localBrowse/previewMode'
+import { isAddSourceView } from '../addSource/view'
 
 export type ViewStateApi = {
   readonly library: {
@@ -28,7 +28,7 @@ function getRendererApi(): ViewStateApi {
 
 function normalizeViewStateForPersist(state: PersistedLibraryViewState): PersistedLibraryViewState {
   return {
-    version: 2,
+    version: 3,
     activeSurface:
       state.activeSurface === 'addSource' || state.activeSurface === 'libraryBrowse'
         ? state.activeSurface
@@ -44,9 +44,7 @@ function normalizeViewStateForPersist(state: PersistedLibraryViewState): Persist
     ...(isLibraryBrowseProfile(state.libraryBrowseProfile)
       ? { libraryBrowseProfile: state.libraryBrowseProfile }
       : {}),
-    ...(isLocalPreviewMode(state.localPreviewMode)
-      ? { localPreviewMode: state.localPreviewMode }
-      : {})
+    ...(isAddSourceView(state.addSourceView) ? { addSourceView: state.addSourceView } : {})
   }
 }
 

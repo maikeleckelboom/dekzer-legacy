@@ -9,7 +9,7 @@ import type {
   LocalBrowseWindowIdentity,
   ReadLocalBrowseItemsResult
 } from '../../../shared/library/localBrowse/items'
-import { mapLocalPreviewModeToLocalBrowseItemFilter, type LocalPreviewMode } from './previewMode'
+import { mapAddSourceViewToLocalBrowseItemFilter, type AddSourceView } from '../addSource/view'
 
 export type LocalBrowseEntryPointsState =
   | {
@@ -44,7 +44,7 @@ export type LocalBrowseEntryPointTarget = {
 }
 
 export type LocalBrowseDirectoryTarget = {
-  readonly previewMode: LocalPreviewMode
+  readonly addSourceView: AddSourceView
   readonly entryPointKind: LocalBrowseEntryPointKind
   readonly resolvedRootPath: string
   readonly resolvedParentPath: string
@@ -70,7 +70,7 @@ export type LocalBrowseMoreState =
     }
 
 export type LoadedLocalBrowseItems = {
-  readonly previewMode: LocalPreviewMode
+  readonly addSourceView: AddSourceView
   readonly identity: LocalBrowseWindowIdentity
   readonly label: string
   readonly items: readonly LocalBrowseItem[]
@@ -124,10 +124,10 @@ export function targetForEntryPoint(
 
 export function localBrowseRootTarget(
   target: LocalBrowseEntryPointTarget,
-  previewMode: LocalPreviewMode
+  addSourceView: AddSourceView
 ): LocalBrowseDirectoryTarget {
   return {
-    previewMode,
+    addSourceView,
     entryPointKind: target.entryPointKind,
     resolvedRootPath: target.resolvedRootPath,
     resolvedParentPath: target.resolvedRootPath,
@@ -137,7 +137,7 @@ export function localBrowseRootTarget(
 
 export function localBrowseWindowKey(target: LocalBrowseDirectoryTarget): string {
   return [
-    target.previewMode,
+    target.addSourceView,
     target.entryPointKind,
     encodeURIComponent(target.resolvedRootPath),
     encodeURIComponent(target.resolvedParentPath)
@@ -146,10 +146,10 @@ export function localBrowseWindowKey(target: LocalBrowseDirectoryTarget): string
 
 export function localBrowseWindowKeyFromIdentity(
   identity: LocalBrowseWindowIdentity,
-  previewMode: LocalPreviewMode
+  addSourceView: AddSourceView
 ): string {
   return localBrowseWindowKey({
-    previewMode,
+    addSourceView,
     entryPointKind: identity.entryPointKind,
     resolvedRootPath: identity.resolvedRootPath,
     resolvedParentPath: identity.resolvedParentPath,
@@ -160,5 +160,5 @@ export function localBrowseWindowKeyFromIdentity(
 export function localBrowseItemFilterForTarget(
   target: LocalBrowseDirectoryTarget
 ): LocalBrowseItemFilter {
-  return mapLocalPreviewModeToLocalBrowseItemFilter(target.previewMode)
+  return mapAddSourceViewToLocalBrowseItemFilter(target.addSourceView)
 }

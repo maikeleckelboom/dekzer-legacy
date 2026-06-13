@@ -471,9 +471,9 @@ describe('panel runtime wiring', () => {
 
     expect(panel).toContain("import { useLocalBrowseController } from './localBrowse/controller'")
     expect(panel).toContain('const libraryBrowseProfile = createLibraryBrowseProfileController()')
-    expect(panel).toContain('const localPreviewMode = createLocalPreviewModeController()')
+    expect(panel).toContain('const addSourceView = createAddSourceViewController()')
     expect(panel).toContain('const localBrowse = useLocalBrowseController(undefined, {')
-    expect(panel).toContain('localPreviewMode: localPreviewMode.mode')
+    expect(panel).toContain('addSourceView: addSourceView.view')
     expect(panel).not.toContain(
       'const localBrowse = useLocalBrowseController(undefined, {\n  profile'
     )
@@ -481,7 +481,7 @@ describe('panel runtime wiring', () => {
     expect(panel).toContain('refreshLocalBrowseEntryPoints: () => localBrowse.refreshEntryPoints()')
   })
 
-  it('keeps library profile and local preview mode watchers separate', () => {
+  it('keeps library profile and Add Source view watchers separate', () => {
     const panel = readRendererSource('panel.vue')
 
     expect(panel).toContain('() => libraryBrowseProfile.profile.value')
@@ -489,12 +489,12 @@ describe('panel runtime wiring', () => {
       'await hierarchyRead.refreshBrowserWindows(expandedLibraryNodeIds.value)'
     )
     expect(panel).toContain('requestContentsForCurrentSelection({ force: true })')
-    expect(panel).toContain('() => localPreviewMode.mode.value')
+    expect(panel).toContain('() => addSourceView.view.value')
     expect(panel).toContain('await localBrowse.refreshBrowserWindows(')
     expect(panel).toContain('expandedAddSourceNodeIds.value')
     expect(panel).toContain('addSourceProjection.value')
     expect(panel).toContain('libraryBrowseProfile: libraryBrowseProfile.profile.value')
-    expect(panel).toContain('localPreviewMode: localPreviewMode.mode.value')
+    expect(panel).toContain('addSourceView: addSourceView.view.value')
   })
 
   it('clears failed disclosure ledger entries from scan completion and manual retries', () => {

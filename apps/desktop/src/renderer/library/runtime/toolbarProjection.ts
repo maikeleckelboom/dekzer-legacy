@@ -1,6 +1,6 @@
 import type { RowBinding } from '../state'
 import { sourceAdmissionOperation } from '../localBrowse/projection'
-import type { LocalPreviewMode } from '../localBrowse/previewMode'
+import type { AddSourceView } from '../addSource/view'
 import type { BrowserProjection } from '../tree/projection'
 import type { BrowserTreeNodeId } from '../tree/types'
 import type { LibraryPanelSurface } from '../../../shared/library/viewState/persistence'
@@ -11,7 +11,7 @@ export type LibraryToolbarModel = {
   readonly scope: LibraryToolbarScope
   readonly search: ToolbarControl
   readonly libraryBrowseProfile: ToolbarControl
-  readonly localPreviewMode: ToolbarControl
+  readonly addSourceView: ToolbarControl
   readonly addMusicFolder: ToolbarAction
 }
 
@@ -36,8 +36,8 @@ export type LibraryToolbarInput = {
   readonly projection: BrowserProjection | undefined
   readonly selectedNodeId: BrowserTreeNodeId | undefined
   readonly selectedLibraryBrowseProfileLabel: string
-  readonly selectedLocalPreviewModeLabel: string
-  readonly localPreviewMode: LocalPreviewMode
+  readonly selectedAddSourceViewLabel: string
+  readonly addSourceView: AddSourceView
   readonly addMusicFolderLabel: string
   readonly canAddMusicFolder: boolean
 }
@@ -54,9 +54,7 @@ export function projectLibraryToolbar(input: LibraryToolbarInput): LibraryToolba
       : false
   const showOpenAddSource = scope === 'libraryBrowse'
   const showFolderPicker =
-    scope === 'addSource' &&
-    input.localPreviewMode !== 'advancedInventory' &&
-    !selectedLocalAdmissionAvailable
+    scope === 'addSource' && input.addSourceView !== 'inventory' && !selectedLocalAdmissionAvailable
 
   return {
     scope,
@@ -73,11 +71,11 @@ export function projectLibraryToolbar(input: LibraryToolbarInput): LibraryToolba
       label: 'Indexed contents view',
       title: `Indexed contents view: ${input.selectedLibraryBrowseProfileLabel}`
     },
-    localPreviewMode: {
+    addSourceView: {
       visible: scope === 'addSource',
       enabled: scope === 'addSource',
-      label: 'Local preview mode',
-      title: `Local preview mode: ${input.selectedLocalPreviewModeLabel}`
+      label: 'Add Source view',
+      title: `Add Source view: ${input.selectedAddSourceViewLabel}`
     },
     addMusicFolder: {
       kind: showOpenAddSource ? 'openAddSource' : 'chooseMusicFolder',

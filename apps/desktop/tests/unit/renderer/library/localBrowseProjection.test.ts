@@ -30,7 +30,7 @@ describe('local browse tree projection', () => {
     expect(projection.nodes.map((node) => node.id)).toEqual([addSourceSectionNodeId])
     expect(projection.nodes[0]?.label).toBe('Add Source')
     expect(firstLoadedChildLabels(projection.nodes[0])).toEqual(['Music'])
-    expect(projection.bindingsById.get('local-browse:section')).toEqual({
+    expect(projection.bindingsById.get('add-source:section')).toEqual({
       kind: 'addSourceSection'
     })
   })
@@ -127,7 +127,7 @@ describe('local browse tree projection', () => {
 
   it('projects local browse child row kinds without source bindings', () => {
     const rootTarget = {
-      previewMode: 'musicEvidence' as const,
+      addSourceView: 'preview' as const,
       entryPointKind: 'music' as const,
       resolvedRootPath: 'C:\\Users\\Maikel\\Music',
       resolvedParentPath: 'C:\\Users\\Maikel\\Music',
@@ -137,7 +137,7 @@ describe('local browse tree projection', () => {
       ...browserState({ entries: [musicEntryPoint()] }),
       localBrowseItemStates: new Map([
         [
-          'musicEvidence:music:C%3A%5CUsers%5CMaikel%5CMusic:C%3A%5CUsers%5CMaikel%5CMusic',
+          'preview:music:C%3A%5CUsers%5CMaikel%5CMusic:C%3A%5CUsers%5CMaikel%5CMusic',
           {
             kind: 'loaded',
             window: {
@@ -146,7 +146,7 @@ describe('local browse tree projection', () => {
                 resolvedRootPath: rootTarget.resolvedRootPath,
                 resolvedParentPath: rootTarget.resolvedParentPath
               },
-              previewMode: rootTarget.previewMode,
+              addSourceView: rootTarget.addSourceView,
               label: rootTarget.label,
               items: [
                 item('directory', 'Albums', 'C:\\Users\\Maikel\\Music\\Albums'),
@@ -194,9 +194,9 @@ describe('local browse tree projection', () => {
     ).toHaveLength(5)
   })
 
-  it('does not reuse a loaded window from another local preview mode', () => {
+  it('does not reuse a loaded window from another Add Source view', () => {
     const rootTarget = {
-      previewMode: 'musicEvidence' as const,
+      addSourceView: 'preview' as const,
       entryPointKind: 'music' as const,
       resolvedRootPath: 'C:\\Users\\Maikel\\Music',
       resolvedParentPath: 'C:\\Users\\Maikel\\Music',
@@ -204,14 +204,14 @@ describe('local browse tree projection', () => {
     }
     const projection = projectTree({
       ...browserState({ entries: [musicEntryPoint()] }),
-      localPreviewMode: 'advancedInventory',
+      addSourceView: 'inventory',
       localBrowseItemStates: new Map([
         [
-          'musicEvidence:music:C%3A%5CUsers%5CMaikel%5CMusic:C%3A%5CUsers%5CMaikel%5CMusic',
+          'preview:music:C%3A%5CUsers%5CMaikel%5CMusic:C%3A%5CUsers%5CMaikel%5CMusic',
           {
             kind: 'loaded',
             window: {
-              previewMode: rootTarget.previewMode,
+              addSourceView: rootTarget.addSourceView,
               identity: {
                 entryPointKind: rootTarget.entryPointKind,
                 resolvedRootPath: rootTarget.resolvedRootPath,
@@ -257,7 +257,7 @@ describe('local browse tree projection', () => {
 
 function projectTree(state: BrowserState): BrowserProjection {
   const projection = projectAddSourceState({
-    localPreviewMode: state.localPreviewMode ?? 'musicEvidence',
+    addSourceView: state.addSourceView ?? 'preview',
     entryPointsState: state.localBrowseEntryPointsState,
     itemStates: state.localBrowseItemStates
   })

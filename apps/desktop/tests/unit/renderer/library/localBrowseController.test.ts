@@ -7,7 +7,7 @@ import {
   type LocalBrowseReadApi
 } from '../../../../src/renderer/library/localBrowse/controller'
 import { localBrowseWindowKey } from '../../../../src/renderer/library/localBrowse/types'
-import type { LocalPreviewMode } from '../../../../src/renderer/library/localBrowse/previewMode'
+import type { AddSourceView } from '../../../../src/renderer/library/addSource/view'
 import type { BrowserState } from '../../../../src/renderer/library/state'
 import { projectAddSourceState } from '../../../../src/renderer/library/localBrowse/projection'
 import type { BrowserProjection } from '../../../../src/renderer/library/tree/projection'
@@ -18,9 +18,9 @@ import type {
 } from '../../../../src/shared/library/localBrowse/items'
 
 describe('createLocalBrowseController', () => {
-  it('keys local browse windows by local preview mode', () => {
+  it('keys local browse windows by Add Source view', () => {
     const target = {
-      previewMode: 'advancedInventory' as const,
+      addSourceView: 'inventory' as const,
       entryPointKind: 'music' as const,
       resolvedRootPath: 'C:\\Users\\Maikel\\Music',
       resolvedParentPath: 'C:\\Users\\Maikel\\Music',
@@ -28,11 +28,9 @@ describe('createLocalBrowseController', () => {
     }
 
     expect(localBrowseWindowKey(target)).toBe(
-      'advancedInventory:music:C%3A%5CUsers%5CMaikel%5CMusic:C%3A%5CUsers%5CMaikel%5CMusic'
+      'inventory:music:C%3A%5CUsers%5CMaikel%5CMusic:C%3A%5CUsers%5CMaikel%5CMusic'
     )
-    expect(localBrowseWindowKeyForIdentity(target, 'advancedInventory')).toBe(
-      localBrowseWindowKey(target)
-    )
+    expect(localBrowseWindowKeyForIdentity(target, 'inventory')).toBe(localBrowseWindowKey(target))
   })
 
   it('reads entry points and item windows with boundary identities', async () => {
@@ -118,9 +116,9 @@ describe('createLocalBrowseController', () => {
     })
   })
 
-  it('uses selected local preview mode for reads and preserves it for read-more', async () => {
+  it('uses selected Add Source view for reads and preserves it for read-more', async () => {
     const itemRequests: ReadLocalBrowseItemsRequest[] = []
-    const localPreviewMode = ref<LocalPreviewMode>('advancedInventory')
+    const addSourceView = ref<AddSourceView>('inventory')
     const readItems = vi.fn(async (request: ReadLocalBrowseItemsRequest) => {
       itemRequests.push(structuredClone(request))
 
@@ -152,7 +150,7 @@ describe('createLocalBrowseController', () => {
       }
     })
     const controller = createLocalBrowseController(testLocalBrowseApi({ readItems }), {
-      localPreviewMode
+      addSourceView
     })
     controller.start()
 
@@ -167,7 +165,7 @@ describe('createLocalBrowseController', () => {
     await controller.requestNodeChildren(musicNodeId, projection)
 
     projection = projectTree({
-      localPreviewMode: 'advancedInventory',
+      addSourceView: 'inventory',
       sourceReadStates: new Map(),
       directoryReadStates: new Map(),
       localBrowseEntryPointsState: controller.entryPointsState.value,
@@ -181,7 +179,7 @@ describe('createLocalBrowseController', () => {
       offset: 1
     })
 
-    localPreviewMode.value = 'musicEvidence'
+    addSourceView.value = 'preview'
     await controller.requestNodeChildren(musicNodeId, projection)
     expect(itemRequests[2]?.itemFilter).toBe('audio')
   })
@@ -267,7 +265,7 @@ function directoryItem(): LocalBrowseItem {
 
 function projectTree(state: BrowserState): BrowserProjection {
   const projection = projectAddSourceState({
-    localPreviewMode: state.localPreviewMode ?? 'musicEvidence',
+    addSourceView: state.addSourceView ?? 'preview',
     entryPointsState: state.localBrowseEntryPointsState,
     itemStates: state.localBrowseItemStates
   })

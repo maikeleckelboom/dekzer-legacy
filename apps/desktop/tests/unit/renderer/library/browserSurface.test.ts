@@ -28,7 +28,7 @@ describe('library browser surface containment', () => {
     expect(panel).not.toContain('Browse profile:')
     expect(panel).toContain('role="listbox"')
     expect(panel).toContain(':aria-selected="libraryBrowseProfile.profile.value === option.key"')
-    expect(panel).toContain(':aria-label="toolbarModel.localPreviewMode.label"')
+    expect(panel).toContain(':aria-label="toolbarModel.addSourceView.label"')
   })
 
   it('keeps library search control compact, icon-first, and accessible', () => {
