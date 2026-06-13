@@ -59,8 +59,8 @@ export function projectAddSourceSection(
       loadingChildren(
         {
           ownerId: addSourceSectionNodeId,
-          label: 'Loading local folders',
-          detail: state.detail ?? 'Loading local browse entry points.'
+          label: 'Loading suggested folders',
+          detail: state.detail ?? 'Loading suggested folders.'
         },
         options.bindingsById
       )
@@ -75,7 +75,7 @@ export function projectAddSourceSection(
       failedChildren(
         {
           ownerId: addSourceSectionNodeId,
-          label: 'Local folders unavailable',
+          label: 'Suggested folders unavailable',
           detail: state.detail
         },
         options.bindingsById
@@ -701,7 +701,7 @@ function moreIcon(more: LoadedLocalBrowseItems['more']): BrowserTreeIcon {
 
 function formatEntryPointDetail(entry: LocalBrowseEntryPoint): string {
   if (entry.status === 'duplicateOfAdmittedSource') {
-    return 'Already added as a library source.'
+    return 'Already added as a music source.'
   }
 
   if (entry.failure !== null) {
@@ -713,17 +713,18 @@ function formatEntryPointDetail(entry: LocalBrowseEntryPoint): string {
   }
 
   if (entry.identity.entryPointKind === 'systemDriveRoot') {
-    return 'Choose a narrower folder.'
+    return 'Choose a specific folder inside this drive.'
   }
 
   return (
-    sourceAdmissionOperationDetail(entry.availableOperations) ?? 'Not a music-source candidate.'
+    sourceAdmissionOperationDetail(entry.availableOperations) ??
+    'Choose a folder that contains music files.'
   )
 }
 
 function formatItemDetail(item: LocalBrowseItem): string {
   if (item.status === 'duplicateOfAdmittedSource') {
-    return 'Already added as a library source.'
+    return 'Already added as a music source.'
   }
 
   if (item.failure !== null) {
@@ -748,9 +749,9 @@ function sourceAdmissionOperationDetail(
 
   switch (operation.requestKind) {
     case 'defaultMusicFolder':
-      return 'Not in library yet.'
+      return 'Ready to add.'
     case 'selectedDirectory':
-      return 'Not in library yet.'
+      return 'Ready to add.'
     case 'parentDirectory':
       return 'Parent folder can be added as a music source.'
   }
@@ -777,7 +778,7 @@ export function sourceAdmissionOperation(
 function itemKindLabel(kind: LocalBrowseItemKind): string {
   switch (kind) {
     case 'directory':
-      return 'Not a music-source candidate.'
+      return 'Choose a folder that contains music files.'
     case 'mediaFile':
       return 'Media file.'
     case 'unsupportedFile':
@@ -832,7 +833,7 @@ function entryPointStatusLabel(status: LocalBrowseEntryPointStatus): string {
 function itemStatusLabel(status: LocalBrowseItemStatus): string {
   switch (status) {
     case 'available':
-      return 'Not a music-source candidate.'
+      return 'Choose a folder that contains music files.'
     case 'unavailable':
       return 'Local item unavailable.'
     case 'permissionBlocked':
@@ -842,7 +843,7 @@ function itemStatusLabel(status: LocalBrowseItemStatus): string {
     case 'unsupportedPlatform':
       return 'Local browse unsupported.'
     case 'duplicateOfAdmittedSource':
-      return 'Already added as a library source.'
+      return 'Already added as a music source.'
     case 'rejected':
       return 'Protected location.'
     case 'unknown':

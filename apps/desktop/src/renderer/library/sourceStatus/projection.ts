@@ -8,6 +8,7 @@ import type { RootLifecycleRefreshStatus } from '../runtime/rootLifecycle'
 import type { SourceReadiness } from '../runtime/sourceReadiness'
 import type { SourceLifecycleRecord } from '../../../shared/library/source/lifecycle'
 import type { StatusContext } from './context'
+import { projectAddSourceStatusText } from '../addSource/projection'
 
 export type StatusBadge =
   | 'Ready'
@@ -18,12 +19,11 @@ export type StatusBadge =
   | 'Maintenance needed'
   | 'Maintenance running'
   | 'Maintenance unavailable'
-  | 'Not a music-source candidate'
-  | 'Not in library yet'
-  | 'Choose a narrower folder'
+  | 'Ready to add'
+  | 'Choose a music folder'
+  | 'Choose a specific folder'
   | 'Protected location'
   | 'Already added'
-  | 'Could not fully resolve this location'
   | 'Blocked'
   | 'Missing'
   | 'Offline/unavailable'
@@ -144,10 +144,10 @@ function localBrowseStatus(
   return {
     role: 'localBrowse',
     title: context.title,
-    badge,
     tone: localBrowseTone(badge),
     detail: localBrowseDetail(context.localState, context.detail),
-    actions: localBrowseActions(input, context, admission)
+    actions: localBrowseActions(input, context, admission),
+    ...(badge === undefined ? {} : { badge })
   }
 }
 
@@ -497,12 +497,11 @@ function toneForBadge(badge: StatusBadge): StatusView['tone'] {
     case 'Needs scan':
     case 'Maintenance needed':
     case 'Maintenance unavailable':
-    case 'Not a music-source candidate':
-    case 'Not in library yet':
-    case 'Choose a narrower folder':
+    case 'Ready to add':
+    case 'Choose a music folder':
+    case 'Choose a specific folder':
     case 'Protected location':
     case 'Already added':
-    case 'Could not fully resolve this location':
     case 'Partial':
     case 'No audio tracks':
       return 'warning'
@@ -517,32 +516,20 @@ function toneForBadge(badge: StatusBadge): StatusView['tone'] {
 
 function localBrowseBadge(
   state: Extract<StatusContext, { readonly kind: 'localBrowse' }>['localState']
-): StatusBadge {
-  switch (state) {
-    case 'eligible':
-      return 'Not in library yet'
-    case 'broadRoot':
-      return 'Choose a narrower folder'
-    case 'protected':
-      return 'Protected location'
-    case 'resolutionFailed':
-      return 'Could not fully resolve this location'
-    case 'alreadyAdded':
-      return 'Already added'
-    case 'notCandidate':
-      return 'Not a music-source candidate'
-  }
+): StatusBadge | undefined {
+  return projectAddSourceStatusText({ localState: state }).badge
 }
 
-function localBrowseTone(badge: StatusBadge): StatusView['tone'] {
+function localBrowseTone(badge: StatusBadge | undefined): StatusView['tone'] {
   switch (badge) {
-    case 'Not in library yet':
-    case 'Not a music-source candidate':
+    case undefined:
+    case 'Ready to add':
+    case 'Choose a music folder':
       return 'muted'
     case 'Already added':
       return 'ready'
     case 'Protected location':
-    case 'Could not fully resolve this location':
+    case 'Blocked':
       return 'danger'
     default:
       return 'warning'
@@ -553,20 +540,10 @@ function localBrowseDetail(
   state: Extract<StatusContext, { readonly kind: 'localBrowse' }>['localState'],
   detail: string | undefined
 ): string {
-  switch (state) {
-    case 'eligible':
-      return 'Not in library yet.'
-    case 'broadRoot':
-      return 'Choose a narrower folder before adding it as a music source.'
-    case 'protected':
-      return 'Protected location.'
-    case 'resolutionFailed':
-      return detail ?? 'Could not fully resolve this location.'
-    case 'alreadyAdded':
-      return 'Already added as a library source. Use the managed source entry for scans and maintenance.'
-    case 'notCandidate':
-      return 'Not a music-source candidate.'
-  }
+  return projectAddSourceStatusText({
+    localState: state,
+    ...(detail === undefined ? {} : { detail })
+  }).detail
 }
 
 function maintenanceUnavailableReason(

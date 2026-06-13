@@ -56,8 +56,8 @@ export function addSourceViewLabel(view: AddSourceView): string {
   return addSourceViewOptions.find((option) => option.key === view)?.label ?? 'Preview'
 }
 
-export function addSourceSurfaceLabel(view: AddSourceView): 'Source Preview' | 'Source Inventory' {
-  return view === 'inventory' ? 'Source Inventory' : 'Source Preview'
+export function addSourceSurfaceLabel(view: AddSourceView): 'Preview' | 'Inventory' {
+  return view === 'inventory' ? 'Inventory' : 'Preview'
 }
 
 export function mapAddSourceViewToLocalBrowseItemFilter(

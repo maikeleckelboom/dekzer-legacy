@@ -44,6 +44,15 @@ describe('library browser surface containment', () => {
     expect(panel).toContain('searchFilterRead.loadNext()')
     expect(panel).not.toContain('Search:')
   })
+
+  it('keeps Add Source product states out of panel conditionals', () => {
+    const panel = readRendererSource('panel.vue')
+    const contents = readRendererSource('contents/projection.ts')
+
+    expect(panel).not.toContain('Choose where your music lives')
+    expect(panel).not.toContain('Choose a specific folder inside this drive')
+    expect(contents).toContain('projectAddSourceProjection')
+  })
 })
 
 function readRendererSource(relativePath: string): string {

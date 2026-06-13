@@ -7,25 +7,18 @@ import type {
 } from '../../../shared/library/contents/read'
 import type { LibraryPanelSurface } from '../../../shared/library/viewState/persistence'
 import type { ContentsBoundaryState } from '../boundary/contentsRead'
-import type {
-  LocalBrowseEntryPointKind,
-  LocalBrowseEntryPointStatus,
-  LocalBrowseOperation
-} from '../../../shared/library/localBrowse/entryPoints'
-import type { LocalBrowseItem } from '../../../shared/library/localBrowse/items'
-import {
-  localBrowseRootTarget,
-  localBrowseWindowKey,
-  type LoadedLocalBrowseItems,
-  type LocalBrowseItemState
-} from '../localBrowse/types'
+import type { LocalBrowseOperation } from '../../../shared/library/localBrowse/entryPoints'
 import { libraryBrowseEmptyStateLabel } from '../libraryBrowseProfile/types'
-import { defaultAddSourceView, addSourceSurfaceLabel, type AddSourceView } from '../addSource/view'
+import {
+  projectAddSourceProjection,
+  type AddSourceAction,
+  type AddSourceProjection,
+  type AddSourceRow
+} from '../addSource/projection'
 import type { BrowserProjection } from '../tree/projection'
 import type { BrowserState, RowBinding } from '../state'
 import type { BrowserTreeNodeId } from '../tree/types'
 import { formatSourceDisplayName } from '../tree/sourcePresentation'
-import { sourceAdmissionOperation } from '../localBrowse/projection'
 
 export type ContentProjectionKind =
   | 'libraryStart'
@@ -144,27 +137,10 @@ const librarySurface = {
   surfaceLabel: 'Library'
 } satisfies ContentSurface
 
-const addSourceSurface = {
-  surfaceKind: 'addSource',
-  surfaceLabel: 'Add Source'
-} satisfies ContentSurface
-
 const sourceStatusSurface = {
   surfaceKind: 'sourceStatus',
   surfaceLabel: 'Source Status'
 } satisfies ContentSurface
-
-function localSurface(mode: AddSourceView): ContentSurface {
-  return mode === 'inventory'
-    ? {
-        surfaceKind: 'sourceInventory',
-        surfaceLabel: addSourceSurfaceLabel(mode)
-      }
-    : {
-        surfaceKind: 'sourcePreview',
-        surfaceLabel: addSourceSurfaceLabel(mode)
-      }
-}
 
 function contentProjection(
   surface: ContentSurface,
@@ -188,7 +164,16 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
 
   if (selectedNodeId === undefined) {
     if (options.surface === 'addSource') {
-      return addSourceStartProjection()
+      return contentProjectionFromAddSource(
+        projectAddSourceProjection({
+          ...(options.state.addSourceView === undefined
+            ? {}
+            : { addSourceView: options.state.addSourceView }),
+          ...(options.state.localBrowseEntryPointsState === undefined
+            ? {}
+            : { entryPointsState: options.state.localBrowseEntryPointsState })
+        })
+      )
     }
 
     if (options.surface === 'libraryBrowse') {
@@ -288,92 +273,33 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
         rows: [contentMoreRow(selectedNodeId, binding)]
       })
     case 'addSourceSection':
-      return contentProjection(addSourceSurface, {
-        kind: 'ready',
-        title: 'Add Source',
-        detail:
-          'Choose a suggested music folder to add as a managed source, or pick another folder manually.',
-        rows: [
-          stateRow({
-            ownerId: selectedNodeId,
-            state: 'empty',
-            label: 'Add a music folder',
-            detail: 'Suggested folders are starting points for adding a managed music source.',
-            action: {
-              kind: 'chooseMusicFolder',
-              label: 'Add music folder'
-            }
-          })
-        ]
-      })
     case 'localBrowseEntryPoint':
-      return projectLocalBrowseFolderContents({
-        ownerId: selectedNodeId,
-        title: binding.entry.displayName,
-        targetNodeId: selectedNodeId,
-        folderDetail: binding.entry.identity.resolvedPath ?? binding.entry.displayName,
-        addSourceView: options.state.addSourceView ?? defaultAddSourceView,
-        entryPointKind: binding.entry.identity.entryPointKind,
-        localStatus: binding.entry.status,
-        windowState: options.state.localBrowseItemStates?.get(
-          localBrowseWindowKey(
-            localBrowseRootTarget(
-              binding.target,
-              options.state.addSourceView ?? defaultAddSourceView
-            )
-          )
-        )
-      })
     case 'localBrowseItem':
-      if (binding.target !== undefined) {
-        return projectLocalBrowseFolderContents({
-          ownerId: selectedNodeId,
-          title: binding.item.displayName,
-          targetNodeId: selectedNodeId,
-          folderDetail: localBrowseItemDetail(binding.item),
-          addSourceView: binding.target.addSourceView,
-          entryPointKind: binding.item.identity.entryPointKind,
-          localStatus: binding.item.status,
-          windowState: options.state.localBrowseItemStates?.get(
-            localBrowseWindowKey(binding.target)
-          )
-        })
-      }
-
-      return projectLocalBrowseFileContents(
-        selectedNodeId,
-        binding.item,
-        options.state.addSourceView ?? defaultAddSourceView
-      )
     case 'localBrowseMore':
-      return contentProjection(localSurface(options.state.addSourceView ?? defaultAddSourceView), {
-        kind: 'ready',
-        title: 'More local items',
-        detail: binding.detail,
-        rows: [localBrowseMoreRow(selectedNodeId, binding)]
-      })
+      return contentProjectionFromAddSource(
+        projectAddSourceProjection({
+          selectedNodeId,
+          ...(options.state.addSourceView === undefined
+            ? {}
+            : { addSourceView: options.state.addSourceView }),
+          ...(options.bindingsById === undefined
+            ? {}
+            : {
+                projection: {
+                  kind: 'tree',
+                  nodes: [],
+                  bindingsById: options.bindingsById
+                } satisfies BrowserProjection
+              }),
+          ...(options.state.localBrowseEntryPointsState === undefined
+            ? {}
+            : { entryPointsState: options.state.localBrowseEntryPointsState }),
+          ...(options.state.localBrowseItemStates === undefined
+            ? {}
+            : { itemStates: options.state.localBrowseItemStates })
+        })
+      )
   }
-}
-
-function addSourceStartProjection(): ContentProjection {
-  return contentProjection(addSourceSurface, {
-    kind: 'ready',
-    title: 'Add Source',
-    detail:
-      'Choose a suggested music folder to add as a managed source, or pick another folder manually.',
-    rows: [
-      stateRow({
-        ownerId: 'add-source',
-        state: 'empty',
-        label: 'Add a music folder',
-        detail: 'Suggested folders are starting points for adding a managed music source.',
-        action: {
-          kind: 'chooseMusicFolder',
-          label: 'Add music folder'
-        }
-      })
-    ]
-  })
 }
 
 function projectHostContents(
@@ -408,6 +334,81 @@ function projectHostContents(
   }
 
   return undefined
+}
+
+function contentProjectionFromAddSource(projection: AddSourceProjection): ContentProjection {
+  return contentProjection(addSourceContentSurface(projection), {
+    kind: contentKindFromAddSource(projection),
+    title: projection.title,
+    ...(projection.detail === undefined ? {} : { detail: projection.detail }),
+    rows: projection.rows.map(contentRowFromAddSource)
+  })
+}
+
+function addSourceContentSurface(projection: AddSourceProjection): ContentSurface {
+  switch (projection.surfaceKind) {
+    case 'inventory':
+      return {
+        surfaceKind: 'sourceInventory',
+        surfaceLabel: projection.surfaceLabel
+      }
+    case 'preview':
+      return {
+        surfaceKind: 'sourcePreview',
+        surfaceLabel: projection.surfaceLabel
+      }
+    case 'addSource':
+      return {
+        surfaceKind: 'addSource',
+        surfaceLabel: projection.surfaceLabel
+      }
+  }
+}
+
+function contentKindFromAddSource(projection: AddSourceProjection): ContentProjectionKind {
+  if (projection.rows.some((row) => row.state === 'loading')) {
+    return 'loading'
+  }
+
+  if (projection.rows.some((row) => row.state === 'failed')) {
+    return 'failed'
+  }
+
+  if (projection.rows.some((row) => row.state === 'unsupported')) {
+    return 'unsupported'
+  }
+
+  if (projection.rows.some((row) => row.state === 'notLoaded')) {
+    return 'notLoaded'
+  }
+
+  return 'ready'
+}
+
+function contentRowFromAddSource(row: AddSourceRow): ContentRow {
+  return {
+    id: row.id,
+    kind: row.kind,
+    label: row.label,
+    ...(row.detail === undefined ? {} : { detail: row.detail }),
+    ...(row.icon === undefined ? {} : { icon: row.icon }),
+    ...(row.state === undefined ? {} : { state: row.state }),
+    ...(row.fileClass === undefined ? {} : { fileClass: row.fileClass }),
+    ...(row.action === undefined ? {} : { action: contentActionFromAddSource(row.action) })
+  }
+}
+
+function contentActionFromAddSource(action: AddSourceAction): ContentRowAction {
+  switch (action.kind) {
+    case 'chooseMusicFolder':
+      return action
+    case 'loadLocalBrowseChildren':
+      return action
+    case 'loadLocalBrowseMore':
+      return action
+    case 'requestLocalBrowseAdmission':
+      return action
+  }
 }
 
 function projectSourceContents(options: {
@@ -839,419 +840,6 @@ function projectFileContents(options: {
   })
 }
 
-function projectLocalBrowseFolderContents(options: {
-  readonly ownerId: BrowserTreeNodeId
-  readonly title: string
-  readonly targetNodeId: BrowserTreeNodeId
-  readonly folderDetail: string
-  readonly addSourceView: AddSourceView
-  readonly entryPointKind: LocalBrowseEntryPointKind
-  readonly localStatus: LocalBrowseEntryPointStatus | LocalBrowseItem['status']
-  readonly windowState: LocalBrowseItemState | undefined
-}): ContentProjection {
-  const state = options.windowState
-  const selectionDetail = localBrowseSelectionDetail(options)
-  const surface = localSurface(options.addSourceView)
-
-  if (state === undefined) {
-    return contentProjection(surface, {
-      kind: 'notLoaded',
-      title: options.title,
-      detail: selectionDetail,
-      rows: [
-        stateRow({
-          ownerId: options.ownerId,
-          state: 'notLoaded',
-          label: 'Folder preview not loaded',
-          detail: 'Load a local preview before deciding whether this belongs in the library.',
-          action: {
-            kind: 'loadLocalBrowseChildren',
-            nodeId: options.targetNodeId,
-            label: 'Load preview'
-          }
-        })
-      ]
-    })
-  }
-
-  if (state.kind === 'loading') {
-    return contentProjection(surface, {
-      kind: 'loading',
-      title: options.title,
-      detail: selectionDetail,
-      rows: [
-        stateRow({
-          ownerId: options.ownerId,
-          state: 'loading',
-          label: 'Loading folder preview',
-          detail: state.detail ?? 'Loading local folder preview.'
-        })
-      ]
-    })
-  }
-
-  if (state.kind === 'failed') {
-    return contentProjection(surface, {
-      kind: 'failed',
-      title: options.title,
-      detail: selectionDetail,
-      rows: [
-        stateRow({
-          ownerId: options.ownerId,
-          state: 'failed',
-          label: 'Local folder preview unavailable',
-          detail: state.detail,
-          action: {
-            kind: 'loadLocalBrowseChildren',
-            nodeId: options.targetNodeId,
-            label: 'Retry'
-          }
-        })
-      ]
-    })
-  }
-
-  const window = state.window
-  const contentRows = window.items
-    .filter((item) => isVisibleLocalBrowsePreviewItem(item, window))
-    .map(localBrowseItemRow)
-  const moreRow =
-    window.nextOffset === undefined ? undefined : localBrowseMoreContentRow(options.ownerId, window)
-  const rows = [...contentRows, ...(moreRow === undefined ? [] : [moreRow])]
-
-  if (rows.length > 0) {
-    return contentProjection(localSurface(window.addSourceView), {
-      kind: 'ready',
-      title: options.title,
-      detail:
-        state.kind === 'refreshing'
-          ? (state.detail ?? 'Refreshing local folder preview.')
-          : localBrowseWindowDetail(window, contentRows.length),
-      rows
-    })
-  }
-
-  return contentProjection(localSurface(window.addSourceView), {
-    kind: 'ready',
-    title: options.title,
-    detail: localBrowseWindowDetail(window, contentRows.length),
-    rows: [
-      stateRow({
-        ownerId: options.ownerId,
-        state: localBrowseWindowState(window),
-        label: localBrowseWindowStateLabel(window),
-        detail: window.failure?.detail ?? localBrowseWindowDetail(window, contentRows.length)
-      })
-    ]
-  })
-}
-
-function projectLocalBrowseFileContents(
-  ownerId: BrowserTreeNodeId,
-  item: LocalBrowseItem,
-  addSourceView: AddSourceView
-): ContentProjection {
-  if (isTerminalLocalBrowseItem(item)) {
-    return stateProjection({
-      surface: localSurface(addSourceView),
-      kind: localBrowseTerminalProjectionKind(item),
-      ownerId,
-      title: item.displayName,
-      state: localBrowseTerminalRowState(item),
-      label: localBrowseTerminalLabel(item),
-      detail: item.failure?.detail ?? localBrowseItemDetail(item)
-    })
-  }
-
-  const selectedRow = localBrowseItemRow(item)
-
-  return contentProjection(localSurface(addSourceView), {
-    kind: 'ready',
-    title: item.displayName,
-    detail: localBrowseItemDetail(item),
-    rows: [selectedRow]
-  })
-}
-
-function localBrowseItemRow(item: LocalBrowseItem): ContentRow {
-  const fileClass = localBrowseFileClass(item)
-
-  return {
-    id: `local-browse-content:${item.identity.entryPointKind}:${encodeURIComponent(
-      item.identity.resolvedRootPath
-    )}:${encodeURIComponent(item.identity.resolvedItemPath)}`,
-    kind: item.itemKind === 'directory' || item.itemKind === 'rejectedRoot' ? 'directory' : 'file',
-    label: item.displayName,
-    detail: localBrowseItemDetail(item),
-    icon: localBrowseItemIcon(item),
-    ...(fileClass === undefined ? {} : { fileClass })
-  }
-}
-
-function localBrowseSelectionDetail(options: {
-  readonly folderDetail: string
-  readonly addSourceView: AddSourceView
-  readonly entryPointKind: LocalBrowseEntryPointKind
-  readonly localStatus: LocalBrowseEntryPointStatus | LocalBrowseItem['status']
-}): string {
-  if (options.localStatus === 'duplicateOfAdmittedSource') {
-    return 'Already added as a library source. Use the managed source entry for scans and maintenance.'
-  }
-
-  if (options.entryPointKind === 'systemDriveRoot') {
-    return 'Broad filesystem root. Choose a specific music folder before adding it as a source.'
-  }
-
-  if (options.addSourceView === 'inventory') {
-    return `Inventory shows local inventory for diagnostics. ${options.folderDetail}`
-  }
-
-  return `Preview local folders and media signals before adding a managed source. ${options.folderDetail}`
-}
-
-function isVisibleLocalBrowsePreviewItem(
-  item: LocalBrowseItem,
-  window: LoadedLocalBrowseItems
-): boolean {
-  if (window.addSourceView === 'inventory') {
-    return true
-  }
-
-  if (isSystemDriveRootWindow(window)) {
-    return (
-      item.status === 'duplicateOfAdmittedSource' ||
-      (item.itemKind === 'directory' &&
-        sourceAdmissionOperation(item.availableOperations) !== undefined)
-    )
-  }
-
-  if (isTerminalLocalBrowseItem(item)) {
-    return true
-  }
-
-  if (item.itemKind === 'directory') {
-    return true
-  }
-
-  return (
-    item.itemKind === 'mediaFile' &&
-    item.mediaRelevance !== 'unsupported' &&
-    (item.fileKind === 'audio' || item.fileKind === 'cueSheet')
-  )
-}
-
-function isSystemDriveRootWindow(window: LoadedLocalBrowseItems): boolean {
-  return (
-    window.identity.entryPointKind === 'systemDriveRoot' &&
-    localBrowsePathKey(window.identity.resolvedRootPath) ===
-      localBrowsePathKey(window.identity.resolvedParentPath)
-  )
-}
-
-function localBrowsePathKey(path: string): string {
-  return path.replaceAll('/', '\\').replace(/\\+$/, '').toLowerCase()
-}
-
-function isTerminalLocalBrowseItem(item: LocalBrowseItem): boolean {
-  return (
-    item.itemKind === 'rejectedRoot' ||
-    item.itemKind === 'inaccessible' ||
-    item.status === 'rejected' ||
-    item.status === 'permissionBlocked' ||
-    item.failure?.code === 'reparsePointSkipped'
-  )
-}
-
-function localBrowseTerminalProjectionKind(item: LocalBrowseItem): ContentProjectionKind {
-  return item.status === 'permissionBlocked' || item.status === 'rejected'
-    ? 'unsupported'
-    : 'failed'
-}
-
-function localBrowseTerminalRowState(
-  item: LocalBrowseItem
-): Exclude<ContentRow['state'], undefined> {
-  return item.status === 'permissionBlocked' || item.status === 'rejected'
-    ? 'unsupported'
-    : 'failed'
-}
-
-function localBrowseTerminalLabel(item: LocalBrowseItem): string {
-  if (item.failure?.code === 'reparsePointSkipped') {
-    return 'Protected location'
-  }
-
-  switch (item.status) {
-    case 'permissionBlocked':
-    case 'rejected':
-      return 'Protected location'
-    case 'missing':
-      return 'Local item missing'
-    default:
-      return 'Not available'
-  }
-}
-
-function localBrowseMoreContentRow(
-  ownerId: BrowserTreeNodeId,
-  window: LoadedLocalBrowseItems
-): ContentRow | undefined {
-  const offset = window.nextOffset
-
-  if (offset === undefined) {
-    return undefined
-  }
-
-  return {
-    id: `contents-local-browse-load-more:${ownerId}:${offset}`,
-    kind: 'more',
-    label:
-      window.more?.kind === 'failed'
-        ? 'Retry loading more'
-        : window.more?.kind === 'loading'
-          ? 'Loading more'
-          : 'Load more',
-    detail:
-      window.more?.kind === 'failed'
-        ? window.more.detail
-        : `Items ${offset + 1}-${Math.min(offset + window.limit, window.totalItems)} of ${window.totalItems} are available.`,
-    icon:
-      window.more?.kind === 'loading'
-        ? 'loading'
-        : window.more?.kind === 'failed'
-          ? 'warning'
-          : 'more',
-    ...(window.more?.kind === 'loading'
-      ? {}
-      : {
-          action: {
-            kind: 'loadLocalBrowseMore',
-            nodeId: ownerId,
-            label: window.more?.kind === 'failed' ? 'Retry' : 'Load more'
-          }
-        })
-  }
-}
-
-function localBrowseWindowDetail(window: LoadedLocalBrowseItems, visibleRowCount: number): string {
-  if (window.failure !== null) {
-    return window.failure.detail
-  }
-
-  if (window.addSourceView === 'inventory') {
-    if (window.totalItems === 0) {
-      return 'No local inventory items are available in this folder.'
-    }
-
-    return `${visibleRowCount} of ${window.totalItems} local inventory items shown.`
-  }
-
-  if (isSystemDriveRootWindow(window)) {
-    if (visibleRowCount === 0) {
-      return 'Broad root preview is limited to plausible music folders.'
-    }
-
-    return `${visibleRowCount} plausible music-source ${
-      visibleRowCount === 1 ? 'candidate' : 'candidates'
-    } shown from this broad root.`
-  }
-
-  if (window.totalItems === 0) {
-    return 'No source preview items is available in this folder.'
-  }
-
-  return `${visibleRowCount} of ${window.totalItems} local preview items shown.`
-}
-
-function localBrowseWindowState(
-  window: LoadedLocalBrowseItems
-): Exclude<ContentRow['state'], undefined> {
-  switch (window.status) {
-    case 'complete':
-      return 'empty'
-    case 'permissionBlocked':
-    case 'unsupportedPlatform':
-      return 'unsupported'
-    case 'partialFailure':
-    case 'failed':
-    case 'missing':
-    case 'unavailable':
-      return 'failed'
-  }
-}
-
-function localBrowseWindowStateLabel(window: LoadedLocalBrowseItems): string {
-  switch (window.status) {
-    case 'complete':
-      return window.addSourceView === 'inventory'
-        ? 'No local inventory items'
-        : 'No source preview items'
-    case 'partialFailure':
-      return 'Local items partially unavailable'
-    case 'failed':
-      return 'Local folder read failed'
-    case 'unsupportedPlatform':
-      return 'Local browse unsupported'
-    case 'missing':
-      return 'Local folder missing'
-    case 'permissionBlocked':
-      return 'Local folder access blocked'
-    case 'unavailable':
-      return 'Local folder unavailable'
-  }
-}
-
-function localBrowseItemIcon(item: LocalBrowseItem): ContentRowIcon {
-  if (item.status !== 'available' && item.status !== 'duplicateOfAdmittedSource') {
-    return 'warning'
-  }
-
-  switch (item.itemKind) {
-    case 'directory':
-    case 'rejectedRoot':
-      return 'folder'
-    case 'mediaFile':
-      switch (item.fileKind) {
-        case 'audio':
-          return 'music'
-        case 'video':
-          return 'video'
-        case 'image':
-          return 'image'
-        case 'cueSheet':
-          return 'cueSheet'
-        default:
-          return 'metadata'
-      }
-    case 'unsupportedFile':
-      return item.fileKind === 'cueSheet' ? 'cueSheet' : 'metadata'
-    case 'inaccessible':
-      return 'warning'
-    case 'unknown':
-      return 'state'
-  }
-}
-
-function localBrowseFileClass(item: LocalBrowseItem): ContentRow['fileClass'] | undefined {
-  switch (item.fileKind) {
-    case 'audio':
-      return 'audio'
-    case 'video':
-      return 'video'
-    case 'image':
-      return 'image'
-    case 'cueSheet':
-    case 'logDoc':
-    case 'textDoc':
-    case 'archive':
-    case 'other':
-    case 'unknown':
-      return 'unsupported'
-    case null:
-      return undefined
-  }
-}
-
 function contentsRow(row: ContentsFileRow): ContentRow {
   const icon = contentsRowIcon(row)
   const detail =
@@ -1587,38 +1175,6 @@ function contentMoreRow(
           }
         })
   }
-}
-
-function localBrowseMoreRow(
-  nodeId: BrowserTreeNodeId,
-  binding: Extract<RowBinding, { readonly kind: 'localBrowseMore' }>
-): ContentRow {
-  return {
-    id: nodeId,
-    kind: 'more',
-    label:
-      binding.state === 'error'
-        ? 'Retry loading more'
-        : binding.state === 'loading'
-          ? 'Loading more'
-          : 'Load more',
-    detail: binding.detail,
-    icon: binding.state === 'loading' ? 'loading' : binding.state === 'error' ? 'warning' : 'more'
-  }
-}
-
-function localBrowseItemDetail(
-  item: Extract<RowBinding, { readonly kind: 'localBrowseItem' }>['item']
-): string {
-  if (item.status === 'duplicateOfAdmittedSource') {
-    return 'Already added as a library source.'
-  }
-
-  if (item.failure !== null) {
-    return item.failure.detail
-  }
-
-  return item.identity.resolvedItemPath
 }
 
 function stateProjection(options: {

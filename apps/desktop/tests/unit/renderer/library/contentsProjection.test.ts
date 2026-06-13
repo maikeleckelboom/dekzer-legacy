@@ -224,7 +224,7 @@ describe('projectContents', () => {
     })
 
     expect(rootContents.kind).toBe('ready')
-    expect(rootContents.surfaceLabel).toBe('Source Preview')
+    expect(rootContents.surfaceLabel).toBe('Preview')
     expect(rootContents.surfaceKind).toBe('sourcePreview')
     expect(rootContents.title).toBe('Music')
     expect(rootContents.rows.map((row) => row.label)).toEqual(['Albums', 'loose.flac'])
@@ -244,7 +244,7 @@ describe('projectContents', () => {
     })
 
     expect(albumContents.kind).toBe('ready')
-    expect(albumContents.surfaceLabel).toBe('Source Preview')
+    expect(albumContents.surfaceLabel).toBe('Preview')
     expect(albumContents.title).toBe('Albums')
     expect(albumContents.rows.map((row) => row.label)).toEqual(['track.flac'])
     expect(
@@ -266,10 +266,10 @@ describe('projectContents', () => {
     })
 
     expect(contents.kind).toBe('notLoaded')
-    expect(contents.surfaceLabel).toBe('Source Preview')
+    expect(contents.surfaceLabel).toBe('Preview')
     expect(contents.title).toBe('Music')
-    expect(contents.detail).toContain('Preview local folders and media signals')
-    expect(contents.rows.map((row) => row.label)).toEqual(['Folder preview not loaded'])
+    expect(contents.detail).toContain('Inspect this folder before adding it as a music source')
+    expect(contents.rows.map((row) => row.label)).toEqual(['Preview not loaded'])
     expect(contents.rows[0]).toMatchObject({
       state: 'notLoaded',
       action: {
@@ -296,11 +296,11 @@ describe('projectContents', () => {
     expect(contents.surfaceLabel).toBe('Add Source')
     expect(contents.surfaceKind).toBe('addSource')
     expect(contents.title).toBe('Add Source')
-    expect(contents.detail).toContain('managed source')
+    expect(contents.detail).toContain('Suggested folders are starting points')
     expect(contents.rows).toEqual([
       expect.objectContaining({
         kind: 'state',
-        label: 'Add a music folder',
+        label: 'Suggested folders',
         action: {
           kind: 'chooseMusicFolder',
           label: 'Add music folder'
@@ -312,7 +312,7 @@ describe('projectContents', () => {
     )
   })
 
-  it('demotes system-drive root preview to plausible music-source candidates', () => {
+  it('demotes system-drive root preview to specific folder guidance', () => {
     const systemRoot = 'C:\\'
     const rootWindow = localBrowseWindow({
       label: 'System Drive',
@@ -371,9 +371,9 @@ describe('projectContents', () => {
       bindingsById: projection.bindingsById
     })
 
-    expect(contents.surfaceLabel).toBe('Source Preview')
+    expect(contents.surfaceLabel).toBe('Preview')
     expect(contents.title).toBe('System Drive')
-    expect(contents.detail).toContain('plausible music-source candidate')
+    expect(contents.detail).toBe('Choose a specific folder inside this drive.')
     expect(contents.rows.map((row) => row.label)).toEqual(['Music'])
     expect(contents.rows.some((row) => row.label === 'Windows')).toBe(false)
   })
@@ -419,7 +419,7 @@ describe('projectContents', () => {
     })
 
     expect(audioContents.rows.map((row) => row.label)).toEqual(['Albums'])
-    expect(audioContents.surfaceLabel).toBe('Source Preview')
+    expect(audioContents.surfaceLabel).toBe('Preview')
 
     const inventoryState = browserState({
       addSourceView: 'inventory',
@@ -437,9 +437,9 @@ describe('projectContents', () => {
       bindingsById: inventoryProjection.bindingsById
     })
 
-    expect(inventoryContents.surfaceLabel).toBe('Source Inventory')
+    expect(inventoryContents.surfaceLabel).toBe('Inventory')
     expect(inventoryContents.surfaceKind).toBe('sourceInventory')
-    expect(inventoryContents.detail).toContain('local inventory items shown')
+    expect(inventoryContents.detail).toContain('local files shown')
     expect(inventoryContents.rows.map((row) => row.label)).toEqual([
       'Albums',
       'notes.txt',
@@ -476,7 +476,7 @@ describe('projectContents', () => {
     expect(contents.rows).toEqual([
       expect.objectContaining({
         label: 'Admitted',
-        detail: 'Already added as a library source.'
+        detail: 'Already added as a music source.'
       })
     ])
     expect(contents.rows[0]?.action).toBeUndefined()

@@ -51,9 +51,11 @@ describe('source status projection', () => {
     })
     const view = statusView(context)
 
+    expect(view.badge).toBe('Ready to add')
     expect(view.actions).toEqual([
       expect.objectContaining({ kind: 'addLocalPath', label: 'Add as music source' })
     ])
+    expect(view.actions).toHaveLength(1)
     expect(view.actions.some((action) => action.kind === 'scanSource')).toBe(false)
     expect(view.actions.some((action) => action.kind === 'runMaintenance')).toBe(false)
   })
@@ -91,6 +93,31 @@ describe('source status projection', () => {
     ])
     expect(view.actions.some((action) => action.kind === 'scanSource')).toBe(false)
     expect(view.actions.some((action) => action.kind === 'runMaintenance')).toBe(false)
+  })
+
+  it('local browse folders without admission avoid hostile copy', () => {
+    const projection = localBrowseProjection(
+      {
+        kind: 'localBrowseItem',
+        item: localItem([{ kind: 'browseChildren' }, { kind: 'chooseDescendant' }], 'directory'),
+        target: {
+          addSourceView: 'preview',
+          entryPointKind: 'music',
+          resolvedRootPath: 'C:/Music',
+          resolvedParentPath: 'C:/Music/Empty',
+          label: 'Empty'
+        }
+      },
+      'Empty'
+    )
+    const view = statusView(
+      projectStatusContext({ projection, selectedNodeId: 'selected', selectedTitle: 'Empty' })
+    )
+
+    expect(view.badge).toBe('Choose a music folder')
+    expect(view.detail).toBe('Choose a folder that contains music files.')
+    expect(`${view.badge} ${view.detail}`).not.toContain('not a music-source candidate')
+    expect(view.actions).toEqual([])
   })
 
   it('duplicate local browse row without matched source identity has no add or show-source action', () => {
@@ -167,7 +194,8 @@ describe('source status projection', () => {
       projectStatusContext({ projection, selectedNodeId: 'selected', selectedTitle: 'loose.flac' })
     )
 
-    expect(view.badge).toBe('Choose a narrower folder')
+    expect(view.badge).toBe('Choose a specific folder')
+    expect(view.detail).toBe('Choose a specific folder inside this drive.')
     expect(view.actions).toEqual([])
   })
 

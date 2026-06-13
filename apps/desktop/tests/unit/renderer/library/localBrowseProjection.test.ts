@@ -40,6 +40,8 @@ describe('local browse tree projection', () => {
       browserState({
         entries: [
           entryPoint('systemDriveRoot', 'System Drive', 'C:\\'),
+          entryPoint('localDataVolumeRoot', 'Data', 'D:\\'),
+          entryPoint('removableVolumeRoot', 'USB', 'E:\\'),
           entryPoint('downloads', 'Downloads', 'C:\\Users\\Maikel\\Downloads'),
           entryPoint('music', 'Music', 'C:\\Users\\Maikel\\Music'),
           entryPoint('desktop', 'Desktop', 'C:\\Users\\Maikel\\Desktop'),
@@ -53,8 +55,13 @@ describe('local browse tree projection', () => {
       'Downloads',
       'Desktop',
       'Home',
+      'USB',
+      'Data',
       'System Drive'
     ])
+    expect(findNodeDetail(projection, 'System Drive')).toBe(
+      'Choose a specific folder inside this drive.'
+    )
   })
 
   it('keeps local browse entries out of source bindings', () => {
@@ -122,7 +129,7 @@ describe('local browse tree projection', () => {
         availableOperations: [{ kind: 'browseChildren' }, { kind: 'chooseDescendant' }]
       }
     })
-    expect(findNodeDetail(projection, 'Music')).toBe('Already added as a library source.')
+    expect(findNodeDetail(projection, 'Music')).toBe('Already added as a music source.')
   })
 
   it('projects local browse child row kinds without source bindings', () => {
