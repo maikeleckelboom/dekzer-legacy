@@ -420,7 +420,7 @@ Every ordered query needs a stable tie-breaker. `source_file_id` is the default 
 ### 9. Deduplication
 
 Browse policies return one row per scoped scanned source file admitted by the policy. The `playableMedia` policy returns
-evidence-backed candidate rows revalidated against scoped source files and attachment identity.
+evidence-backed playable-media rows revalidated against scoped source files and attachment identity.
 
 Do not leave duplicate collapse to the renderer.
 

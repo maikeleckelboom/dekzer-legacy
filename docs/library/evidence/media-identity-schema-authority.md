@@ -92,8 +92,8 @@ Evidence:
 - Unpromoted source-file fallback rows are intentionally removed. Plain scanned source files do not surface as
   `playableMedia`.
 
-Therefore `playableMedia` must not be treated as current track identity. It is now a narrow playable-media candidate
-projection backed by current attachment identity and audio probe evidence. The detailed eligibility and non-goals are
+Therefore `playableMedia` must not be treated as current track identity. It is now a narrow playable-media profile
+backed by current attachment identity and audio probe evidence. The detailed eligibility and non-goals are
 owned by `docs/library/evidence/playable-media-promotion-contract.md`.
 
 ## Track Identity Candidate Decision
@@ -224,7 +224,7 @@ CUE sheets remain source-file companion metadata rows and are not parsed by medi
 | Source files              | Durable source-relative file inventory, path-derived file kind/file class, presence, size, mtime     | Playability, track identity, attachment identity, artwork role                              |
 | Source-file observations  | Future/partial evidence from reading bytes or probing containers                                     | Product row admission or user-facing track identity by itself                               |
 | Attachments               | Current durable bytes-identity relation from current BLAKE3 evidence to source-file occurrence links | Path proximity guesses, track identity, CUE pairing, preparation readiness                  |
-| Playable media             | Evidence-backed playable-media candidate projection from current attachments and audio probe observations   | Canonical track identity, CUE pairing, contents authority                                   |
+| Playable media             | Evidence-backed playable-media record from current attachments and audio probe observations                 | Canonical track identity, CUE pairing, contents authority                                   |
 | Track identity candidates | Reversible exact evidence candidate grouping from current playable-media observations                   | Canonical track identity, user decisions, semantic recording matching, CUE pairing          |
 | Track identity decisions  | Reversible/supersedable decisions over candidates with preserved provenance                          | Canonical track rows, semantic identity by hash alone, CUE pairing, metadata reconciliation |
 | Track identity            | Future semantic musical/performance identity                                                         | Source-file row identity, exact hash candidate alone, or playlist membership alone          |

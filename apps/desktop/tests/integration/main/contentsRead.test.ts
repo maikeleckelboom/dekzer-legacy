@@ -252,6 +252,78 @@ describe('contents reads through the host', () => {
       }
     })
   })
+
+  it('maps playableMedia rows with required durable fields', async () => {
+    const config = hostConfig()
+    const successHost = await startedHostWithClient(
+      config,
+      createFakeClient({
+        readContents: async (request) => ({
+          result: {
+            state: 'ready',
+            scope: request.scope,
+            policy: request.policy,
+            scopeDepth: request.scopeDepth,
+            rows: [
+              {
+                id: 'playable-media:5',
+                sourceId: '7',
+                sourceFileId: '11',
+                parentDirectoryId: null,
+                label: 'track.wav',
+                relativePath: 'Album/track.wav',
+                fileName: 'track.wav',
+                fileClass: 'audio',
+                fileKind: 'audio',
+                presence: 'present',
+                playableMedia: {
+                  playableMediaId: '5',
+                  attachmentId: '9',
+                  contentHashAlgorithm: 'blake3',
+                  contentHashValue: 'abc',
+                  evidenceSourceFileId: '11',
+                  mediaKind: 'audio',
+                  mimeType: null,
+                  durationMs: null,
+                  sampleRateHz: null,
+                  channels: null,
+                  bitDepth: null,
+                  codec: null
+                },
+                updatedAtMs: 100
+              }
+            ],
+            scopeCoverage: completeCoverage(),
+            hasPolicyOmittedRows: false
+          }
+        })
+      })
+    )
+
+    await expect(
+      readContentsThroughHost(successHost, {
+        scope: { kind: 'source', sourceId: '7' },
+        policy: { kind: 'playableMedia', mediaKinds: ['audio'] },
+        scopeDepth: 'recursive'
+      })
+    ).resolves.toMatchObject({
+      state: 'ready',
+      result: {
+        rows: [
+          {
+            playableMedia: {
+              playableMediaId: '5',
+              attachmentId: '9',
+              contentHashAlgorithm: 'blake3',
+              contentHashValue: 'abc',
+              evidenceSourceFileId: '11',
+              mediaKind: 'audio'
+            }
+          }
+        ]
+      }
+    })
+  })
 })
 
 function sourceLocationRequest(): Parameters<typeof readContentsThroughHost>[1] {

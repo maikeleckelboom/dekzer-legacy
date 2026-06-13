@@ -3,7 +3,7 @@ status: accepted
 last-reviewed: 2026-06-09
 owner: library-store-sqlite
 canonical-context:
-  - observed-file-observations-contract
+  - source-file-observations-contract
   - attachment-identity-contract
   - media-probe-observations-contract
   - playable-media-promotion-contract

@@ -2607,10 +2607,7 @@
       "type": "object",
       "properties": {
         "attachmentId": {
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": "string"
         },
         "bitDepth": {
           "type": [
@@ -2633,16 +2630,10 @@
           ]
         },
         "contentHashAlgorithm": {
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": "string"
         },
         "contentHashValue": {
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": "string"
         },
         "durationMs": {
           "type": [
@@ -2652,16 +2643,10 @@
           "format": "int64"
         },
         "evidenceSourceFileId": {
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": "string"
         },
         "mediaKind": {
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": "string"
         },
         "mimeType": {
           "type": [
@@ -2670,10 +2655,7 @@
           ]
         },
         "playableMediaId": {
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": "string"
         },
         "sampleRateHz": {
           "type": [
@@ -2682,7 +2664,15 @@
           ],
           "format": "int64"
         }
-      }
+      },
+      "required": [
+        "playableMediaId",
+        "attachmentId",
+        "contentHashAlgorithm",
+        "contentHashValue",
+        "evidenceSourceFileId",
+        "mediaKind"
+      ]
     },
     "PlayableMediaKind": {
       "type": "string",

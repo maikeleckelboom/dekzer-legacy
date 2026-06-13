@@ -353,7 +353,7 @@ expressed through row-level color treatment, columns, facets, or status text.
 | `pending`       | Row-level treatment or readiness column, not `badge.scanActive` unless scan is actually active        |
 | `blocked`       | May map to `badge.lock` only when the block is permission/access related                              |
 | `unavailable`   | May map to `badge.offline`, `badge.lock`, or `badge.warning` only when the source condition matches   |
-| `unsupported`   | May map to `badge.unsupported` for media/candidate rows                                               |
+| `unsupported`   | May map to `badge.unsupported` for media or candidate-result entries                                  |
 | `failed`        | May map to `badge.warning` only for structural or source-level failure; otherwise row-level treatment |
 
 Do not create new icon badges just because a readiness state exists.

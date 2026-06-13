@@ -1391,7 +1391,7 @@ fn map_contents_row(
         .ok_or_else(|| invalid_contents_value("file_kind", &row.file_kind))?;
     let presence = protocol::ContentsPresenceState::from_projection_value(&row.presence)
         .ok_or_else(|| invalid_contents_value("presence", &row.presence))?;
-    let playable_media = row.playable_media.map(map_playable_media_summary);
+    let playable_media = row.playable_media.map(map_playable_media);
 
     Ok(protocol::ContentsFileRow {
         id: row.id,
@@ -1409,20 +1409,20 @@ fn map_contents_row(
     })
 }
 
-fn map_playable_media_summary(summary: store::StorePlayableMedia) -> protocol::PlayableMedia {
+fn map_playable_media(media: store::StorePlayableMedia) -> protocol::PlayableMedia {
     protocol::PlayableMedia {
-        playable_media_id: summary.playable_media_id,
-        attachment_id: summary.attachment_id,
-        content_hash_algorithm: summary.content_hash_algorithm,
-        content_hash_value: summary.content_hash_value,
-        evidence_source_file_id: summary.evidence_source_file_id,
-        media_kind: summary.media_kind,
-        mime_type: summary.mime_type,
-        duration_ms: summary.duration_ms,
-        sample_rate_hz: summary.sample_rate_hz,
-        channels: summary.channels,
-        bit_depth: summary.bit_depth,
-        codec: summary.codec,
+        playable_media_id: media.playable_media_id,
+        attachment_id: media.attachment_id,
+        content_hash_algorithm: media.content_hash_algorithm,
+        content_hash_value: media.content_hash_value,
+        evidence_source_file_id: media.evidence_source_file_id,
+        media_kind: media.media_kind,
+        mime_type: media.mime_type,
+        duration_ms: media.duration_ms,
+        sample_rate_hz: media.sample_rate_hz,
+        channels: media.channels,
+        bit_depth: media.bit_depth,
+        codec: media.codec,
     }
 }
 

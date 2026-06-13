@@ -98,7 +98,7 @@ pub fn read_track_identity_candidates_for_source(
                 evidence_key_value: row.get(4)?,
                 status: map_candidate_status(row.get::<_, String>(5)?.as_str()),
                 exists_because:
-                    "current playableMedia candidates share exact BLAKE3 content evidence"
+                    "current playable-media records share exact BLAKE3 content evidence"
                         .to_string(),
                 does_not_prove:
                     "canonical track identity, user decision, CUE association, or semantic multi-encode equivalence"

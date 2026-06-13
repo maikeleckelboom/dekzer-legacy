@@ -326,7 +326,7 @@ If the eye lands first on the module rail or the object row, the hierarchy is wr
 
 - perform-plus-library workbenches where the upper-right instrument remains dominant
 - preparation screens with a strong left authority stack and a large active work surface
-- route or transition workflows needing a visible horizon lane and lower candidate row
+- route or transition workflows needing a visible horizon lane and lower candidate lane
 - hybrid screens where authority, active field, and object candidates must coexist without destroying dominance
 
 ### Illegal distortions

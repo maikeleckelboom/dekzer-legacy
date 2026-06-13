@@ -210,14 +210,14 @@ The current implementation proves:
 4. `playableMediaBrowse` implies audio and video and has no caller-supplied class filter.
 5. `audioBrowse` implies audio and has no caller-supplied class filter.
 6. Policy omission metadata is required and service-owned.
-7. Primary-media vocabulary remains separate and valid.
+7. Playable-media vocabulary remains separate and valid.
 8. The active shape uses no compatibility aliases.
 
 ## Non-Goals
 
 - Audio browse field expansion.
 - Canonical track identity.
-- Primary-media product activation.
+- Playable-media product activation.
 - Preparation-facet redesign.
 - Source-file classification semantic changes.
 - Renderer table redesign.

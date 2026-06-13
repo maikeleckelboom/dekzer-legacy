@@ -1282,6 +1282,9 @@ function playableMediaRow(
     presence: 'present',
     playableMedia: {
       playableMediaId: stableId,
+      attachmentId: `attachment-${stableId}`,
+      contentHashAlgorithm: 'blake3',
+      contentHashValue: `hash-${stableId}`,
       evidenceSourceFileId: `file-${stableId}`,
       mediaKind: fileClass,
       mimeType: fileClass === 'audio' ? 'audio/wav' : 'video/mp4'

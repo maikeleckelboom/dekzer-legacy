@@ -3,7 +3,7 @@ status: accepted
 last-reviewed: 2026-06-01
 owner: library-substrate-boundary
 canonical-context:
-  - observed-file-observations-contract
+  - source-file-observations-contract
   - media-identity-schema-authority
   - media-relevant-file-inventory-contract
 scope:
@@ -24,7 +24,7 @@ state, preparation readiness, playlist state, CUE association, or UI status.
 
 ## Storage And Merge Policy
 
-`source_file_observations` remains the accepted current observed-file-observations row for media probe v0. No separate observation ledger is
+`source_file_observations` remains the accepted current source-file observations row for media probe v0. No separate observation ledger is
 introduced in this gate.
 
 Because `source_file_observations` is one accepted row per `source_file_id`, evidence jobs must merge compatible current observations instead

@@ -3,7 +3,7 @@ status: accepted
 last-reviewed: 2026-06-01
 owner: library-substrate-boundary
 canonical-context:
-  - observed-file-observations-contract
+  - source-file-observations-contract
   - media-identity-schema-authority
 scope:
   - attachment-identity
@@ -55,7 +55,7 @@ current only when the current observed-observations read for that `source_file_i
 
 - `content_hash_algorithm = 'blake3'`;
 - `content_hash_value` equal to the linked `content_attachments.content_hash_value`;
-- current observed-observation status according to the observed-file-observations basis comparison.
+- current source-file observation status according to the source-file observations basis comparison.
 
 Observations with stale basis, missing observations, or non-BLAKE3 observations do not materialize current links.
 

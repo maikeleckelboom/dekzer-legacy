@@ -230,7 +230,7 @@ Attachment occurrence evidence must stay a derived read over `source_file_attach
 
 Current non-occurrence tables keep their own roles:
 
-- `playable_media`: playable-media candidate projection; one row per attachment in v0, not per source-file
+- `playable_media`: playable-media record; one row per attachment in v0, not per source-file
   occurrence.
 - `track_identity_candidates`, `track_identity_candidate_members`, and `track_identity_candidate_evidence`: exact
   playable-media observation grouping; not A-5 occurrence grouping.

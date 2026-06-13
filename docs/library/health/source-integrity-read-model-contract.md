@@ -7,7 +7,7 @@ canonical-context:
   - lifecycle-visible-state-contract
   - maintenance-orchestration-contract
   - media-relevant-file-inventory-contract
-  - observed-file-observations-contract
+  - source-file-observations-contract
   - attachment-identity-contract
   - playable-media-promotion-contract
   - track-identity-candidate-contract

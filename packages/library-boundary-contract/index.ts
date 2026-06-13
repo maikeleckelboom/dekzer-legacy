@@ -374,7 +374,7 @@ export type ContentsScopeCoverageState = "complete" | "pending" | "scanning" | "
 
 export type ContentsFileRow = { id: string, sourceId: string, sourceFileId: string, parentDirectoryId: string | null, label: string, relativePath?: string, fileName: string, fileClass: ContentsFileClass, fileKind: ContentsFileKind, presence: ContentsPresenceState, playableMedia?: PlayableMedia, updatedAtMs?: number, };
 
-export type PlayableMedia = { playableMediaId: string | null, attachmentId: string | null, contentHashAlgorithm: string | null, contentHashValue: string | null, evidenceSourceFileId: string | null, mediaKind: string | null, mimeType: string | null, durationMs: number | null, sampleRateHz: number | null, channels: number | null, bitDepth: number | null, codec: string | null, };
+export type PlayableMedia = { playableMediaId: string, attachmentId: string, contentHashAlgorithm: string, contentHashValue: string, evidenceSourceFileId: string, mediaKind: string, mimeType: string | null, durationMs: number | null, sampleRateHz: number | null, channels: number | null, bitDepth: number | null, codec: string | null, };
 
 export type ContentsFileKind = "audio" | "video" | "image" | "cueSheet" | "logDoc" | "textDoc" | "archive" | "other" | "unknown";
 

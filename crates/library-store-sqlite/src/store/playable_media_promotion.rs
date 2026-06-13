@@ -971,11 +971,11 @@ mod tests {
         assert_eq!(result.rows.len(), 1);
         let row = &result.rows[0];
         assert_eq!(row.source_file_id, 100);
-        let summary = row.playable_media.as_ref().expect("playable media summary");
-        assert!(summary.playable_media_id.is_some());
-        assert!(summary.attachment_id.is_some());
-        assert_eq!(summary.content_hash_value.as_deref(), Some(HASH_A));
-        assert_eq!(summary.codec.as_deref(), Some("pcm"));
+        let media = row.playable_media.as_ref().expect("playable-media record");
+        assert!(media.playable_media_id > 0);
+        assert!(media.attachment_id > 0);
+        assert_eq!(media.content_hash_value, HASH_A);
+        assert_eq!(media.codec.as_deref(), Some("pcm"));
     }
 
     #[test]

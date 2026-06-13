@@ -46,7 +46,7 @@ This contract explicitly does not introduce:
 - collection health reads;
 - CUE parsing, CUE-to-audio pairing, or CUE-derived split rows;
 - tag ledger behavior;
-- media candidate rows;
+- media candidate entries;
 - preparation facets;
 - deck runtime behavior.
 

@@ -1001,21 +1001,21 @@ pub struct ContentsFileRow {
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
 pub struct PlayableMedia {
-    #[serde(with = "crate::wire::option_i64_string")]
-    #[schemars(with = "Option<String>")]
-    #[ts(as = "Option<String>")]
-    pub playable_media_id: Option<i64>,
-    #[serde(with = "crate::wire::option_i64_string")]
-    #[schemars(with = "Option<String>")]
-    #[ts(as = "Option<String>")]
-    pub attachment_id: Option<i64>,
-    pub content_hash_algorithm: Option<String>,
-    pub content_hash_value: Option<String>,
-    #[serde(with = "crate::wire::option_i64_string")]
-    #[schemars(with = "Option<String>")]
-    #[ts(as = "Option<String>")]
-    pub evidence_source_file_id: Option<i64>,
-    pub media_kind: Option<String>,
+    #[serde(with = "crate::wire::i64_string")]
+    #[schemars(with = "String")]
+    #[ts(as = "String")]
+    pub playable_media_id: i64,
+    #[serde(with = "crate::wire::i64_string")]
+    #[schemars(with = "String")]
+    #[ts(as = "String")]
+    pub attachment_id: i64,
+    pub content_hash_algorithm: String,
+    pub content_hash_value: String,
+    #[serde(with = "crate::wire::i64_string")]
+    #[schemars(with = "String")]
+    #[ts(as = "String")]
+    pub evidence_source_file_id: i64,
+    pub media_kind: String,
     pub mime_type: Option<String>,
     pub duration_ms: Option<i64>,
     pub sample_rate_hz: Option<i64>,
@@ -2491,8 +2491,8 @@ mod tests {
         LocalBrowseItemFailureCode, LocalBrowseItemIdentity, LocalBrowseItemKind,
         LocalBrowseItemMediaRelevance, LocalBrowseItemStatus, LocalBrowseItemsReadStatus,
         LocalBrowsePlatform, LocalBrowseWindowIdentity, NavigableChildScopeState, NavigationRow,
-        NavigationRowFamily, NavigationRowKind, NavigationRowSelectorKind, PlayableMediaKind,
-        ReadAttachmentSourceFilesReply, ReadAttachmentSourceFilesRequest,
+        NavigationRowFamily, NavigationRowKind, NavigationRowSelectorKind, PlayableMedia,
+        PlayableMediaKind, ReadAttachmentSourceFilesReply, ReadAttachmentSourceFilesRequest,
         ReadLibraryTreeChildrenReply, ReadLibraryTreeChildrenRequest,
         ReadLocalBrowseEntryPointsReply, ReadLocalBrowseEntryPointsRequest,
         ReadLocalBrowseItemsReply, ReadLocalBrowseItemsRequest, ReadNavigationRowsRequest,
@@ -2824,6 +2824,86 @@ mod tests {
             serde_json::from_value::<ContentsReadPolicy>(json).expect("deserialize policy"),
             policy
         );
+    }
+
+    #[test]
+    fn contents_playable_media_serializes_required_durable_fields() {
+        let media = PlayableMedia {
+            playable_media_id: 5,
+            attachment_id: 7,
+            content_hash_algorithm: "blake3".to_string(),
+            content_hash_value: "abc".to_string(),
+            evidence_source_file_id: 11,
+            media_kind: "audio".to_string(),
+            mime_type: None,
+            duration_ms: Some(120_000),
+            sample_rate_hz: None,
+            channels: None,
+            bit_depth: None,
+            codec: None,
+        };
+
+        let json = serde_json::to_value(&media).expect("serialize playable media");
+        assert_eq!(
+            json,
+            json!({
+                "playableMediaId": "5",
+                "attachmentId": "7",
+                "contentHashAlgorithm": "blake3",
+                "contentHashValue": "abc",
+                "evidenceSourceFileId": "11",
+                "mediaKind": "audio",
+                "mimeType": null,
+                "durationMs": 120000,
+                "sampleRateHz": null,
+                "channels": null,
+                "bitDepth": null,
+                "codec": null
+            })
+        );
+        assert_eq!(
+            serde_json::from_value::<PlayableMedia>(json).expect("deserialize playable media"),
+            media
+        );
+    }
+
+    #[test]
+    fn authority_docs_avoid_old_playable_media_boundary_wording() {
+        let repo_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let docs = [
+            "docs/library/evidence/playable-media-promotion-contract.md",
+            "docs/library/evidence/media-identity-schema-authority.md",
+            "docs/library/identity/track-identity-candidate-contract.md",
+            "docs/docs-authority-map.md",
+            "docs/library/roadmap/product-roadmap-and-substrate-authority.md",
+        ];
+        let disallowed = [
+            concat!("observed-file-", "observations"),
+            concat!("playable-media ", "candidate"),
+            concat!("playableMedia ", "candidate"),
+            concat!("candidate ", "row"),
+            concat!("candidate ", "rows"),
+            concat!("candidate ", "projection"),
+            concat!("primary", "Media"),
+            concat!("Primary", "Media"),
+            concat!("source_file_", "facts"),
+            concat!("Source", "Facts"),
+            concat!("primary_media_", "facts"),
+            concat!("primary_media_", "fact"),
+        ];
+
+        for doc in docs {
+            let path = repo_root.join(doc);
+            let text = std::fs::read_to_string(&path)
+                .unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
+            for phrase in disallowed {
+                assert!(
+                    !text.contains(phrase),
+                    "{} contains old playable-media boundary wording: {phrase}",
+                    path.display()
+                );
+            }
+        }
     }
 
     #[test]

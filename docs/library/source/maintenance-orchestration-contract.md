@@ -3,7 +3,7 @@ status: accepted
 last-reviewed: 2026-06-03
 owner: library-boundary-service
 canonical-context:
-  - observed-file-observations-contract
+  - source-file-observations-contract
   - attachment-identity-contract
   - media-probe-observations-contract
   - playable-media-promotion-contract
@@ -36,7 +36,7 @@ The current unit exists so a scan completion or explicit command can make bounde
 6. Track identity decision production from active exact-content candidates.
 7. Maintained read-model invalidation through the existing honest scopes.
 
-This is substrate maintenance only. Primary-media promotion v0 is attachment/probe evidence promotion, not preparation
+This is substrate maintenance only. Playable-media promotion v0 is attachment/probe evidence promotion, not preparation
 readiness, canonical track identity, CUE association, waveform generation, stems, artwork intelligence, playlist UI, or
 renderer presentation state. Track identity candidate production is exact current evidence grouping only; it is not a
 canonical track decision. Track identity decision production creates reversible/supersedable decision records only; it
@@ -57,10 +57,10 @@ The deterministic order is:
 Attachment materialization follows hashing because `content_attachments` and `source_file_attachment_links` consume
 current BLAKE3 `source_file_observations`. Media probing follows materialization because probe commits merge current compatible
 BLAKE3 evidence into `source_file_observations`; existing attachment links remain current when the hash evidence is preserved.
-Primary-media promotion follows probing because it requires current attachment links and at least one current audio
+Playable-media promotion follows probing because it requires current attachment links and at least one current audio
 probe observation. Track identity candidate production follows playable-media promotion because it consumes only current
 evidence-backed `playable_media` rows and revalidates the source-file, attachment, BLAKE3, and probe evidence
-before producing or refreshing candidate rows. Track identity decision production follows candidate production because it
+before producing or refreshing track identity candidates. Track identity decision production follows candidate production because it
 consumes only active exact-content candidates with current candidate evidence and produces current
 `system_exact_content_v0` accepted decision records only when a current system decision does not already exist and no
 current user `rejected` or `deferred` decision blocks the candidate.
@@ -180,7 +180,7 @@ Each phase commits through the existing authority path:
 - BLAKE3 hashing commits accepted `source_file_observations` through inspect-source work/artifact authority.
 - Attachment materialization updates `content_attachments` and `source_file_attachment_links`.
 - Media probing commits accepted `source_file_observations` through inspect-source work/artifact authority.
-- Primary-media promotion updates `playable_media` from current attachments and current audio probe observations.
+- Playable-media promotion updates `playable_media` from current attachments and current audio probe observations.
 - Track identity candidate production updates `track_identity_candidates`,
   `track_identity_candidate_members`, and `track_identity_candidate_evidence` from current evidence-backed
   playable-media observations.

@@ -141,7 +141,7 @@ The following surfaces have not yet been migrated to natural browse sort keys:
 
 ### Rationale for deferral
 
-Primary-media rows are metadata-ordered (title/artist/album).
+Playable-media rows are metadata-ordered (title/artist/album).
 The `lower(relative_path)` is used only as a final tie-break for rows with identical
 metadata values. The `[10]` before `[2]` class of bug in these tie-breaks is unlikely
 to be visible to users. Converting these requires either joining `source_files` to

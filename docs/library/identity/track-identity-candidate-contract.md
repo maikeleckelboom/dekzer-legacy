@@ -3,7 +3,7 @@ status: accepted
 last-reviewed: 2026-06-02
 owner: library-store-sqlite
 canonical-context:
-  - observed-file-observations-contract
+  - source-file-observations-contract
   - attachment-identity-contract
   - media-probe-observations-contract
   - playable-media-promotion-contract
@@ -19,8 +19,8 @@ scope:
 
 ## Purpose
 
-Track identity candidates are the first durable backend-owned foundation for saying that current evidence-backed
-`playableMedia` candidates appear to represent the same exact playable item candidate.
+Track identity candidates are the first durable backend-owned foundation for saying current evidence-backed
+playable-media records appear equivalent by exact content evidence.
 
 They are not canonical tracks. They are not user-facing track identity. They do not make a semantic recording decision.
 They preserve reversible evidence and provenance so the track identity decision layer and later identity layers can
@@ -68,7 +68,7 @@ observations cannot create or refresh candidates.
 current links and attachment hash equality but does not re-read files or own hash authority.
 
 `playable_media` remain the playable-media input. Candidate production consumes only current promoted audio
-playable-media observations and revalidates them before producing or refreshing candidate rows.
+playable-media records and revalidates them before producing or refreshing track identity candidates.
 
 ## Sufficient Evidence
 
@@ -96,11 +96,11 @@ The following never create or refresh track identity candidates by themselves:
 
 ## Grouping Rules
 
-One candidate group may contain multiple evidence rows when current playable-media observations share the same exact BLAKE3
+One candidate group may contain multiple evidence rows when current playable-media records share the same exact BLAKE3
 content evidence. This is exact content evidence grouping only. It is not a semantic track decision.
 
 The current substrate promotes one `playable_media` row per attachment, so duplicate source files with the same
-BLAKE3 attachment are represented as one member with multiple source-file evidence rows. A playable-media observation may
+BLAKE3 attachment are represented as one member with multiple source-file evidence rows. A playable-media record may
 belong to only one active v0 candidate.
 
 Different hashes do not group merely because paths, titles, filenames, or probe observations look similar. Different encodes of

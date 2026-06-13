@@ -110,12 +110,12 @@ export type ContentsScopeCoverage = {
 export type ContentsPresence = 'present' | 'missing' | 'removed'
 
 export type PlayableMedia = {
-  readonly playableMediaId?: string
-  readonly attachmentId?: string
-  readonly contentHashAlgorithm?: string
-  readonly contentHashValue?: string
-  readonly evidenceSourceFileId?: string
-  readonly mediaKind?: string
+  readonly playableMediaId: string
+  readonly attachmentId: string
+  readonly contentHashAlgorithm: string
+  readonly contentHashValue: string
+  readonly evidenceSourceFileId: string
+  readonly mediaKind: string
   readonly mimeType?: string
   readonly durationMs?: number
   readonly sampleRateHz?: number

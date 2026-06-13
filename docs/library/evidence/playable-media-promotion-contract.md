@@ -11,7 +11,7 @@ canonical-context:
   - track-identity-decision-contract
 scope:
   - playable-media-promotion
-  - playable-media-candidates
+  - playable-media-records
   - contents-playable-media-profile
 ---
 
@@ -37,7 +37,7 @@ The durable target is `playable_media`.
 
 Rules:
 
-- One candidate row exists per `content_attachments.attachment_id`.
+- One playable-media row exists per `content_attachments.attachment_id`.
 - The row stores the evidence source file, the accepted evidence basis fingerprint, media kind, and basic probe fields.
 - The row is evidence-backed attachment promotion only. It must not write source inventory, attachment identity,
   track-identity candidate/decision rows, preparation rows, waveform/stem artifacts, playlists, or product UI state.
@@ -56,7 +56,7 @@ A source-file occurrence is eligible only when all of these are true:
 - `source_file_observations.media_kind = audio`.
 - At least one probe field is present: MIME type, duration, sample rate, channels, bit depth, or codec.
 
-When multiple current source files point at the same attachment, promotion stores one candidate for the attachment and
+When multiple current source files point at the same attachment, promotion stores one playable-media record for the attachment and
 chooses a deterministic representative by lowercased relative path and source-file id.
 
 ## Contents Read Behavior
@@ -64,10 +64,10 @@ chooses a deterministic representative by lowercased relative path and source-fi
 `readContents` with `{ kind: 'playableMedia', mediaKinds: [...] }` reads only promoted
 `playable_media` rows. At read time it
 revalidates the current scoped source-file row, attachment link, attachment hash, and source observations. Stale or out-of-scope
-candidate rows are omitted rather than returned as degraded product rows.
+playable-media records are omitted rather than returned as degraded product rows.
 
 There is no fallback from plain present audio/video `source_files` to playable-media rows. A complete scope with no
-promoted candidates is an authoritative empty playable-media result.
+promoted playable-media records is an authoritative empty playable-media result.
 
 The row origin exposed through the boundary for these rows is `playableMedia`. Plain source-file fallback rows
 are not emitted by the v0 playable-media query path.

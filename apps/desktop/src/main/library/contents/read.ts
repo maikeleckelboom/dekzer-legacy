@@ -511,16 +511,12 @@ function mapContentsRow(row: ContractContentsFileRow): ContentsFileRow | undefin
 
 function mapPlayableMedia(media: ContractPlayableMedia): PlayableMedia {
   return {
-    ...(media.playableMediaId === null ? {} : { playableMediaId: media.playableMediaId }),
-    ...(media.attachmentId === null ? {} : { attachmentId: media.attachmentId }),
-    ...(media.contentHashAlgorithm === null
-      ? {}
-      : { contentHashAlgorithm: media.contentHashAlgorithm }),
-    ...(media.contentHashValue === null ? {} : { contentHashValue: media.contentHashValue }),
-    ...(media.evidenceSourceFileId === null
-      ? {}
-      : { evidenceSourceFileId: media.evidenceSourceFileId }),
-    ...(media.mediaKind === null ? {} : { mediaKind: media.mediaKind }),
+    playableMediaId: media.playableMediaId,
+    attachmentId: media.attachmentId,
+    contentHashAlgorithm: media.contentHashAlgorithm,
+    contentHashValue: media.contentHashValue,
+    evidenceSourceFileId: media.evidenceSourceFileId,
+    mediaKind: media.mediaKind,
     ...(media.mimeType === null ? {} : { mimeType: media.mimeType }),
     ...(media.durationMs === null ? {} : { durationMs: media.durationMs }),
     ...(media.sampleRateHz === null ? {} : { sampleRateHz: media.sampleRateHz }),

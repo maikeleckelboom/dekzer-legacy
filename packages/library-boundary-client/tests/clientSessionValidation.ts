@@ -12,6 +12,7 @@ import type {
   ReadSourceMaintenanceReply,
   ReadSourceFileAttachmentReply,
   ReadTrackIdentityReviewCandidatesReply,
+  PlayableMedia,
   RegisterLocalRootReply,
   RunSourceMaintenanceReply,
   TrackIdentityDecisionCommandResult
@@ -80,6 +81,28 @@ type ReadSourceIntegrityReturnIsGenerated = AssertType<
   EqualTypes<
     Awaited<ReturnType<LibraryBoundaryClient['readSourceIntegrity']>>,
     ReadSourceIntegrityReply
+  >
+>
+
+type PlayableMediaRequiredDurableFields = AssertType<
+  EqualTypes<
+    Pick<
+      PlayableMedia,
+      | 'playableMediaId'
+      | 'attachmentId'
+      | 'contentHashAlgorithm'
+      | 'contentHashValue'
+      | 'evidenceSourceFileId'
+      | 'mediaKind'
+    >,
+    {
+      playableMediaId: string
+      attachmentId: string
+      contentHashAlgorithm: string
+      contentHashValue: string
+      evidenceSourceFileId: string
+      mediaKind: string
+    }
   >
 >
 

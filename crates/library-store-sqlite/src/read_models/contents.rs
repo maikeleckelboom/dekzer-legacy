@@ -402,12 +402,12 @@ pub enum StoreContentsReadPolicy {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StorePlayableMedia {
-    pub playable_media_id: Option<i64>,
-    pub attachment_id: Option<i64>,
-    pub content_hash_algorithm: Option<String>,
-    pub content_hash_value: Option<String>,
-    pub evidence_source_file_id: Option<i64>,
-    pub media_kind: Option<String>,
+    pub playable_media_id: i64,
+    pub attachment_id: i64,
+    pub content_hash_algorithm: String,
+    pub content_hash_value: String,
+    pub evidence_source_file_id: i64,
+    pub media_kind: String,
     pub mime_type: Option<String>,
     pub duration_ms: Option<i64>,
     pub sample_rate_hz: Option<i64>,
@@ -2157,31 +2157,43 @@ fn contents_row_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoreConte
     let codec: Option<String> = row.get(20)?;
     let path_sort_key: Option<String> = row.get(21)?;
 
-    let playable_media = playable_media_id.map(|playable_media_id| StorePlayableMedia {
-        playable_media_id: Some(playable_media_id),
-        attachment_id,
-        content_hash_algorithm: content_hash_algorithm.clone(),
-        content_hash_value: content_hash_value.clone(),
-        evidence_source_file_id,
-        media_kind: candidate_media_kind.clone(),
-        mime_type: mime_type.clone(),
-        duration_ms,
-        sample_rate_hz,
-        channels,
-        bit_depth,
-        codec: codec.clone(),
-    });
+    let playable_media = playable_media_id
+        .map(|playable_media_id| {
+            Ok::<StorePlayableMedia, rusqlite::Error>(StorePlayableMedia {
+                playable_media_id,
+                attachment_id: required_playable_media_field(attachment_id, "attachment_id")?,
+                content_hash_algorithm: required_playable_media_field(
+                    content_hash_algorithm.clone(),
+                    "content_hash_algorithm",
+                )?,
+                content_hash_value: required_playable_media_field(
+                    content_hash_value.clone(),
+                    "content_hash_value",
+                )?,
+                evidence_source_file_id: required_playable_media_field(
+                    evidence_source_file_id,
+                    "evidence_source_file_id",
+                )?,
+                media_kind: required_playable_media_field(
+                    candidate_media_kind.clone(),
+                    "media_kind",
+                )?,
+                mime_type: mime_type.clone(),
+                duration_ms,
+                sample_rate_hz,
+                channels,
+                bit_depth,
+                codec: codec.clone(),
+            })
+        })
+        .transpose()?;
 
     let label = contents_label(&file_name, &relative_path);
 
     Ok(StoreContentsFileRow {
         id: playable_media
             .as_ref()
-            .and_then(|summary| {
-                summary
-                    .playable_media_id
-                    .map(|id| format!("playable-media:{id}"))
-            })
+            .map(|media| format!("playable-media:{}", media.playable_media_id))
             .unwrap_or_else(|| format!("source-file:{source_file_id}")),
         source_id,
         source_file_id,
@@ -2195,6 +2207,21 @@ fn contents_row_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoreConte
         playable_media,
         updated_at,
         path_sort_key,
+    })
+}
+
+fn required_playable_media_field<T>(
+    value: Option<T>,
+    field_name: &'static str,
+) -> rusqlite::Result<T> {
+    value.ok_or_else(|| {
+        rusqlite::Error::FromSqlConversionFailure(
+            0,
+            rusqlite::types::Type::Null,
+            Box::new(LibrarySqliteError::MalformedSchemaState(format!(
+                "playable_media row is missing required {field_name}"
+            ))),
+        )
     })
 }
 
@@ -2307,7 +2334,20 @@ mod tests {
     fn playable_media(row: &super::StoreContentsFileRow) -> &super::StorePlayableMedia {
         row.playable_media
             .as_ref()
-            .expect("playable-media profile rows carry a summary")
+            .expect("playable-media profile rows carry a playable-media record")
+    }
+
+    #[test]
+    fn playable_media_required_field_rejects_missing_join_value() {
+        let error = super::required_playable_media_field::<i64>(None, "attachment_id")
+            .expect_err("missing playable-media join field should be rejected");
+
+        assert!(
+            error.to_string().contains(
+                "database schema state is malformed: playable_media row is missing required attachment_id"
+            ),
+            "unexpected error: {error}"
+        );
     }
 
     fn insert_source(connection: &Connection, source_id: i64) {
@@ -2761,11 +2801,8 @@ mod tests {
                 .rows
                 .iter()
                 .map(|row| {
-                    let summary = playable_media(row);
-                    (
-                        summary.playable_media_id.is_some(),
-                        summary.attachment_id.is_some(),
-                    )
+                    let media = playable_media(row);
+                    (media.playable_media_id > 0, media.attachment_id > 0)
                 })
                 .collect::<Vec<_>>(),
             vec![(true, true)]
@@ -2868,10 +2905,10 @@ mod tests {
                 .rows
                 .iter()
                 .map(|row| {
-                    let summary = playable_media(row);
+                    let media = playable_media(row);
                     (
-                        summary.playable_media_id.is_some(),
-                        summary.attachment_id.is_some(),
+                        media.playable_media_id > 0,
+                        media.attachment_id > 0,
                         row.file_class.as_str(),
                     )
                 })
@@ -3152,7 +3189,7 @@ mod tests {
     }
 
     #[test]
-    fn promoted_candidate_rows_are_returned_when_evidence_is_current() {
+    fn promoted_playable_media_rows_are_returned_when_evidence_is_current() {
         let connection = open_connection();
         seed_assets(&connection);
         insert_source(&connection, 1);
@@ -3180,11 +3217,11 @@ mod tests {
 
         assert_eq!(result.state, StoreContentsState::Ready);
         assert_eq!(result.rows.len(), 1);
-        let summary = playable_media(&result.rows[0]);
-        assert!(summary.playable_media_id.is_some());
-        assert!(summary.attachment_id.is_some());
-        assert_eq!(summary.content_hash_value.as_deref(), Some("hash:1000"));
-        assert_eq!(summary.media_kind.as_deref(), Some("audio"));
+        let media = playable_media(&result.rows[0]);
+        assert!(media.playable_media_id > 0);
+        assert!(media.attachment_id > 0);
+        assert_eq!(media.content_hash_value, "hash:1000");
+        assert_eq!(media.media_kind, "audio");
         assert!(
             result.rows[0].id.starts_with("playable-media:"),
             "promoted row id must start with 'playable-media:', got: {}",
@@ -3368,7 +3405,7 @@ mod tests {
         assert_eq!(result.state, StoreContentsState::Ready);
         assert_eq!(result.rows.len(), 1);
         assert_eq!(result.rows[0].source_file_id, 1000);
-        assert!(playable_media(&result.rows[0]).playable_media_id.is_some());
+        assert!(playable_media(&result.rows[0]).playable_media_id > 0);
     }
 
     #[test]
