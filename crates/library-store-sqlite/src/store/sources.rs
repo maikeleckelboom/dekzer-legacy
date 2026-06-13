@@ -179,13 +179,7 @@ impl SqliteDurableStore {
     pub fn upsert_source_state(&self, input: UpsertSourceStateInput) -> LibrarySqliteResult<()> {
         self.with_write(|write| {
             SourceStateAuthorityTx::new(write).upsert_source_state(&input)?;
-            publication::reseed_projection_domains(
-                write,
-                &[
-                    ProjectionDomain::Navigation,
-                    ProjectionDomain::LibraryBrowser,
-                ],
-            )?;
+            publication::reseed_projection_domains(write, &[ProjectionDomain::Navigation])?;
             Ok(())
         })
     }
@@ -196,7 +190,7 @@ impl SqliteDurableStore {
     ) -> LibrarySqliteResult<()> {
         self.with_write(|write| {
             SourceStateAuthorityTx::new(write).upsert_source_scan_state(&input)?;
-            publication::reseed_projection_domains(write, &[ProjectionDomain::LibraryBrowser])?;
+            publication::reseed_projection_domains(write, &[ProjectionDomain::Navigation])?;
             Ok(())
         })
     }
@@ -251,7 +245,6 @@ impl SqliteDurableStore {
                 input.mtime_ns,
                 input.updated_at,
             )?;
-            publication::reseed_projection_domains(write, &[ProjectionDomain::LibraryBrowser])?;
             Ok(source_file_id)
         })
     }
@@ -701,7 +694,7 @@ impl SqliteDurableStore {
                     updated_at: observed_at,
                 },
             )?;
-            publication::reseed_projection_domains(write, &[ProjectionDomain::LibraryBrowser])?;
+            publication::reseed_projection_domains(write, &[ProjectionDomain::Navigation])?;
             Ok(())
         })?;
 
@@ -794,7 +787,7 @@ impl SqliteDurableStore {
                     updated_at: input.updated_at,
                 },
             )?;
-            publication::reseed_projection_domains(write, &[ProjectionDomain::LibraryBrowser])?;
+            publication::reseed_projection_domains(write, &[ProjectionDomain::Navigation])?;
             Ok(())
         })
     }

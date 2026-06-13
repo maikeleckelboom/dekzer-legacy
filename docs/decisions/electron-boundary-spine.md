@@ -534,7 +534,7 @@ ResourcePlane
 MainLibraryEventPump
 registerLibraryCommands
 createLibraryCommandHandler
-emitLibraryBrowserInvalidation
+emitLibraryProjectionInvalidation
 emitLibraryScanEvent
 normaliseHostCommandFailure
 normaliseTransportFailure

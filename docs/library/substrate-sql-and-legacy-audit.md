@@ -2,6 +2,11 @@
 
 Date: 2026-06-12
 
+Deletion-history note, 2026-06-13: this document preserves the pre-deletion audit vocabulary and is no longer a live
+implementation target list. Prompt 2 deleted the legacy store/schema/projection/domain surfaces from the current
+baseline. Active implementation contracts must use the current source-file, `SourceFacts`, attachment, primary-media,
+track-identity candidate, and track-identity decision substrate.
+
 Scope: current library substrate in `crates/library-store-sqlite`, its baseline migration, boundary protocol/service exposure, desktop/client references, and current doctrine documents. This is a greenfield audit: compatibility, dormant authority, transitional vocabulary, and dual paths are risks unless the current A-5/A-6 substrate proves they are still needed.
 
 Doctrine inputs treated as current unless contradicted by the tree:

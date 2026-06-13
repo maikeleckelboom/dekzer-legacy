@@ -35,11 +35,10 @@ Rules:
 
 - One candidate row exists per `content_attachments.attachment_id`.
 - The row stores the evidence source file, the accepted evidence basis fingerprint, media kind, and basic probe fields.
-- The row is evidence-backed attachment promotion only. It must not write `LibraryAssets`, `LibraryAssetAttachments`,
-  `SourceSegmentSets`, `SourceSegments`, `LibraryBrowserRows`, tracks, prep rows, waveforms, stems, playlists, or playlist
-  entries.
-- Legacy browser projections and library-asset rows are not primary-media v0 authority and are not public contents row
-  identity.
+- The row is evidence-backed attachment promotion only. It must not write source inventory, attachment identity,
+  track-identity candidate/decision rows, preparation rows, waveform/stem artifacts, playlists, or product UI state.
+- Current contents row identity for this policy is the `primary_media_candidates` row plus revalidated source-file,
+  attachment, and `SourceFacts` provenance.
 
 ## Eligibility
 
@@ -66,8 +65,8 @@ candidate rows are omitted rather than returned as degraded product rows.
 There is no fallback from plain present audio/video `source_files` to primary-media rows. A complete scope with no
 promoted candidates is an authoritative empty primary-media result.
 
-The row origin exposed through the boundary for these rows is `primaryMediaCandidate`. Legacy `libraryAsset` and
-`sourceFile` origins are not emitted by the v0 primary-media query path.
+The row origin exposed through the boundary for these rows is `primaryMediaCandidate`. Plain source-file fallback rows
+are not emitted by the v0 primary-media query path.
 
 ## Source Maintenance Integration
 
@@ -95,7 +94,8 @@ Primary media promotion v0 does not:
 - promote video files;
 - parse CUE sheets or pair CUE with audio;
 - infer canonical tracks, releases, performances, artwork roles, or metadata identity;
-- create preparation, waveform, stems, playlist, or browser-row records;
+- create preparation, waveform, stems, playlist, or product-contents projection records outside
+  `primary_media_candidates`;
 - drain all candidates synchronously;
 - expose local filesystem paths to the renderer.
 

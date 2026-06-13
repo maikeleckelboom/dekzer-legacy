@@ -600,45 +600,6 @@ mod tests {
     }
 
     #[test]
-    fn equivalence_fingerprint_is_not_used_as_content_hash_evidence() {
-        let mut connection = install_test_baseline();
-        insert_source(&connection);
-        insert_source_file(&connection, 100, "Album/track.flac", 123, 456);
-        connection
-            .execute(
-                "INSERT INTO LibraryAssets (
-                     library_asset_id,
-                     equivalence_fingerprint,
-                     created_at,
-                     updated_at
-                 )
-                 VALUES (1, 'eq:opaque-caller-key', 1, 1)",
-                [],
-            )
-            .expect("insert library asset");
-
-        commit_source_fact(
-            &mut connection,
-            200,
-            100,
-            "basis:track:100",
-            "audio",
-            Some(ContentHashEvidence {
-                algorithm: "sha256".to_string(),
-                value: "fixture-digest".to_string(),
-            }),
-        );
-
-        let facts = read_observed_file_facts_for_source_file(&connection, 100)
-            .expect("read observed facts")
-            .expect("facts exist");
-        let hash = facts.content_hash.expect("content hash");
-        assert_eq!(hash.algorithm, "sha256");
-        assert_eq!(hash.value, "fixture-digest");
-        assert_ne!(hash.value, "eq:opaque-caller-key");
-    }
-
-    #[test]
     fn cue_source_file_holds_evidence_without_audio_pairing_or_identity_creation() {
         let mut connection = install_test_baseline();
         insert_source(&connection);
@@ -677,23 +638,5 @@ mod tests {
                 .is_none(),
             "CUE evidence must not be copied to the adjacent audio file"
         );
-
-        let library_asset_count: i64 = connection
-            .query_row("SELECT COUNT(*) FROM LibraryAssets", [], |row| row.get(0))
-            .expect("count library assets");
-        let attachment_count: i64 = connection
-            .query_row("SELECT COUNT(*) FROM LibraryAssetAttachments", [], |row| {
-                row.get(0)
-            })
-            .expect("count attachments");
-        let segment_set_count: i64 = connection
-            .query_row("SELECT COUNT(*) FROM SourceSegmentSets", [], |row| {
-                row.get(0)
-            })
-            .expect("count segment sets");
-
-        assert_eq!(library_asset_count, 0);
-        assert_eq!(attachment_count, 0);
-        assert_eq!(segment_set_count, 0);
     }
 }

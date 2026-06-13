@@ -88,11 +88,11 @@ will own future CUE parse observations on its own row in a separate gate.
 Media probe v0 does not:
 
 - promote attachments into `primaryMedia`;
-- create `LibraryAssets`, `LibraryAssetAttachments`, `content_attachments`, or `source_file_attachment_links`;
+- create `content_attachments`, `source_file_attachment_links`, `primary_media_candidates`, or track identity rows;
 - infer track identity;
 - parse CUE sheets or associate CUE files with audio;
 - generate waveform data;
-- create stems, prep readiness, playlists UI, crates, sleeves, chips, badges, or renderer UI.
+- create stems, preparation readiness, playlists UI, crates, sleeves, chips, badges, or renderer UI.
 
 ## v0 Completion Heuristic
 

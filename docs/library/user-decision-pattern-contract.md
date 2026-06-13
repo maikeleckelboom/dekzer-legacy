@@ -53,7 +53,7 @@ Projections may compute effective state, current/stale labels, review state, cou
 projection must be rebuildable from its owners and must not be treated as durable decision truth.
 
 Current examples include attachment occurrence reads, track identity review candidates, source integrity facets,
-contents reads, navigation/browser rows, and generated renderer-facing contract shapes.
+contents reads, navigation rows, and generated renderer-facing contract shapes.
 
 ## Decision Verbs
 
@@ -270,13 +270,8 @@ classifies current and legacy decision-like concepts against A-6. It is not a mi
 | Track identity decision commands | `crates/library-boundary-protocol/src/commands/track_identity_decisions.rs`; `crates/library-boundary-service/src/track_identity_decisions.rs`; desktop trackIdentity adapters | Boundary protocol/service/app adapters | Candidate id | Command surface | Conforming but narrow. Transport exposes accept/reject/defer without adding semantics. |
 | Search/filter index and contents omission metadata | `docs/library/search-filter-substrate-contract.md`; `crates/library-store-sqlite/src/read_models/search_filter`; contents read docs | Search/filter and contents read authorities | Source-file/content read rows | Projection/index | Unrelated. Must not become ignore/reject authority. |
 | Source integrity/collection health facets | `docs/library/health/source-integrity-read-model-contract.md`; source integrity reads | Source integrity read model | Source-scoped health facets | Projection | Already conforming. Read-only health; no decision creation. |
-| Library assets and equivalence fingerprint | `LibraryAssets`; `crates/library-store-sqlite/src/authority/library_asset/library_assets.rs` | Legacy library asset authority | Library asset id/equivalence fingerprint | Legacy identity-like record | Dormant/legacy and must not be reused for A-6, attachment identity, or future track identity. |
-| Source segment acceptance | `SourceSegmentSets`; `SourceSegments`; `crates/library-store-sqlite/src/authority/promotion/accept_segmentation.rs` | Legacy segmentation promotion | Source file/segment set/artifact | Legacy accepted artifact/configuration | Dormant/legacy and must not be reused for CUE split, association, or A-6 split decisions. |
-| Library asset attachments | `LibraryAssetAttachments`; `crates/library-store-sqlite/src/authority/library_asset/attachments.rs` | Legacy library asset attachment authority | Library asset plus source segment | Legacy attachment/configuration | Dormant/legacy and must not be reused for attachment occurrence or source-file preference. |
-| Library asset metadata corrections | `LibraryAssetMetadataCorrections`; `crates/library-store-sqlite/src/authority/library_asset/metadata_corrections.rs` | Legacy library asset metadata correction authority | Library asset field | Legacy user correction | Needs future migration. Do not reuse as general override authority for canonical tracks or future stable item refs. |
-| Prep policies, assignments, resolved targets | `PrepPolicies`; `PrepAssignments`; `ResolvedLibraryAssetPrepTargets`; `crates/library-store-sqlite/src/authority/work/prep_policies.rs`; `prep_assignments.rs`; `resolved_targets.rs` | Legacy prep/work authority | Library/source/library asset prep scope | Configuration/projection | Needs future migration before prep facets are product-facing under A-6. |
 | Long-term role/classification assignments | `docs/decisions/media-role-classification.md` | Future architecture only | Future library item/file identity | Future decision/classification | Future architecture. Compatible with A-6 separation but not current schema authority. |
 | V1 preparation substrate identity resolution notes | `docs/decisions/library-preparation-substrate.md` | Preparation substrate doctrine | Future track identity/prep facets | Future candidate/decision pattern | Conforming at doctrine level. Future implementation must use A-6 target/provenance/recompute gates. |
 
 No audited current code path requires A-5 semantics to change. Existing conflicts are limited to dormant or future
-vocabulary that must not be reused without an A-6-compliant migration.
+vocabulary that must not be reused without an A-6-compliant implementation contract.

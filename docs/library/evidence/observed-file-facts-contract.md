@@ -58,17 +58,13 @@ and observed-facts authority path. The production batch path does not accept ren
 paths. It resolves each `source_file_id` from durable source state before reading bytes. The algorithm string is
 `blake3`, and the value is the canonical lowercase hex digest.
 
-BLAKE3 is content evidence, not identity by itself. The hash job does not create `LibraryAssets`,
-`LibraryAssetAttachments`, `SourceSegmentSets`, `SourceSegments`, track rows, attachment identity, or CUE-to-audio
-pairing.
+BLAKE3 is content evidence, not identity by itself. The hash job does not create attachment identity, primary-media
+candidates, track identity rows, preparation rows, waveform artifacts, or CUE-to-audio pairing.
 
 The job captures the current `source_files` basis before reading bytes and re-reads it before committing. If the basis
 changed while hashing was in flight, the job rejects the commit with a typed basis-change result instead of recording
 evidence that could appear current for the wrong row state. Missing or unreadable filesystem paths fail as typed IO
 errors and do not create `SourceFacts`.
-
-`LibraryAssets.equivalence_fingerprint` is not a content hash. It must not be copied into observed file facts as hash
-evidence.
 
 ## Source-File Path Resolution
 
@@ -105,7 +101,6 @@ Hash admission is bounded and deterministic. The store-owned candidate read supp
 
 A candidate needs BLAKE3 evidence when no `SourceFacts` row exists, the content hash is absent, the stored hash
 algorithm is not `blake3`, or the observed facts read model would be stale against the current `source_files` basis.
-`LibraryAssets.equivalence_fingerprint` never satisfies hash evidence.
 
 The batch path uses a default bounded limit when none is supplied and caps oversized requests. It orders candidates by
 lowercased `relative_path`, then `source_file_id`. Each candidate is resolved through the backend resolver and then
@@ -141,10 +136,10 @@ relative path, root escape, physical-file missing/blocked, file open/read failur
 `sourceFailure` distinguishes source-level problems from an empty candidate set. A source that is unknown, unavailable,
 missing, or blocked must not be reported as an empty success.
 
-Hash evidence commits still go through the inspect-source artifact and observed-facts authority path. After a successful
-hash commit, the store reseeds and invalidates the current `LibraryBrowser` maintained scope. This is the narrowest
-current event scope available for source-file observed-facts changes; no separate observed-facts event scope exists yet.
-The service also runs one bounded internal attachment materialization unit for the same source after a successful
+Hash evidence commits still go through the inspect-source artifact and observed-facts authority path. Hash evidence
+commits do not claim a maintained contents or navigation scope by themselves; attachment, primary-media, and track
+identity maintenance are explicit follow-on phases. The service also runs one bounded internal attachment
+materialization unit for the same source after a successful
 non-source-failure manual hash batch. The public hash reply remains hash-only and does not report attachment work.
 
 ## Media Probe Policy
@@ -192,7 +187,7 @@ The current trigger model is intentionally narrow:
 - successful root scan completion requests one bounded maintenance unit for the completed source;
 - duplicate source maintenance requests are deduped while pending or active;
 - blocked, failed, or cancelled scans do not automatically request source maintenance;
-- maintained `LibraryBrowser` invalidation alone does not schedule maintenance unless it came from the successful scan
+- maintained snapshot invalidation alone does not schedule maintenance unless it came from the successful scan
   completion path or an explicit maintenance command.
 
 Maintenance uses the existing store-owned `hash_source_file_blake3_batch`,

@@ -30,7 +30,7 @@ scope:
 This document defines how Dekzer library representation roots may be realized, grouped, split, and placed in the
 workspace.
 
-[The Library Browser Representation Contract](representation-contract.md) defines what library representations mean.
+[The Library Browse Representation Contract](representation-contract.md) defines what library representations mean.
 
 This document defines how those representations may appear.
 

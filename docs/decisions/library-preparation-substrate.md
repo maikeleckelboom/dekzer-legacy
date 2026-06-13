@@ -1,6 +1,6 @@
 # Library Preparation Substrate
 
-**Status:** ACCEPTED FOR V1 SCHEMA IMPLEMENTATION
+**Status:** HISTORICAL / FUTURE ARCHITECTURE — not current schema authority
 **Location:** `docs/decisions/library-preparation-substrate.md`
 
 ---
@@ -13,8 +13,8 @@ track and whether it is ready). These two phases are distinct in time and
 in ownership, but they share a substrate: the track identity layer sits
 between them.
 
-The previous schema epoch used a `LibraryAssets` table as the primary object
-identity. That model conflates file-level observation with collection-level
+The previous schema epoch used a deleted asset table as the primary object
+identity. That model conflated file-level observation with collection-level
 identity. A file is not a track. A track is a collection identity decision,
 which may be backed by one or many files across one or many sources.
 
@@ -126,7 +126,7 @@ Preparation work
 
 Browser projections
   navigation rows
-  track browser rows
+  track projection rows
 ```
 
 ---
@@ -210,7 +210,7 @@ facet_key              — unique stable identifier
                           loudness_lufs, musical_key, track_energy,
                           phrase_markers, stem_separation, notes, transition_ideas)
 subject_kind           — which subject kind this facet applies to
-                         (track, track_attachment, source_file, source_segment)
+                         (track, track_attachment, source_file, source_fragment)
 display_name           — human-readable label
 evidence_schema_version — version of the artifact schema this facet produces
 definition_version     — version of the facet definition itself
@@ -254,7 +254,7 @@ track-scoped. Allowed v1 subject kinds:
 
 ```text
 source_file        — container readability, tag parse, format detection
-source_segment     — (reserved; disc image chapter-level analysis)
+source_fragment    — (reserved; disc image chapter-level analysis)
 track              — cue points, notes, transition ideas
 track_attachment   — waveform, duration, loudness, audio fingerprint, beat grid
 ```
@@ -379,8 +379,7 @@ replacement, not a production migration.
 
 ### Phase A: Replace baseline schema
 
-Create the v1 tables as the new baseline. Remove `LibraryAssets` and all
-`library_asset_id` references. Do not add compatibility views or aliases.
+Create the v1 tables as the new baseline. Remove deleted asset-table references. Do not add compatibility views or aliases.
 Do not add dual-write paths. The legacy model is gone.
 
 ### Phase B: Port code references
@@ -403,7 +402,7 @@ to Phase E until all checks pass.
 
 ### Phase E: Delete legacy vocabulary
 
-Remove all `LibraryAssets` naming from code, docs, tests, and fixtures.
+Remove all deleted asset-table naming from code, docs, tests, and fixtures.
 Remove any temporary conversion helpers written in Phase C. The baseline
 is clean when no file in the repository references the legacy epoch.
 
@@ -423,7 +422,7 @@ is clean when no file in the repository references the legacy epoch.
 
 **Accepted costs:**
 
-- Track browser rows require a materialization step. Cold starts or large
+- Track projection rows require a materialization step. Cold starts or large
   invalidations need a rebuild pass before the renderer can show results.
 - Identity resolution requires a separate decision record even for obvious
   single-match cases. This is intentional: every claim is auditable.

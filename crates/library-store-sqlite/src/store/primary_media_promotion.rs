@@ -1024,7 +1024,7 @@ mod tests {
     }
 
     #[test]
-    fn promotion_creates_no_tracks_prep_waveforms_or_legacy_asset_rows() {
+    fn promotion_writes_only_primary_media_candidates() {
         let fixture = PrimaryMediaPromotionFixture::new();
         fixture.insert_source_file(100, "Album/track.wav");
         fixture.link_attachment(100, HASH_A);
@@ -1032,41 +1032,9 @@ mod tests {
 
         fixture.promote(10);
 
-        for table in [
-            "LibraryAssets",
-            "LibraryAssetAttachments",
-            "LibraryBrowserRows",
-            "SourceSegmentSets",
-            "SourceSegments",
-            "PrepAssignments",
-            "ResolvedLibraryAssetPrepTargets",
-            "Playlists",
-            "PlaylistEntries",
-        ] {
-            assert_eq!(fixture.count_rows(table), 0, "{table} must remain empty");
-        }
-        let connection = fixture.store.open_read_connection().expect("open read");
-        for absent_or_future_table in [
-            "Tracks",
-            "TrackRows",
-            "LibraryTracks",
-            "Waveforms",
-            "Stems",
-            "PrepRows",
-            "PreparationRows",
-        ] {
-            let count = connection
-                .query_row(
-                    "SELECT COUNT(*)
-                     FROM sqlite_master
-                     WHERE type = 'table'
-                       AND name = ?1",
-                    [absent_or_future_table],
-                    |row| row.get::<_, i64>(0),
-                )
-                .expect("check table existence");
-            assert_eq!(count, 0, "{absent_or_future_table} must be absent");
-        }
+        assert_eq!(fixture.count_rows("primary_media_candidates"), 1);
+        assert_eq!(fixture.count_rows("track_identity_candidates"), 0);
+        assert_eq!(fixture.count_rows("track_identity_decisions"), 0);
     }
 
     fn primary_media_policy() -> StoreContentsReadPolicy {

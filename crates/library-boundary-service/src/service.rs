@@ -2412,17 +2412,6 @@ mod tests {
             "test fixture uses unique bytes, so one bounded unit creates one attachment per link"
         );
 
-        let events_after_hash = read_after_events(&service, None, 128);
-        assert!(
-            events_after_hash.events.iter().any(|e| {
-                let LibraryBoundaryEvent::MaintainedSnapshotInvalidated(event) = e else {
-                    return false;
-                };
-                event.invalidation.scope == MaintainedSnapshotScope::Contents
-            }),
-            "hash evidence changes must publish the narrow current maintained scope"
-        );
-
         let runs = service.source_maintenance.completed_runs_for_test();
         let run = runs
             .iter()

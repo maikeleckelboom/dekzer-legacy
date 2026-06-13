@@ -95,8 +95,6 @@ mod tests {
         "ArtifactFileStoreEntries",
         "ArtifactInlinePayloads",
         "Artifacts",
-        "CapabilityDependencies",
-        "CapabilitySpecs",
         "LibraryMetadata",
         "browser_user_order",
         "browser_user_prefs",
@@ -111,22 +109,10 @@ mod tests {
         "search_filter_index_rows",
         "search_filter_index_source_coverage",
         "navigation_rows",
-        "LibraryBrowserRows",
-        "LibraryBrowserRows_fts",
-        "LibraryAssetAttachments",
-        "LibraryAssetCapabilities",
-        "LibraryAssetMetadataCorrections",
-        "LibraryAssets",
-        "PlaylistEntries",
-        "Playlists",
-        "PrepAssignments",
-        "PrepPolicies",
-        "PrepPolicyTargets",
         "ProjectionChangeLog",
         "ProjectionCursors",
         "ProjectionRetentionWatermarks",
         "ProjectionSubscribers",
-        "ResolvedLibraryAssetPrepTargets",
         "content_attachments",
         "primary_media_candidates",
         "source_directories",
@@ -134,8 +120,6 @@ mod tests {
         "SourceFacts",
         "source_files",
         "source_locators",
-        "SourceSegmentSets",
-        "SourceSegments",
         "track_identity_candidate_evidence",
         "track_identity_candidate_members",
         "track_identity_candidates",
@@ -166,7 +150,6 @@ mod tests {
                  FROM sqlite_master
                  WHERE type = 'table'
                    AND name NOT LIKE 'sqlite_%'
-                   AND name NOT LIKE 'LibraryBrowserRows_fts_%'
                    AND name NOT LIKE 'search_filter_index_fts_%'
                  ORDER BY name",
             )
@@ -269,39 +252,6 @@ mod tests {
             metadata_rows,
             vec![(1, super::canonical_baseline_generation().to_string())]
         );
-    }
-
-    #[test]
-    fn canonical_baseline_includes_durable_playlist_authority_tables() {
-        let connection = install_test_baseline();
-
-        assert_eq!(
-            table_column_names(&connection, "Playlists"),
-            vec!["playlist_id", "display_name", "created_at", "updated_at"]
-        );
-        assert_eq!(
-            table_column_names(&connection, "PlaylistEntries"),
-            vec![
-                "playlist_entry_id",
-                "playlist_id",
-                "library_asset_id",
-                "position",
-                "created_at",
-                "updated_at",
-            ]
-        );
-
-        let foreign_keys = table_foreign_keys(&connection, "PlaylistEntries");
-        assert!(foreign_keys.contains(&(
-            "Playlists".to_string(),
-            "playlist_id".to_string(),
-            "CASCADE".to_string(),
-        )));
-        assert!(foreign_keys.contains(&(
-            "LibraryAssets".to_string(),
-            "library_asset_id".to_string(),
-            "CASCADE".to_string(),
-        )));
     }
 
     #[test]
@@ -982,59 +932,6 @@ mod tests {
     }
 
     #[test]
-    fn baseline_schema_defines_library_asset_durable_tables() {
-        let connection = install_test_baseline();
-        let tables = sorted_user_table_names(&connection);
-
-        for table_name in [
-            "LibraryAssets",
-            "LibraryAssetAttachments",
-            "LibraryAssetMetadataCorrections",
-            "LibraryAssetCapabilities",
-            "ResolvedLibraryAssetPrepTargets",
-            "LibraryBrowserRows",
-            "LibraryBrowserRows_fts",
-        ] {
-            assert!(
-                tables.iter().any(|table| table == table_name),
-                "canonical library-asset table {table_name} is missing"
-            );
-        }
-
-        for table_name in [
-            "LibraryAssets",
-            "LibraryAssetAttachments",
-            "LibraryAssetMetadataCorrections",
-            "LibraryAssetCapabilities",
-            "ResolvedLibraryAssetPrepTargets",
-            "LibraryBrowserRows",
-        ] {
-            let columns = table_column_names(&connection, table_name);
-            assert!(columns.iter().any(|column| column == "library_asset_id"));
-        }
-
-        let subject_kinds = connection
-            .prepare(
-                "SELECT sql
-                 FROM sqlite_master
-                 WHERE sql LIKE '%library_asset%'",
-            )
-            .expect("prepare schema sql scan")
-            .query_map([], |row| row.get::<_, String>(0))
-            .expect("query schema sql")
-            .collect::<Result<Vec<_>, _>>()
-            .expect("collect schema sql")
-            .join("\n");
-
-        assert!(
-            subject_kinds
-                .contains("subject_kind IN ('source_file', 'library_asset', 'projection_domain')")
-        );
-        assert!(subject_kinds.contains("scope_kind IN ('library', 'source', 'library_asset')"));
-        assert!(subject_kinds.contains("resolve_library_asset"));
-    }
-
-    #[test]
     fn ensure_baseline_schema_rejects_noncanonical_database_shapes() {
         let mut connection = Connection::open_in_memory().expect("open in-memory database");
         connection
@@ -1073,7 +970,7 @@ mod tests {
     fn tampered_compared_schema_object_reports_a_precise_structural_failure() {
         let mut connection = install_test_baseline();
         connection
-            .execute_batch("DROP INDEX WorkItems_active_non_capability;")
+            .execute_batch("DROP INDEX WorkItems_active_work;")
             .expect("drop compared index");
 
         let detail = malformed_detail(
@@ -1085,7 +982,7 @@ mod tests {
             "expected compared-index diagnostic, found {detail}"
         );
         assert!(
-            detail.contains("WorkItems_active_non_capability"),
+            detail.contains("WorkItems_active_work"),
             "expected missing index name in diagnostic, found {detail}"
         );
     }
@@ -1095,10 +992,11 @@ mod tests {
         let connection = install_test_baseline();
         connection
             .execute(
-                "DELETE FROM CapabilitySpecs WHERE capability_kind = 'waveform'",
+                "DELETE FROM search_filter_index_metadata
+                 WHERE search_filter_index_id = 1",
                 [],
             )
-            .expect("tamper seeded capability row");
+            .expect("tamper seeded search/filter metadata row");
 
         let canonical = snapshot::canonical_snapshot().expect("build canonical snapshot");
         let live = snapshot::live_snapshot(&connection).expect("build live snapshot");
@@ -1109,8 +1007,8 @@ mod tests {
             seeds::validate_seed_rows(&connection).expect_err("reject seed drift"),
         );
         assert!(
-            detail.contains("CapabilitySpecs"),
-            "expected capability-spec diagnostic, found {detail}"
+            detail.contains("search_filter_index_metadata"),
+            "expected search/filter metadata diagnostic, found {detail}"
         );
     }
 
@@ -1139,97 +1037,26 @@ mod tests {
             connection.query_row("SELECT COUNT(*) FROM LibraryMetadata", [], |row| row.get(0))?;
         assert_eq!(metadata_row_count, 1);
 
-        let capability_specs = connection
-            .prepare(
-                "SELECT capability_kind, display_name, quality_aware, default_profile_key
-                 FROM CapabilitySpecs
-                 ORDER BY capability_kind",
-            )?
-            .query_map([], |row| {
+        let search_filter_metadata = connection.query_row(
+            "SELECT search_filter_index_id, indexer_version, generation, state
+             FROM search_filter_index_metadata",
+            [],
+            |row| {
                 Ok((
-                    row.get::<_, String>(0)?,
+                    row.get::<_, i64>(0)?,
                     row.get::<_, String>(1)?,
-                    row.get::<_, i64>(2)? != 0,
+                    row.get::<_, i64>(2)?,
                     row.get::<_, String>(3)?,
                 ))
-            })?
-            .collect::<Result<Vec<_>, _>>()?;
+            },
+        )?;
         assert_eq!(
-            capability_specs,
-            vec![
-                (
-                    "beatgrid".to_string(),
-                    "Beatgrid".to_string(),
-                    false,
-                    "default".to_string(),
-                ),
-                (
-                    "musical_key".to_string(),
-                    "Musical Key".to_string(),
-                    false,
-                    "default".to_string(),
-                ),
-                (
-                    "stems".to_string(),
-                    "Stems".to_string(),
-                    true,
-                    "default".to_string(),
-                ),
-                (
-                    "tempo".to_string(),
-                    "Tempo".to_string(),
-                    false,
-                    "default".to_string(),
-                ),
-                (
-                    "waveform".to_string(),
-                    "Waveform".to_string(),
-                    true,
-                    "default".to_string(),
-                ),
-            ]
+            search_filter_metadata,
+            (1, "search_filter_v0".to_string(), 0, "ready".to_string())
         );
-
-        let dependency_row_count: i64 =
-            connection.query_row("SELECT COUNT(*) FROM CapabilityDependencies", [], |row| {
-                row.get(0)
-            })?;
-        assert_eq!(dependency_row_count, 0);
 
         seeds::validate_seed_rows(&connection)?;
         Ok(())
-    }
-
-    #[test]
-    fn validate_seed_rows_rejects_unexpected_capability_dependency_rows() {
-        let connection = install_test_baseline();
-        connection
-            .execute(
-                "INSERT INTO CapabilityDependencies (
-                     upstream_capability_kind,
-                     downstream_capability_kind,
-                     invalidation_mode,
-                     created_at,
-                     updated_at
-                 )
-                 VALUES ('beatgrid', 'tempo', 'mark_stale', 1, 1)",
-                [],
-            )
-            .expect("tamper capability-dependency seed rows");
-
-        let canonical = snapshot::canonical_snapshot().expect("build canonical snapshot");
-        let live = snapshot::live_snapshot(&connection).expect("build live snapshot");
-        compare::compare_snapshots(&canonical, &live)
-            .expect("seed drift should not change structural schema");
-
-        let detail = malformed_detail(
-            seeds::validate_seed_rows(&connection)
-                .expect_err("reject unexpected capability-dependency seed drift"),
-        );
-        assert!(
-            detail.contains("CapabilityDependencies"),
-            "expected CapabilityDependencies diagnostic, found {detail}"
-        );
     }
 
     #[test]
@@ -1292,10 +1119,8 @@ mod tests {
                 matches!(
                     object.reason,
                     introspection::IgnoredObjectReason::SqliteInternalPrefix
-                        | introspection::IgnoredObjectReason::LibraryBrowserFtsShadowObject
                         | introspection::IgnoredObjectReason::SearchFilterIndexFtsShadowObject
                 ) && (object.name.starts_with("sqlite_")
-                    || object.name.starts_with("LibraryBrowserRows_fts_")
                     || object.name.starts_with("search_filter_index_fts_"))
             }),
             "only sqlite-internal objects may be ignored: {:?}",
@@ -1308,11 +1133,10 @@ mod tests {
         let connection = install_test_baseline();
         connection
             .execute_batch(
-                "DROP INDEX WorkItems_active_non_capability;
-                 CREATE UNIQUE INDEX WorkItems_active_non_capability
+                "DROP INDEX WorkItems_active_work;
+                 CREATE UNIQUE INDEX WorkItems_active_work
                      ON WorkItems (subject_kind, subject_id, work_kind, basis_fingerprint)
-                     WHERE work_kind <> 'compute_capability'
-                       AND state IN ('queued', 'leased');",
+                     WHERE state IN ('queued', 'leased');",
             )
             .expect("tamper partial index predicate");
 
@@ -1323,7 +1147,7 @@ mod tests {
                 .expect_err("reject partial-index predicate drift"),
         );
         assert!(
-            detail.contains("WorkItems_active_non_capability"),
+            detail.contains("WorkItems_active_work"),
             "expected drifting partial index name in diagnostic, found {detail}"
         );
         assert!(

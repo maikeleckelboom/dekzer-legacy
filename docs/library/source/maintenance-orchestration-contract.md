@@ -188,9 +188,9 @@ Each phase commits through the existing authority path:
   active exact-content candidates, preserves candidate/member/evidence provenance, and skips candidates with current
   user reject/defer decisions.
 
-After each phase, the service publishes maintained snapshot invalidations from current maintained revisions. The narrow
-honest maintained scope today is `LibraryBrowser`; attachment identity reads remain explicit until a precise maintained
-attachment scope exists. No new source-maintenance event family is introduced in v0.
+After each phase, the service publishes maintained snapshot invalidations only from current maintained revisions.
+Attachment identity reads remain explicit until a precise maintained attachment scope exists. No new source-maintenance
+event family is introduced in v0.
 
 ## Non-Goals
 
@@ -201,7 +201,7 @@ Source maintenance v0 does not:
 - make exact track identity decisions canonical tracks;
 - parse CUE sheets or pair CUE with audio;
 - probe video files;
-- generate waveform data, stems, prep rows, artwork intelligence, playlist UI, crates, sleeves, badges, chips, or
+- generate waveform data, stems, preparation rows, artwork intelligence, playlist UI, crates, sleeves, badges, chips, or
   visible renderer status;
 - create durable scheduler state or duplicate scheduler state in the renderer;
 - resolve filesystem paths outside the backend.

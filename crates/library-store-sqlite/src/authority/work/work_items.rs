@@ -6,17 +6,14 @@ use crate::authority::work::work_runs::{
 use crate::authority::write_lane::AdmittedWrite;
 use crate::{LibrarySqliteError, LibrarySqliteResult};
 use library_domain::{
-    CapabilityKind, MachineWorkKind, ProjectionDomain, SourceFileId, WorkItemId, WorkItemState,
-    WorkPriorityClass, WorkRunOutcome, WorkSubject, WorkSubjectKind,
+    MachineWorkKind, ProjectionDomain, SourceFileId, WorkItemId, WorkItemState, WorkPriorityClass,
+    WorkRunOutcome, WorkSubject, WorkSubjectKind,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MachineWorkKey {
     pub subject: WorkSubject,
     pub work_kind: MachineWorkKind,
-    pub capability_kind: Option<CapabilityKind>,
-    pub target_profile_key: Option<String>,
-    pub target_quality: Option<i64>,
     pub basis_fingerprint: String,
 }
 
@@ -69,9 +66,6 @@ pub struct ClaimedMachineWorkItem {
     pub work_item_id: WorkItemId,
     pub subject: WorkSubject,
     pub work_kind: MachineWorkKind,
-    pub capability_kind: Option<CapabilityKind>,
-    pub target_profile_key: Option<String>,
-    pub target_quality: Option<i64>,
     pub priority_class: WorkPriorityClass,
     pub basis_fingerprint: String,
     pub state: WorkItemState,
@@ -157,9 +151,6 @@ impl<'write, 'conn> WorkItemsAuthorityTx<'write, 'conn> {
                  subject_kind,
                  subject_id,
                  work_kind,
-                 capability_kind,
-                 target_profile_key,
-                 target_quality,
                  priority_class,
                  basis_fingerprint,
                  state,
@@ -171,18 +162,11 @@ impl<'write, 'conn> WorkItemsAuthorityTx<'write, 'conn> {
                  created_at,
                  updated_at
              )
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'queued', NULL, 0, NULL, NULL, NULL, ?9, ?9)",
+             VALUES (?1, ?2, ?3, ?4, ?5, 'queued', NULL, 0, NULL, NULL, NULL, ?6, ?6)",
             params![
                 input.key.subject.kind().as_str(),
                 subject_id.as_str(),
                 input.key.work_kind.as_str(),
-                input
-                    .key
-                    .capability_kind
-                    .as_ref()
-                    .map(CapabilityKind::as_str),
-                input.key.target_profile_key.as_deref(),
-                input.key.target_quality,
                 input.priority_class.as_str(),
                 input.key.basis_fingerprint.as_str(),
                 input.queued_at,
@@ -204,9 +188,6 @@ impl<'write, 'conn> WorkItemsAuthorityTx<'write, 'conn> {
             key: MachineWorkKey {
                 subject: WorkSubject::SourceFile(input.source_file_id),
                 work_kind: MachineWorkKind::InspectSource,
-                capability_kind: None,
-                target_profile_key: None,
-                target_quality: None,
                 basis_fingerprint: input.basis_fingerprint.clone(),
             },
             priority_class: input.priority_class,
@@ -222,9 +203,6 @@ impl<'write, 'conn> WorkItemsAuthorityTx<'write, 'conn> {
             key: MachineWorkKey {
                 subject: WorkSubject::ProjectionDomain(input.projection_domain),
                 work_kind: MachineWorkKind::RebuildProjection,
-                capability_kind: None,
-                target_profile_key: None,
-                target_quality: None,
                 basis_fingerprint: input.basis_fingerprint.clone(),
             },
             priority_class: input.priority_class,
@@ -452,51 +430,25 @@ impl<'write, 'conn> WorkItemsAuthorityTx<'write, 'conn> {
         key: &MachineWorkKey,
     ) -> LibrarySqliteResult<Option<(WorkItemId, WorkItemState)>> {
         let subject_id = key.subject.storage_id();
-        let row = if key.work_kind == MachineWorkKind::ComputeCapability {
-            self.tx
-                .query_row(
-                    "SELECT work_item_id, state
-                     FROM WorkItems
-                     WHERE subject_kind = ?1
-                       AND subject_id = ?2
-                       AND work_kind = ?3
-                       AND capability_kind = ?4
-                       AND target_profile_key = ?5
-                       AND target_quality = ?6
-                       AND basis_fingerprint = ?7
-                       AND state IN ('queued', 'leased', 'blocked')",
-                    params![
-                        key.subject.kind().as_str(),
-                        subject_id.as_str(),
-                        key.work_kind.as_str(),
-                        key.capability_kind.as_ref().map(CapabilityKind::as_str),
-                        key.target_profile_key.as_deref(),
-                        key.target_quality,
-                        key.basis_fingerprint.as_str(),
-                    ],
-                    |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
-                )
-                .optional()?
-        } else {
-            self.tx
-                .query_row(
-                    "SELECT work_item_id, state
-                     FROM WorkItems
-                     WHERE subject_kind = ?1
-                       AND subject_id = ?2
-                       AND work_kind = ?3
-                       AND basis_fingerprint = ?4
-                       AND state IN ('queued', 'leased', 'blocked')",
-                    params![
-                        key.subject.kind().as_str(),
-                        subject_id.as_str(),
-                        key.work_kind.as_str(),
-                        key.basis_fingerprint.as_str(),
-                    ],
-                    |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
-                )
-                .optional()?
-        };
+        let row = self
+            .tx
+            .query_row(
+                "SELECT work_item_id, state
+                 FROM WorkItems
+                 WHERE subject_kind = ?1
+                   AND subject_id = ?2
+                   AND work_kind = ?3
+                   AND basis_fingerprint = ?4
+                   AND state IN ('queued', 'leased', 'blocked')",
+                params![
+                    key.subject.kind().as_str(),
+                    subject_id.as_str(),
+                    key.work_kind.as_str(),
+                    key.basis_fingerprint.as_str(),
+                ],
+                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
+            )
+            .optional()?;
 
         row.map(|(work_item_id, state)| {
             Ok((parse_work_item_id(work_item_id)?, parse_state(&state)?))
@@ -515,9 +467,6 @@ pub(crate) fn load_work_item_row(
                 subject_kind,
                 subject_id,
                 work_kind,
-                capability_kind,
-                target_profile_key,
-                target_quality,
                 priority_class,
                 basis_fingerprint,
                 state,
@@ -537,19 +486,16 @@ pub(crate) fn load_work_item_row(
                     row.get::<_, String>(1)?,
                     row.get::<_, String>(2)?,
                     row.get::<_, String>(3)?,
-                    row.get::<_, Option<String>>(4)?,
-                    row.get::<_, Option<String>>(5)?,
-                    row.get::<_, Option<i64>>(6)?,
-                    row.get::<_, String>(7)?,
-                    row.get::<_, String>(8)?,
-                    row.get::<_, String>(9)?,
-                    row.get::<_, Option<i64>>(10)?,
-                    row.get::<_, i64>(11)?,
-                    row.get::<_, Option<String>>(12)?,
-                    row.get::<_, Option<String>>(13)?,
-                    row.get::<_, Option<String>>(14)?,
-                    row.get::<_, i64>(15)?,
-                    row.get::<_, i64>(16)?,
+                    row.get::<_, String>(4)?,
+                    row.get::<_, String>(5)?,
+                    row.get::<_, String>(6)?,
+                    row.get::<_, Option<i64>>(7)?,
+                    row.get::<_, i64>(8)?,
+                    row.get::<_, Option<String>>(9)?,
+                    row.get::<_, Option<String>>(10)?,
+                    row.get::<_, Option<String>>(11)?,
+                    row.get::<_, i64>(12)?,
+                    row.get::<_, i64>(13)?,
                 ))
             },
         )
@@ -566,19 +512,16 @@ pub(crate) fn load_work_item_row(
         work_item_id: parse_work_item_id(raw.0)?,
         subject: parse_work_subject(subject_kind, &raw.2)?,
         work_kind: parse_work_kind(&raw.3)?,
-        capability_kind: raw.4.as_deref().map(parse_capability_kind).transpose()?,
-        target_profile_key: raw.5,
-        target_quality: raw.6,
-        priority_class: parse_priority_class(&raw.7)?,
-        basis_fingerprint: raw.8,
-        state: parse_state(&raw.9)?,
-        leased_until: raw.10,
-        attempt_count: raw.11,
-        blocked_reason: raw.12,
-        failure_kind: raw.13,
-        error_detail: raw.14,
-        created_at: raw.15,
-        updated_at: raw.16,
+        priority_class: parse_priority_class(&raw.4)?,
+        basis_fingerprint: raw.5,
+        state: parse_state(&raw.6)?,
+        leased_until: raw.7,
+        attempt_count: raw.8,
+        blocked_reason: raw.9,
+        failure_kind: raw.10,
+        error_detail: raw.11,
+        created_at: raw.12,
+        updated_at: raw.13,
     })
 }
 
@@ -590,33 +533,13 @@ fn validate_work_key(key: &MachineWorkKey) -> LibrarySqliteResult<()> {
     }
 
     match key.work_kind {
-        MachineWorkKind::ComputeCapability => {
-            if !matches!(key.subject, WorkSubject::LibraryAsset(_)) {
-                return Err(LibrarySqliteError::WriteInvariant(
-                    "compute_capability work must target subject_kind=library_asset".to_string(),
-                ));
-            }
-            if key.capability_kind.is_none() {
-                return Err(LibrarySqliteError::WriteInvariant(
-                    "compute_capability work requires capability_kind, target_profile_key, and target_quality".to_string(),
-                ));
-            }
-            if key.target_profile_key.as_deref().is_none() || key.target_quality.is_none() {
-                return Err(LibrarySqliteError::WriteInvariant(
-                    "compute_capability work requires capability_kind, target_profile_key, and target_quality".to_string(),
-                ));
-            }
-        }
-        MachineWorkKind::InspectSource
-        | MachineWorkKind::AcceptSegmentation
-        | MachineWorkKind::RebindSource => {
+        MachineWorkKind::InspectSource => {
             if !matches!(key.subject, WorkSubject::SourceFile(_)) {
                 return Err(LibrarySqliteError::WriteInvariant(format!(
                     "{} work must target subject_kind=source_file",
                     key.work_kind.as_str()
                 )));
             }
-            require_non_capability_fields_absent(key)?;
         }
         MachineWorkKind::RebuildProjection => {
             if !matches!(key.subject, WorkSubject::ProjectionDomain(_)) {
@@ -625,39 +548,15 @@ fn validate_work_key(key: &MachineWorkKey) -> LibrarySqliteResult<()> {
                         .to_string(),
                 ));
             }
-            require_non_capability_fields_absent(key)?;
         }
-        MachineWorkKind::ResolveLibraryAsset => require_non_capability_fields_absent(key)?,
     }
 
     Ok(())
 }
 
-fn require_non_capability_fields_absent(key: &MachineWorkKey) -> LibrarySqliteResult<()> {
-    if key.capability_kind.is_some()
-        || key.target_profile_key.is_some()
-        || key.target_quality.is_some()
-    {
-        Err(LibrarySqliteError::WriteInvariant(format!(
-            "{} work must not set capability fields",
-            key.work_kind.as_str()
-        )))
-    } else {
-        Ok(())
-    }
-}
-
 fn parse_work_item_id(value: i64) -> LibrarySqliteResult<WorkItemId> {
     WorkItemId::new(value).ok_or_else(|| {
         LibrarySqliteError::WriteInvariant(format!("invalid WorkItems.work_item_id value: {value}"))
-    })
-}
-
-fn parse_capability_kind(value: &str) -> LibrarySqliteResult<CapabilityKind> {
-    CapabilityKind::parse(value).ok_or_else(|| {
-        LibrarySqliteError::WriteInvariant(format!(
-            "invalid WorkItems.capability_kind value: {value:?}"
-        ))
     })
 }
 

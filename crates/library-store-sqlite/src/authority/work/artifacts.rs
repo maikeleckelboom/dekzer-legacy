@@ -8,8 +8,8 @@ use crate::authority::work::work_runs::{PersistedWorkRun, WorkRunsAuthorityTx};
 use crate::authority::write_lane::AdmittedWrite;
 use crate::{LibrarySqliteError, LibrarySqliteResult};
 use library_domain::{
-    ArtifactId, ArtifactKind, ArtifactRole, ArtifactStorageKind, CapabilityKind, MachineWorkKind,
-    WorkItemId, WorkRunId, WorkSubject,
+    ArtifactId, ArtifactKind, ArtifactRole, ArtifactStorageKind, MachineWorkKind, WorkItemId,
+    WorkRunId, WorkSubject,
 };
 
 #[allow(dead_code)]
@@ -66,8 +66,6 @@ pub struct RecordedArtifact {
     pub artifact_id: ArtifactId,
     pub work_run_id: WorkRunId,
     pub subject: WorkSubject,
-    pub capability_kind: Option<CapabilityKind>,
-    pub profile_key: Option<String>,
     pub artifact_kind: ArtifactKind,
     pub artifact_role: ArtifactRole,
     pub basis_fingerprint: String,
@@ -247,25 +245,12 @@ impl<'write, 'conn> ArtifactsAuthorityTx<'write, 'conn> {
         input: &RecordArtifactInput,
         storage_kind: ArtifactStorageKind,
     ) -> LibrarySqliteResult<RecordedArtifact> {
-        let capability_kind = if context.work_item.work_kind == MachineWorkKind::ComputeCapability {
-            context.work_item.capability_kind.clone()
-        } else {
-            None
-        };
-        let profile_key = if context.work_item.work_kind == MachineWorkKind::ComputeCapability {
-            context.work_item.target_profile_key.clone()
-        } else {
-            None
-        };
-
         let subject_id = context.work_item.subject.storage_id();
         self.tx.execute(
             "INSERT INTO Artifacts (
                  work_run_id,
                  subject_kind,
                  subject_id,
-                 capability_kind,
-                 profile_key,
                  artifact_kind,
                  artifact_role,
                  adapter_key,
@@ -276,13 +261,11 @@ impl<'write, 'conn> ArtifactsAuthorityTx<'write, 'conn> {
                  payload_hash,
                  created_at
              )
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
             params![
                 context.run.work_run_id,
                 context.work_item.subject.kind().as_str(),
                 subject_id.as_str(),
-                capability_kind.as_ref().map(CapabilityKind::as_str),
-                profile_key.as_deref(),
                 input.artifact_kind.as_str(),
                 input.artifact_role.as_str(),
                 context.run.adapter_key.as_str(),
@@ -299,8 +282,6 @@ impl<'write, 'conn> ArtifactsAuthorityTx<'write, 'conn> {
             artifact_id: parse_artifact_id(self.tx.last_insert_rowid())?,
             work_run_id: input.work_run_id,
             subject: context.work_item.subject,
-            capability_kind,
-            profile_key,
             artifact_kind: input.artifact_kind,
             artifact_role: input.artifact_role,
             basis_fingerprint: input.basis_fingerprint.clone(),
@@ -357,10 +338,6 @@ fn parse_artifact_id(value: i64) -> LibrarySqliteResult<ArtifactId> {
 fn expected_primary_artifact_kind(work_kind: MachineWorkKind) -> ArtifactKind {
     match work_kind {
         MachineWorkKind::InspectSource => ArtifactKind::InspectionResult,
-        MachineWorkKind::AcceptSegmentation => ArtifactKind::SegmentationResult,
-        MachineWorkKind::ResolveLibraryAsset => ArtifactKind::DiagnosticResult,
-        MachineWorkKind::ComputeCapability => ArtifactKind::CapabilityResult,
-        MachineWorkKind::RebindSource => ArtifactKind::DiagnosticResult,
         MachineWorkKind::RebuildProjection => ArtifactKind::ProjectionSnapshot,
     }
 }

@@ -1,5 +1,4 @@
 use std::collections::HashSet;
-use std::path::{Path, PathBuf};
 
 use rusqlite::{OptionalExtension, params, params_from_iter};
 
@@ -20,7 +19,6 @@ use super::{SqliteDurableStore, bootstrap::open_connection};
 #[allow(dead_code)]
 pub(crate) enum FilesystemPathLibraryStatus {
     Indexed { root_id: i64 },
-    Attached { track_id: i64 },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -44,14 +42,6 @@ pub(crate) struct FilesystemPathRootResolution {
 pub(crate) struct LibraryNavigationPathTarget {
     pub root_id: i64,
     pub parent_node_id: Option<i64>,
-    pub track_id: Option<i64>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(dead_code)]
-pub(crate) struct TrackFilesystemPathTarget {
-    pub directory_path: String,
-    pub file_path: String,
 }
 
 impl SqliteDurableStore {
@@ -144,17 +134,6 @@ impl SqliteDurableStore {
                      root_id,
                      relative_path,
                      root_path_length,
-                     (
-                        SELECT pbr.library_asset_id
-                        FROM source_files sf
-                        JOIN LibraryBrowserRows pbr
-                          ON pbr.primary_source_file_id = sf.source_file_id
-                        WHERE sf.source_id = candidate_paths.root_id
-                          AND sf.presence_state = 'present'
-                          AND lower(sf.relative_path) = lower(candidate_paths.relative_path)
-                        ORDER BY pbr.library_asset_id ASC
-                        LIMIT 1
-                    ) AS attached_track_id,
                     EXISTS(
                         SELECT 1
                         FROM source_files sf
@@ -183,9 +162,8 @@ impl SqliteDurableStore {
              FROM candidate_paths
              ORDER BY requested_path ASC,
                       CASE
-                          WHEN attached_track_id IS NOT NULL THEN 0
-                          WHEN has_file THEN 1
-                          WHEN has_source_directory THEN 2
+                          WHEN has_file THEN 0
+                          WHEN has_source_directory THEN 1
                           ELSE 3
                       END ASC,
                       root_path_length DESC,
@@ -205,33 +183,23 @@ impl SqliteDurableStore {
                     row.get::<_, String>(0)?,
                     row.get::<_, i64>(1)?,
                     row.get::<_, String>(2)?,
-                    row.get::<_, Option<i64>>(4)?,
+                    row.get::<_, bool>(4)?,
                     row.get::<_, bool>(5)?,
-                    row.get::<_, bool>(6)?,
-                    row.get::<_, Option<String>>(7)?,
+                    row.get::<_, Option<String>>(6)?,
                 ))
             })?
             .collect::<Result<Vec<_>, _>>()?;
 
         let mut annotations = Vec::new();
         let mut seen_paths = HashSet::<String>::new();
-        for (
-            requested_path,
-            root_id,
-            relative_path,
-            attached_track_id,
-            has_file,
-            has_source_directory,
-            media_kind,
-        ) in rows
+        for (requested_path, root_id, relative_path, has_file, has_source_directory, media_kind) in
+            rows
         {
             if !seen_paths.insert(requested_path.clone()) {
                 continue;
             }
 
-            let status = if let Some(track_id) = attached_track_id {
-                Some(FilesystemPathLibraryStatus::Attached { track_id })
-            } else if has_file || has_source_directory {
+            let status = if has_file || has_source_directory {
                 Some(FilesystemPathLibraryStatus::Indexed { root_id })
             } else {
                 None
@@ -357,21 +325,13 @@ impl SqliteDurableStore {
             return Ok(Some(LibraryNavigationPathTarget {
                 root_id,
                 parent_node_id: None,
-                track_id: None,
             }));
         }
 
         let connection = open_connection(&self.path)?;
         connection
             .query_row(
-                "SELECT sf.parent_source_directory_id,
-                        (
-                            SELECT pbr.library_asset_id
-                            FROM LibraryBrowserRows pbr
-                            WHERE pbr.primary_source_file_id = sf.source_file_id
-                            ORDER BY pbr.library_asset_id ASC
-                            LIMIT 1
-                        ) AS track_id
+                "SELECT sf.parent_source_directory_id
                  FROM source_files sf
                  WHERE sf.source_id = ?1
                    AND sf.presence_state = 'present'
@@ -383,7 +343,6 @@ impl SqliteDurableStore {
                     Ok(LibraryNavigationPathTarget {
                         root_id,
                         parent_node_id: row.get(0)?,
-                        track_id: row.get(1)?,
                     })
                 },
             )
@@ -401,7 +360,6 @@ impl SqliteDurableStore {
             return Ok(Some(LibraryNavigationPathTarget {
                 root_id,
                 parent_node_id: None,
-                track_id: None,
             }));
         }
 
@@ -420,86 +378,10 @@ impl SqliteDurableStore {
                     Ok(LibraryNavigationPathTarget {
                         root_id,
                         parent_node_id: Some(row.get(0)?),
-                        track_id: None,
                     })
                 },
             )
             .optional()
             .map_err(LibrarySqliteError::from)
-    }
-
-    #[allow(dead_code)]
-    pub(crate) fn resolve_track_filesystem_path_target(
-        &self,
-        track_id: i64,
-    ) -> LibrarySqliteResult<Option<TrackFilesystemPathTarget>> {
-        let connection = open_connection(&self.path)?;
-        let Some((root_path, relative_path)) = connection
-            .query_row(
-                "SELECT COALESCE(lss.effective_path, sl.absolute_path) AS root_path,
-                        sf.relative_path
-                 FROM LibraryBrowserRows pbr
-                 JOIN source_files sf
-                   ON sf.source_file_id = pbr.primary_source_file_id
-                 LEFT JOIN source_locators sl
-                   ON sl.source_id = sf.source_id
-                 LEFT JOIN source_state lss
-                   ON lss.source_id = sf.source_id
-                 WHERE pbr.library_asset_id = ?1
-                   AND sf.presence_state = 'present'
-                 ORDER BY pbr.library_asset_id ASC, sf.source_file_id ASC
-                 LIMIT 1",
-                [track_id],
-                |row| Ok((row.get::<_, Option<String>>(0)?, row.get::<_, String>(1)?)),
-            )
-            .optional()?
-        else {
-            return Ok(None);
-        };
-
-        let Some(root_path) = root_path else {
-            return Ok(None);
-        };
-
-        let file_path = join_root_relative_path(&root_path, &relative_path);
-        let directory_path = file_path
-            .parent()
-            .map(normalize_system_path)
-            .unwrap_or(root_path);
-
-        Ok(Some(TrackFilesystemPathTarget {
-            directory_path,
-            file_path: normalize_system_path(&file_path),
-        }))
-    }
-}
-
-fn join_root_relative_path(root_path: &str, relative_path: &str) -> PathBuf {
-    let mut path = PathBuf::from(root_path);
-    for segment in relative_path.split('/') {
-        if segment.is_empty() {
-            continue;
-        }
-        path.push(segment);
-    }
-    path
-}
-
-fn normalize_system_path(path: &Path) -> String {
-    #[cfg(windows)]
-    {
-        let value = path.to_string_lossy().into_owned();
-        if let Some(rest) = value.strip_prefix(r"\\?\UNC\") {
-            return format!(r"\\{rest}");
-        }
-        if let Some(rest) = value.strip_prefix(r"\\?\") {
-            return rest.to_string();
-        }
-        value
-    }
-
-    #[cfg(not(windows))]
-    {
-        path.to_string_lossy().into_owned()
     }
 }

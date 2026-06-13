@@ -27,8 +27,8 @@ Attachment identity answers a narrow bytes-evidence question:
 - which durable attachment/content row represents that evidence;
 - which source-file rows currently link to that attachment as observed source-file occurrences.
 
-It does not create tracks, playlist items, playable primary media, preparation targets, browser rows, CUE associations,
-or user-facing readiness.
+It does not create tracks, playlist items, playable primary media, preparation targets, CUE associations, product
+contents projections, or user-facing readiness.
 
 ## Relation To Source Files
 
@@ -87,11 +87,9 @@ The current service limit constants are intentionally small:
 The service checks stop/shutdown between the hash unit and the attachment materialization unit. If shutdown arrives
 while an individual file hash is in progress, the existing hash job may finish that file before the next stop check.
 
-Attachment materialization mutates `content_attachments` and `source_file_attachment_links`. The service republishes
-existing maintained snapshot revisions after maintenance units; today, hash writes can advance the existing maintained
-`LibraryBrowser` scope, while attachment-only writes do not claim a precise public invalidation. Attachment identity
-reads are explicit snapshot reads. They are not currently attached to a maintained snapshot invalidation scope, because
-neither navigation rows nor library browser rows are an honest precise signal for attachment-only link changes.
+Attachment materialization mutates `content_attachments` and `source_file_attachment_links`. Attachment identity reads
+are explicit snapshot reads. They are not currently attached to a maintained snapshot invalidation scope, because
+navigation rows are not an honest precise signal for attachment-only link changes.
 
 ## Read Boundary
 
@@ -105,7 +103,7 @@ Service/client commands:
 
 Desktop, preload, and renderer exposure is grouped under `library.attachmentIdentity.*` and forwards only those read
 commands. Reads do not hash source files, materialize attachments, resolve filesystem paths, publish invalidation
-events, update browser rows, or populate product views.
+events, or populate product views.
 
 Read statuses are:
 
@@ -123,7 +121,7 @@ with attachment links, source files missing attachment links, and `unmaterialize
 belongs to collection health / source integrity work.
 
 The boundary deliberately does not expose duplicate, relocation, product UI, track identity, CUE association,
-`primaryMedia`, preparation, playlist, waveform, or browser-row behavior.
+`primaryMedia`, preparation, playlist, waveform, or product-contents projection behavior.
 
 ## Attachment/Content Record Authority
 
@@ -138,8 +136,7 @@ Columns:
 - `updated_at INTEGER NOT NULL`
 - `UNIQUE (content_hash_algorithm, content_hash_value)`
 
-It deliberately has no `file_kind`, `equivalence_fingerprint`, title, artist, `primaryMedia`, track, playlist, prep, or
-capability columns.
+It deliberately has no `file_kind`, title, artist, `primaryMedia`, track, playlist, preparation, or capability columns.
 
 ## Source-File Attachment Link Authority
 
@@ -158,7 +155,7 @@ Columns:
 
 Indexes exist for `source_file_id` and `attachment_id`. The table represents the one current materialized attachment
 occurrence for a `source_file_id` in this v0. It deliberately has no link history, stored `is_current`, stored
-`is_stale`, stored hash copy, CUE/audio association, track FK, playlist FK, or prep FK.
+`is_stale`, stored hash copy, CUE/audio association, track FK, playlist FK, or preparation FK.
 
 ## Staleness Model
 
@@ -209,25 +206,7 @@ This is duplicate content evidence only. It is not track identity.
 
 CUE source files may materialize as their own attachments from their own current BLAKE3 facts. Adjacent audio source
 files may materialize as their own attachments. Materialization does not parse CUE sheets, infer adjacency, pair CUE
-files to audio files, or create source segments.
-
-## LibraryAssets And LibraryAssetAttachments
-
-Task 1 decision block:
-
-- Final table names: `content_attachments` and `source_file_attachment_links`.
-- `LibraryAssets` and `LibraryAssetAttachments` are legacy internal schema/projection residue, not attachment identity
-  authority and not public boundary surfaces.
-- Remaining direct references are cleanup targets for the legacy schema/projection deletion pass; they must not be
-  adapted, renamed, or reused for attachment occurrence, media candidate, or track identity work.
-- This slice does not add compatibility views, aliases, or dual-write paths for old columns.
-- The smallest honest shape is a greenfield canonical bytes-identity table plus a source-file occurrence link table.
-
-## equivalence_fingerprint After This Pass
-
-`LibraryAssets.equivalence_fingerprint` remains an opaque internal legacy schema/projection key. It is not content
-identity, is not read by attachment materialization, is not copied into `content_attachments`, and does not satisfy
-BLAKE3 evidence.
+files to audio files, or create split/association rows.
 
 ## Explicitly Deferred
 
@@ -242,6 +221,6 @@ BLAKE3 evidence.
 - `primaryMedia` activation;
 - media probing and format metadata;
 - artwork intelligence;
-- waveform and prep;
-- browser row population from attachment records;
+- waveform and preparation;
+- product contents projection from attachment records;
 - playlist or crate membership.

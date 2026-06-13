@@ -20,15 +20,13 @@ use crate::authority::work::{
     RecordInlineArtifactInput, StartWorkRunInput, WorkItemsAuthorityTx, WorkRunsAuthorityTx,
 };
 use crate::authority::write_lane::AdmittedWrite;
-use crate::publication;
 use crate::store::source_file_hash::{
     ResolveSourceFilePathError, SourceFileHashBasis, is_source_scope_unavailable_resolution_error,
     load_source_file_hash_basis,
 };
 use crate::{LibrarySqliteError, LibrarySqliteResult};
 use library_domain::{
-    ArtifactKind, ArtifactRole, ProjectionDomain, SourceFileId, WorkItemState, WorkPriorityClass,
-    WorkRunOutcome,
+    ArtifactKind, ArtifactRole, SourceFileId, WorkItemState, WorkPriorityClass, WorkRunOutcome,
 };
 
 use super::SqliteDurableStore;
@@ -420,12 +418,6 @@ impl SqliteDurableStore {
                 &initial_basis,
                 &facts,
                 input.observed_at_ms,
-            )?;
-            publication::reseed_projection_domains(write, &[ProjectionDomain::LibraryBrowser])?;
-            publication::invalidate_projection_domain(
-                write,
-                ProjectionDomain::LibraryBrowser,
-                "source_file_media_probe",
             )?;
             Ok(result)
         })
@@ -1249,28 +1241,6 @@ mod tests {
                 })
                 .expect("count rows")
         }
-
-        fn count_table_if_exists(&self, table: &str) -> Option<i64> {
-            let connection = self.store.open_read_connection().expect("open read");
-            let table_exists = connection
-                .query_row(
-                    "SELECT COUNT(*)
-                     FROM sqlite_master
-                     WHERE type = 'table'
-                       AND name = ?1",
-                    [table],
-                    |row| row.get::<_, i64>(0),
-                )
-                .expect("check table existence")
-                > 0;
-            table_exists.then(|| {
-                connection
-                    .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
-                        row.get(0)
-                    })
-                    .expect("count existing table")
-            })
-        }
     }
 
     #[test]
@@ -1488,45 +1458,19 @@ mod tests {
     }
 
     #[test]
-    fn probing_creates_no_attachment_identity_or_track_prep_projection_rows() {
+    fn probing_writes_only_source_facts_and_artifacts() {
         let fixture = MediaProbeFixture::new();
         let bytes = tiny_wav_bytes(44_100, 2, 16, 4_410);
         fixture.write_source_file(100, "Album/track.wav", &bytes);
 
         fixture.run_probe_batch_for_source_files(&[100], 10);
 
-        for table in [
-            "content_attachments",
-            "source_file_attachment_links",
-            "LibraryAssets",
-            "LibraryAssetAttachments",
-            "LibraryBrowserRows",
-            "SourceSegmentSets",
-            "SourceSegments",
-            "PrepAssignments",
-            "ResolvedLibraryAssetPrepTargets",
-            "Playlists",
-            "PlaylistEntries",
-        ] {
-            assert_eq!(fixture.count_rows(table), 0, "{table} must remain empty");
-        }
-        for absent_or_future_table in [
-            "Tracks",
-            "TrackRows",
-            "LibraryTracks",
-            "Waveforms",
-            "Stems",
-            "PrepRows",
-            "PreparationRows",
-        ] {
-            assert!(
-                matches!(
-                    fixture.count_table_if_exists(absent_or_future_table),
-                    None | Some(0)
-                ),
-                "{absent_or_future_table} must be absent or empty"
-            );
-        }
+        assert_eq!(fixture.count_rows("SourceFacts"), 1);
+        assert_eq!(fixture.count_rows("Artifacts"), 1);
+        assert_eq!(fixture.count_rows("content_attachments"), 0);
+        assert_eq!(fixture.count_rows("source_file_attachment_links"), 0);
+        assert_eq!(fixture.count_rows("primary_media_candidates"), 0);
+        assert_eq!(fixture.count_rows("track_identity_candidates"), 0);
     }
 
     #[test]

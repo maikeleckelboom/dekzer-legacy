@@ -14,7 +14,7 @@ new names with companion terminology rather than introducing another taxonomy.
 Dekzer does not browse files directly.
 
 Dekzer discovers source files, records media facts, assigns product roles, computes target-specific readiness, and
-projects context-specific browser rows.
+projects context-specific contents rows.
 
 ```
 A file is inventory.

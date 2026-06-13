@@ -60,7 +60,7 @@ The first slice includes the following capabilities, whether fully implemented o
 | Contents read boundary             | Active. Single parameterized `contentsRead` with cursor pagination.                                    |
 | Renderer tree projection           | Active. Navigation-only tree with source, source-location, directory, and hierarchy state/action rows. |
 | Renderer contents pane projection  | Active. Contents table with `loadContentsPage` cursor pagination.                                      |
-| Renderer library browser shell     | Active. Panel, source toolbar, browser, split pane.                                                    |
+| Renderer library browse shell      | Active. Panel, source toolbar, browse surface, split pane.                                             |
 | Cursor-only boundary event stream  | Active. `ReadAfter` polled event ring with `eventSequence` cursors.                                    |
 | Source scan event family           | Active. `SourceScanEvent` with lifecycle kinds and bounded counters.                                   |
 | Maintained snapshot invalidations  | Active. Scope-based invalidation events trigger authoritative rereads.                                 |

@@ -2700,7 +2700,7 @@ mod tests {
                      created_at,
                      updated_at
                  )
-                 VALUES (1, 'projection_domain', 'library_browser', 'rebuild_projection', 'basis:test', 'completed', 'interactive', 1, 1)",
+                 VALUES (1, 'projection_domain', 'navigation', 'rebuild_projection', 'basis:test', 'completed', 'interactive', 1, 1)",
                 [],
             )
             .expect("insert work item");
@@ -5583,10 +5583,10 @@ mod tests {
         insert_directory(&connection, 10, 1, "Music", "complete");
         for i in 0..10 {
             let source_file_id = 1000 + i as i64;
-            let library_asset_id = i as i64 + 1;
+            let attachment_id = i as i64 + 1;
             insert_promoted_media_file(
                 &connection,
-                library_asset_id,
+                attachment_id,
                 source_file_id,
                 1,
                 10,

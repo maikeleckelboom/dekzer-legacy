@@ -31,7 +31,6 @@ impl SchemaObjectKind {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum IgnoredObjectReason {
     SqliteInternalPrefix,
-    LibraryBrowserFtsShadowObject,
     SearchFilterIndexFtsShadowObject,
 }
 
@@ -344,9 +343,6 @@ fn raw_schema_objects(connection: &Connection) -> LibrarySqliteResult<Vec<RawSch
 fn schema_object_policy(object: &RawSchemaObject) -> ObjectDisposition {
     if object.name.starts_with("sqlite_") {
         return ObjectDisposition::Ignored(IgnoredObjectReason::SqliteInternalPrefix);
-    }
-    if object.name.starts_with("LibraryBrowserRows_fts_") {
-        return ObjectDisposition::Ignored(IgnoredObjectReason::LibraryBrowserFtsShadowObject);
     }
     if object.name.starts_with("search_filter_index_fts_") {
         return ObjectDisposition::Ignored(IgnoredObjectReason::SearchFilterIndexFtsShadowObject);

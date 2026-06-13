@@ -166,7 +166,7 @@ missing
   checked_at_ms
 ```
 
-The probe result updates source access state. It does not directly classify media or project browser rows.
+The probe result updates source access state. It does not directly classify media or project contents rows.
 
 ---
 

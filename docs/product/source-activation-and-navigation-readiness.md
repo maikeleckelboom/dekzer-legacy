@@ -85,7 +85,7 @@ The browser must expose readiness honestly instead of pretending the filesystem 
 
 ## Relationship To Representation Contract
 
-[The Library Browser Representation Contract](../library/browse/representation-contract.md) owns the umbrella model for library representations.
+[The Library Browse Representation Contract](../library/browse/representation-contract.md) owns the umbrella model for library representations.
 
 This document owns readiness behavior for the Local Files/raw source representation.
 
@@ -524,7 +524,7 @@ coverage, retained reads, blocked states, failed states, and no false empty path
 
 ## Final Statement
 
-Dekzer’s library browser must feel fast because it is honest, not because it pretends to know more than it does.
+Dekzer’s library browse surface must feel fast because it is honest, not because it pretends to know more than it does.
 
 A source can be browsable before it is fully scanned.
 

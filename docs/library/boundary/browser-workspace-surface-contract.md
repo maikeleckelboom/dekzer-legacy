@@ -13,18 +13,18 @@ canonical-context:
   - topology-negotiation-law
   - workspace-layout-contract (TODO: not yet written)
 scope:
-  - library-browser-surface-identity
+  - library-workspace-surface-identity
   - workspace-topology-handoff
   - geometry-and-viewport-hints
   - internal-layout-presets
   - authority-partition
 ---
 
-# Library Browser Workspace Surface Contract
+# Library Workspace Surface Contract
 
 ## Core laws
 
-1. **The Library Browser is a workspace surface. Its rows are not workspace topology.**
+1. **The Library Workspace is a workspace surface. Its rows are not workspace topology.**
 2. **Workspace topology owns placement, sizing, visibility, and surface composition.**
 3. **Library projection owns source, row, selection, contents, track, segment, and readiness meaning.**
 4. **Renderer realization owns frame-stable painting inside the surface.**
@@ -33,8 +33,8 @@ scope:
 
 ## The boundary
 
-The workspace topology slot containing the Library Browser is an opaque container
-from the library browser's perspective. The library browser is an opaque tenant
+The workspace topology slot containing the Library Workspace is an opaque container
+from the library workspace's perspective. The library workspace is an opaque tenant
 from the topology's perspective.
 
 They exchange exactly two things:
@@ -45,7 +45,7 @@ They exchange exactly two things:
 | Library → Topology | Preferred minimum dimensions, surface identity for routing. |
 
 Nothing else crosses the boundary. The topology does not know what sources,
-directories, tracks, or row profiles exist. The library browser does not know
+directories, tracks, or row profiles exist. The library workspace does not know
 what slot it occupies, how many panels surround it, or what the workspace
 layout algorithm decided.
 
@@ -54,29 +54,29 @@ layout algorithm decided.
 | Owner              | Owns                                                                                               | Must not own                                                                             |
 | ------------------ | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
 | Workspace topology | Surface existence, placement, sizing, visibility, tab/split/dock composition.                      | Scan state, row authority, source identity, selection.                                   |
-| Library Browser    | Tree state, contents state, selection, source visible projection/presentation state, branch cache. | Surface placement, workspace slot identity, layout geometry, source lifecycle authority. |
+| Library Workspace  | Tree state, contents state, selection, source visible projection/presentation state, branch cache. | Surface placement, workspace slot identity, layout geometry, source lifecycle authority. |
 | Library substrate  | Hierarchy node IDs, source records, source lifecycle state, track identity, preparation evidence.  | DOM realization, renderer state.                                                         |
 | Renderer           | Frame-stable painting of tree and contents rows inside the surface bounds.                         | Source meaning, hierarchy authority, source lifecycle.                                   |
 
 ## Surface identity
 
-The Library Browser is registered in workspace topology as a named surface kind:
+The Library Workspace is registered in workspace topology as a named surface kind:
 
 ```
-surfaceKind: library_browser
+surfaceKind: library_workspace
 ```
 
-A workspace may contain at most one Library Browser surface in v1. Multiple
+A workspace may contain at most one Library Workspace surface in v1. Multiple
 instances are a future concern and not governed here.
 
-The Library Browser surface is identified by kind, not by slot position. If the
-topology moves the Library Browser to a different slot, the library browser's
+The Library Workspace surface is identified by kind, not by slot position. If the
+topology moves the Library Workspace to a different slot, the library workspace's
 internal state (tree expansion, selection, scroll position, branch cache) is
 preserved. Slot changes are geometry changes, not identity changes.
 
 ## What topology provides
 
-Topology provides the Library Browser with its rendered bounds:
+Topology provides the Library Workspace with its rendered bounds:
 
 | Provided value  | Meaning                                                     |
 | --------------- | ----------------------------------------------------------- |
@@ -86,34 +86,34 @@ Topology provides the Library Browser with its rendered bounds:
 
 ## What Library provides
 
-The Library Browser declares its identity and advisory geometry needs to topology.
+The Library Workspace declares its identity and advisory geometry needs to topology.
 These are not authoritative over layout. Topology may use them for placement
-negotiation, but they do not let the Library Browser choose its own slot, split,
+negotiation, but they do not let the Library Workspace choose its own slot, split,
 dock, or tab position.
 
 | Provided value               | Meaning                                                                     |
 | ---------------------------- | --------------------------------------------------------------------------- |
-| `surfaceKind`                | Stable workspace surface kind: `library_browser`.                           |
+| `surfaceKind`                | Stable workspace surface kind: `library_workspace`.                         |
 | `preferredMinDimensions`     | Advisory minimum width/height for usable browser presentation.              |
 | `preferredDefaultDimensions` | Optional advisory default size for first placement. Topology may ignore it. |
 
 **Topology may use these values for layout negotiation, but they are not authority over workspace topology.**
 
 If topology cannot satisfy `preferredMinDimensions`, it proceeds with the available
-space and the Library Browser adapts using its internal layout presets. The
+space and the Library Workspace adapts using its internal layout presets. The
 browser does not refuse to render because it received less space than preferred.
 
-The Library Browser uses `isVisible` to pause non-critical work (prefetch,
+The Library Workspace uses `isVisible` to pause non-critical work (prefetch,
 background projection reads) when the surface is hidden. It does not stop
 scan progress or preparation work on visibility changes.
 
-The Library Browser uses `surfaceBounds` and `viewportHint` to select an
+The Library Workspace uses `surfaceBounds` and `viewportHint` to select an
 internal layout preset and to size the visible frontier for prefetch bounds.
 
 ## Internal layout presets
 
-The Library Browser manages its own internal layout. Topology provides bounds;
-the browser decides how to fill them.
+The Library Workspace manages its own internal layout. Topology provides bounds;
+the workspace surface decides how to fill them.
 
 | Preset                         | When used                              | Regions visible                           |
 | ------------------------------ | -------------------------------------- | ----------------------------------------- |
@@ -122,22 +122,22 @@ the browser decides how to fill them.
 | `navigator_contents_inspector` | Expanded surface width or user pinned. | Source tree + contents + inspector panel. |
 
 The compact threshold, standard threshold, and inspector pin state are
-Library Browser preferences, not topology configuration. Topology does not
+Library Workspace preferences, not topology configuration. Topology does not
 know which preset is active.
 
-Region proportions (tree width, inspector width) are Library Browser state.
+Region proportions (tree width, inspector width) are Library Workspace state.
 They are persisted independently of workspace layout state.
 
 ## Viewport hints and prefetch
 
-When topology reports `isVisible = false`, the Library Browser:
+When topology reports `isVisible = false`, the Library Workspace:
 
 - Pauses visible-frontier prefetch entirely.
 - Does not issue new branch reads for off-screen refreshes.
 - Continues to accept scan events and mark cache entries stale.
 - Resumes prefetch when `isVisible` returns to `true`.
 
-When `surfaceBounds` changes (resize, split drag), the Library Browser:
+When `surfaceBounds` changes (resize, split drag), the Library Workspace:
 
 - Recalculates the visible frontier for prefetch bounds.
 - Does not clear the branch cache.
@@ -159,7 +159,7 @@ produce any of the failure modes described in the frame-stability rejection tabl
 
 ## Reconnection after hide/show
 
-When the Library Browser surface becomes visible after being hidden:
+When the Library Workspace surface becomes visible after being hidden:
 
 1. Restore the branch cache as-is. It may be stale.
 2. Re-validate visible branches against current epochs.
@@ -172,19 +172,19 @@ hide, modulo any scan progress that arrived while hidden.
 
 ## Panel containment
 
-The Library Browser must keep row browsing inside its own surface bounds. Contents rows must be reachable through the
+The Library Workspace must keep row browsing inside its own surface bounds. Contents rows must be reachable through the
 contents region inside the library panel and must not require app-level overflow or workspace scrolling to browse the
 table.
 
-This is an acceptance rule between workspace topology and the Library Browser surface. It does not require a specific
+This is an acceptance rule between workspace topology and the Library Workspace surface. It does not require a specific
 CSS class, grid, or table implementation.
 
 ## Non-goals
 
 This contract does not define workspace routing, slot assignment algorithms,
-multi-surface composition, or how the Library Browser surface is opened or
+multi-surface composition, or how the Library Workspace surface is opened or
 closed. Those are governed by workspace topology contracts.
 
-It does not define the internal layout system within the Library Browser regions.
-Internal split proportions and region visibility are Library Browser state
+It does not define the internal layout system within the Library Workspace regions.
+Internal split proportions and region visibility are Library Workspace state
 governed by the selection-contents contract and the frame-stability contract.

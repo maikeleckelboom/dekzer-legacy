@@ -403,147 +403,17 @@ CREATE INDEX source_files_source_browse_order
 CREATE INDEX source_files_parent_browse
     ON source_files (source_id, parent_source_directory_id, presence_state, name_browse_sort_key, name, file_class, file_kind);
 
--- TOMBSTONE: LibraryAssets is dormant for new content identity work. It is
--- replaced by content_attachments plus future track/media layers, and the
--- media-candidate/track-identity slice must delete or rename it once asset-prep
--- and browser paths no longer depend on it. Current code must not use it for
--- new content identity.
-CREATE TABLE LibraryAssets
-(
-    library_asset_id          INTEGER PRIMARY KEY,
-    equivalence_fingerprint   TEXT    NOT NULL UNIQUE CHECK (length(trim(equivalence_fingerprint)) > 0),
-    retention_policy          TEXT    NOT NULL DEFAULT 'keep_metadata'
-        CHECK (retention_policy IN ('keep_metadata', 'purge')),
-    created_at                INTEGER NOT NULL,
-    updated_at                INTEGER NOT NULL,
-    CHECK (updated_at >= created_at)
-) STRICT;
-
-CREATE TABLE Playlists
-(
-    playlist_id   INTEGER PRIMARY KEY,
-    display_name  TEXT    NOT NULL CHECK (length(trim(display_name)) > 0),
-    created_at    INTEGER NOT NULL,
-    updated_at    INTEGER NOT NULL,
-    CHECK (updated_at >= created_at)
-) STRICT;
-
-CREATE TABLE PlaylistEntries
-(
-    playlist_entry_id  INTEGER PRIMARY KEY,
-    playlist_id        INTEGER NOT NULL REFERENCES Playlists (playlist_id) ON DELETE CASCADE,
-    library_asset_id   INTEGER NOT NULL REFERENCES LibraryAssets (library_asset_id) ON DELETE CASCADE,
-    position           INTEGER NOT NULL CHECK (position >= 0),
-    created_at         INTEGER NOT NULL,
-    updated_at         INTEGER NOT NULL,
-    CHECK (updated_at >= created_at),
-    UNIQUE (playlist_id, library_asset_id),
-    UNIQUE (playlist_id, position)
-) STRICT;
-
-CREATE INDEX PlaylistEntries_library_asset
-    ON PlaylistEntries (library_asset_id);
-
-CREATE TABLE CapabilitySpecs
-(
-    capability_kind     TEXT PRIMARY KEY CHECK (length(trim(capability_kind)) > 0),
-    display_name        TEXT    NOT NULL CHECK (length(trim(display_name)) > 0),
-    quality_aware       INTEGER NOT NULL CHECK (quality_aware IN (0, 1)),
-    default_profile_key TEXT    NOT NULL CHECK (length(trim(default_profile_key)) > 0),
-    created_at          INTEGER NOT NULL,
-    updated_at          INTEGER NOT NULL,
-    CHECK (updated_at >= created_at)
-) STRICT;
-
-CREATE TABLE CapabilityDependencies
-(
-    upstream_capability_kind    TEXT    NOT NULL REFERENCES CapabilitySpecs (capability_kind) ON DELETE CASCADE,
-    downstream_capability_kind  TEXT    NOT NULL REFERENCES CapabilitySpecs (capability_kind) ON DELETE CASCADE,
-    invalidation_mode           TEXT    NOT NULL CHECK (length(trim(invalidation_mode)) > 0),
-    created_at                  INTEGER NOT NULL,
-    updated_at                  INTEGER NOT NULL,
-    PRIMARY KEY (upstream_capability_kind, downstream_capability_kind),
-    CHECK (upstream_capability_kind <> downstream_capability_kind),
-    CHECK (updated_at >= created_at)
-) STRICT;
-
-CREATE TABLE PrepPolicies
-(
-    prep_policy_id     INTEGER PRIMARY KEY,
-    policy_name        TEXT    NOT NULL CHECK (length(trim(policy_name)) > 0),
-    is_system_policy   INTEGER NOT NULL CHECK (is_system_policy IN (0, 1)),
-    is_user_editable   INTEGER NOT NULL CHECK (is_user_editable IN (0, 1)),
-    created_at         INTEGER NOT NULL,
-    updated_at         INTEGER NOT NULL,
-    CHECK (updated_at >= created_at),
-    UNIQUE (policy_name)
-) STRICT;
-
-CREATE TABLE PrepPolicyTargets
-(
-    prep_policy_id          INTEGER NOT NULL REFERENCES PrepPolicies (prep_policy_id) ON DELETE CASCADE,
-    capability_kind         TEXT    NOT NULL REFERENCES CapabilitySpecs (capability_kind),
-    target_profile_key      TEXT    NOT NULL CHECK (length(trim(target_profile_key)) > 0),
-    target_quality          INTEGER NOT NULL CHECK (target_quality >= 0),
-    target_stability_class  TEXT    NOT NULL
-        CHECK (target_stability_class IN ('provisional', 'stable')),
-    priority_class          TEXT    NOT NULL
-        CHECK (priority_class IN ('urgent', 'interactive', 'background')),
-    PRIMARY KEY (prep_policy_id, capability_kind, target_profile_key)
-) STRICT;
-
-CREATE TABLE PrepAssignments
-(
-    prep_assignment_id  INTEGER PRIMARY KEY,
-    scope_kind          TEXT    NOT NULL
-        CHECK (scope_kind IN ('library', 'source', 'library_asset')),
-    scope_id            TEXT    NOT NULL CHECK (length(trim(scope_id)) > 0),
-    prep_policy_id      INTEGER NOT NULL REFERENCES PrepPolicies (prep_policy_id) ON DELETE CASCADE,
-    precedence_rank     INTEGER NOT NULL CHECK (precedence_rank >= 0),
-    created_at          INTEGER NOT NULL,
-    updated_at          INTEGER NOT NULL,
-    CHECK (updated_at >= created_at)
-) STRICT;
-
-CREATE INDEX PrepAssignments_scope_precedence
-    ON PrepAssignments (scope_kind, scope_id, precedence_rank);
-
-CREATE TABLE ResolvedLibraryAssetPrepTargets
-(
-    library_asset_id         INTEGER NOT NULL REFERENCES LibraryAssets (library_asset_id) ON DELETE CASCADE,
-    capability_kind          TEXT    NOT NULL REFERENCES CapabilitySpecs (capability_kind),
-    target_profile_key       TEXT    NOT NULL CHECK (length(trim(target_profile_key)) > 0),
-    target_quality           INTEGER NOT NULL CHECK (target_quality >= 0),
-    target_stability_class   TEXT    NOT NULL
-        CHECK (target_stability_class IN ('provisional', 'stable')),
-    priority_class           TEXT    NOT NULL
-        CHECK (priority_class IN ('urgent', 'interactive', 'background')),
-    resolved_from_policy_id  INTEGER NOT NULL REFERENCES PrepPolicies (prep_policy_id),
-    updated_at               INTEGER NOT NULL,
-    PRIMARY KEY (library_asset_id, capability_kind, target_profile_key)
-) STRICT;
-
-CREATE INDEX ResolvedLibraryAssetPrepTargets_policy
-    ON ResolvedLibraryAssetPrepTargets (resolved_from_policy_id);
-
 CREATE TABLE WorkItems
 (
     work_item_id        INTEGER PRIMARY KEY,
     subject_kind        TEXT    NOT NULL
-        CHECK (subject_kind IN ('source_file', 'library_asset', 'projection_domain')),
+        CHECK (subject_kind IN ('source_file', 'projection_domain')),
     subject_id          TEXT    NOT NULL CHECK (length(trim(subject_id)) > 0),
     work_kind           TEXT    NOT NULL
         CHECK (work_kind IN (
             'inspect_source',
-            'accept_segmentation',
-            'resolve_library_asset',
-            'compute_capability',
-            'rebind_source',
             'rebuild_projection'
         )),
-    capability_kind     TEXT REFERENCES CapabilitySpecs (capability_kind),
-    target_profile_key  TEXT CHECK (target_profile_key IS NULL OR length(trim(target_profile_key)) > 0),
-    target_quality      INTEGER CHECK (target_quality IS NULL OR target_quality >= 0),
     priority_class      TEXT    NOT NULL
         CHECK (priority_class IN ('urgent', 'interactive', 'background')),
     basis_fingerprint   TEXT    NOT NULL CHECK (length(trim(basis_fingerprint)) > 0),
@@ -556,24 +426,10 @@ CREATE TABLE WorkItems
     error_detail        TEXT,
     created_at          INTEGER NOT NULL,
     updated_at          INTEGER NOT NULL,
-    CHECK (
-        (
-            work_kind = 'compute_capability'
-                AND capability_kind IS NOT NULL
-                AND target_profile_key IS NOT NULL
-                AND target_quality IS NOT NULL
-        )
-            OR (
-            work_kind <> 'compute_capability'
-                AND capability_kind IS NULL
-                AND target_profile_key IS NULL
-                AND target_quality IS NULL
-        )
-    ),
     CHECK ((state = 'leased' AND leased_until IS NOT NULL) OR state <> 'leased'),
     CHECK (
         subject_kind <> 'projection_domain'
-            OR subject_id IN ('library_browser', 'navigation')
+            OR subject_id = 'navigation'
     ),
     CHECK (updated_at >= created_at)
 ) STRICT;
@@ -581,23 +437,9 @@ CREATE TABLE WorkItems
 CREATE INDEX WorkItems_subject_state
     ON WorkItems (subject_kind, subject_id, state, priority_class);
 
-CREATE UNIQUE INDEX WorkItems_active_compute_capability
-    ON WorkItems (
-        subject_kind,
-        subject_id,
-        work_kind,
-        capability_kind,
-        target_profile_key,
-        target_quality,
-        basis_fingerprint
-    )
-    WHERE work_kind = 'compute_capability'
-      AND state IN ('queued', 'leased', 'blocked');
-
-CREATE UNIQUE INDEX WorkItems_active_non_capability
+CREATE UNIQUE INDEX WorkItems_active_work
     ON WorkItems (subject_kind, subject_id, work_kind, basis_fingerprint)
-    WHERE work_kind <> 'compute_capability'
-      AND state IN ('queued', 'leased', 'blocked');
+    WHERE state IN ('queued', 'leased', 'blocked');
 
 CREATE TABLE WorkRuns
 (
@@ -621,17 +463,12 @@ CREATE TABLE Artifacts
     artifact_id         INTEGER PRIMARY KEY,
     work_run_id         INTEGER NOT NULL REFERENCES WorkRuns (work_run_id) ON DELETE CASCADE,
     subject_kind        TEXT    NOT NULL
-        CHECK (subject_kind IN ('source_file', 'library_asset', 'projection_domain')),
+        CHECK (subject_kind IN ('source_file', 'projection_domain')),
     subject_id          TEXT    NOT NULL CHECK (length(trim(subject_id)) > 0),
-    capability_kind     TEXT REFERENCES CapabilitySpecs (capability_kind),
-    profile_key         TEXT CHECK (profile_key IS NULL OR length(trim(profile_key)) > 0),
     artifact_kind       TEXT    NOT NULL
         CHECK (artifact_kind IN (
             'inspection_result',
-            'segmentation_result',
-            'capability_result',
-            'projection_snapshot',
-            'diagnostic_result'
+            'projection_snapshot'
         )),
     artifact_role       TEXT    NOT NULL
         CHECK (artifact_role IN (
@@ -649,33 +486,14 @@ CREATE TABLE Artifacts
         CHECK (storage_kind IN ('inline_payload', 'file_store')),
     payload_hash        TEXT    NOT NULL CHECK (length(trim(payload_hash)) > 0),
     created_at          INTEGER NOT NULL,
-    CHECK (
-        artifact_kind <> 'capability_result'
-            OR (
-                subject_kind = 'library_asset'
-                    AND capability_kind IS NOT NULL
-                    AND profile_key IS NOT NULL
-            )
-    ),
-    CHECK (
-        artifact_kind NOT IN ('inspection_result', 'segmentation_result')
-            OR (
-                subject_kind = 'source_file'
-                    AND capability_kind IS NULL
-                    AND profile_key IS NULL
-            )
-    ),
+    CHECK (artifact_kind <> 'inspection_result' OR subject_kind = 'source_file'),
     CHECK (
         artifact_kind <> 'projection_snapshot'
-            OR (
-                subject_kind = 'projection_domain'
-                    AND capability_kind IS NULL
-                    AND profile_key IS NULL
-            )
+            OR subject_kind = 'projection_domain'
     ),
     CHECK (
         subject_kind <> 'projection_domain'
-            OR subject_id IN ('library_browser', 'navigation')
+            OR subject_id = 'navigation'
     )
 ) STRICT;
 
@@ -685,8 +503,8 @@ CREATE INDEX Artifacts_work_run
 CREATE INDEX Artifacts_subject_created_at
     ON Artifacts (subject_kind, subject_id, created_at DESC);
 
-CREATE INDEX Artifacts_capability_lookup
-    ON Artifacts (subject_kind, subject_id, capability_kind, profile_key, artifact_kind, artifact_role);
+CREATE INDEX Artifacts_kind_role_lookup
+    ON Artifacts (subject_kind, subject_id, artifact_kind, artifact_role);
 
 CREATE TABLE ArtifactInlinePayloads
 (
@@ -1046,175 +864,6 @@ CREATE INDEX track_identity_decision_evidence_candidate
 CREATE INDEX track_identity_decision_evidence_source_file
     ON track_identity_decision_evidence (source_file_id);
 
-CREATE TABLE SourceSegmentSets
-(
-    source_segment_set_id  INTEGER PRIMARY KEY,
-    source_file_id         INTEGER NOT NULL REFERENCES source_files (source_file_id) ON DELETE CASCADE,
-    segment_set_kind       TEXT    NOT NULL CHECK (length(trim(segment_set_kind)) > 0),
-    basis_fingerprint      TEXT    NOT NULL CHECK (length(trim(basis_fingerprint)) > 0),
-    accepted_at            INTEGER NOT NULL,
-    accepted_artifact_id   INTEGER NOT NULL REFERENCES Artifacts (artifact_id),
-    updated_at             INTEGER NOT NULL,
-    CHECK (updated_at >= accepted_at),
-    UNIQUE (source_file_id, segment_set_kind)
-) STRICT;
-
-CREATE TABLE SourceSegments
-(
-    source_segment_id      INTEGER PRIMARY KEY,
-    source_segment_set_id  INTEGER NOT NULL REFERENCES SourceSegmentSets (source_segment_set_id) ON DELETE CASCADE,
-    segment_kind           TEXT    NOT NULL CHECK (length(trim(segment_kind)) > 0),
-    ordinal                INTEGER NOT NULL CHECK (ordinal >= 0),
-    start_offset_ms        INTEGER NOT NULL CHECK (start_offset_ms >= 0),
-    end_offset_ms          INTEGER CHECK (end_offset_ms IS NULL OR end_offset_ms > start_offset_ms),
-    display_title          TEXT,
-    display_artist         TEXT,
-    display_album          TEXT,
-    created_at             INTEGER NOT NULL,
-    updated_at             INTEGER NOT NULL,
-    CHECK (updated_at >= created_at),
-    UNIQUE (source_segment_set_id, ordinal)
-) STRICT;
-
-CREATE INDEX SourceSegments_segment_set_range
-    ON SourceSegments (source_segment_set_id, start_offset_ms);
-
--- TOMBSTONE: LibraryAssetAttachments is dormant for new attachment identity
--- work. It is replaced by source_file_attachment_links, and the future CUE
--- association plus media-candidate/subtrack slice must delete it when segment
--- promotion is replaced. Current code must not use it for attachment identity.
-CREATE TABLE LibraryAssetAttachments
-(
-    library_asset_attachment_id  INTEGER PRIMARY KEY,
-    library_asset_id             INTEGER NOT NULL REFERENCES LibraryAssets (library_asset_id) ON DELETE CASCADE,
-    source_segment_id            INTEGER NOT NULL UNIQUE REFERENCES SourceSegments (source_segment_id) ON DELETE CASCADE,
-    accepted_at                  INTEGER NOT NULL,
-    updated_at                   INTEGER NOT NULL,
-    CHECK (updated_at >= accepted_at)
-) STRICT;
-
-CREATE INDEX LibraryAssetAttachments_library_asset
-    ON LibraryAssetAttachments (library_asset_id);
-
-CREATE TABLE LibraryAssetMetadataCorrections
-(
-    correction_id        INTEGER PRIMARY KEY,
-    library_asset_id     INTEGER NOT NULL REFERENCES LibraryAssets (library_asset_id) ON DELETE CASCADE,
-    field_name           TEXT    NOT NULL CHECK (length(trim(field_name)) > 0),
-    value_text           TEXT,
-    value_int            INTEGER,
-    is_null_correction   INTEGER NOT NULL DEFAULT 0 CHECK (is_null_correction IN (0, 1)),
-    source_kind          TEXT    NOT NULL CHECK (length(trim(source_kind)) > 0),
-    applied_at           INTEGER NOT NULL,
-    retracted_at         INTEGER,
-    CHECK (retracted_at IS NULL OR retracted_at >= applied_at),
-    CHECK (
-        (
-            is_null_correction = 1
-                AND value_text IS NULL
-                AND value_int IS NULL
-        )
-            OR (
-            is_null_correction = 0
-                AND (
-                    (value_text IS NOT NULL AND value_int IS NULL)
-                        OR (value_text IS NULL AND value_int IS NOT NULL)
-                )
-        )
-    )
-) STRICT;
-
-CREATE UNIQUE INDEX LibraryAssetMetadataCorrections_active_field
-    ON LibraryAssetMetadataCorrections (library_asset_id, field_name)
-    WHERE retracted_at IS NULL;
-
-CREATE INDEX LibraryAssetMetadataCorrections_item_applied
-    ON LibraryAssetMetadataCorrections (library_asset_id, applied_at DESC);
-
-CREATE TABLE LibraryAssetCapabilities
-(
-    library_asset_id      INTEGER NOT NULL REFERENCES LibraryAssets (library_asset_id) ON DELETE CASCADE,
-    capability_kind       TEXT    NOT NULL REFERENCES CapabilitySpecs (capability_kind),
-    profile_key           TEXT    NOT NULL CHECK (length(trim(profile_key)) > 0),
-    state                 TEXT    NOT NULL
-        CHECK (state IN ('missing', 'queued', 'leased', 'ready', 'stale', 'blocked', 'failed')),
-    stability_class       TEXT CHECK (
-        stability_class IS NULL
-            OR stability_class IN ('provisional', 'stable')
-    ),
-    quality_current       INTEGER CHECK (quality_current IS NULL OR quality_current >= 0),
-    basis_fingerprint     TEXT CHECK (basis_fingerprint IS NULL OR length(trim(basis_fingerprint)) > 0),
-    selected_artifact_id  INTEGER REFERENCES Artifacts (artifact_id),
-    updated_at            INTEGER NOT NULL,
-    PRIMARY KEY (library_asset_id, capability_kind, profile_key),
-    CHECK (
-        (
-            state IN ('ready', 'stale')
-                AND stability_class IS NOT NULL
-                AND basis_fingerprint IS NOT NULL
-        )
-            OR state NOT IN ('ready', 'stale')
-    ),
-    CHECK (selected_artifact_id IS NULL OR state IN ('ready', 'stale'))
-) STRICT;
-
-CREATE INDEX LibraryAssetCapabilities_state
-    ON LibraryAssetCapabilities (state, capability_kind);
-
--- TOMBSTONE: primaryMedia is dormant as a row-profile/projection shape. It is
--- replaced by the future media-candidate/track-identity projection, and that
--- slice must explicitly activate it as a projection or delete the shape once
--- replacement read surfaces exist. Current code must not treat it as default
--- content, track identity, or a new read/write target.
-CREATE TABLE LibraryBrowserRows
-(
-    library_asset_id           INTEGER PRIMARY KEY REFERENCES LibraryAssets (library_asset_id) ON DELETE CASCADE,
-    row_version                INTEGER NOT NULL CHECK (row_version >= 0),
-    primary_source_file_id     INTEGER REFERENCES source_files (source_file_id),
-    availability_state         TEXT    NOT NULL
-        CHECK (availability_state IN ('available', 'unavailable', 'degraded')),
-    title                      TEXT,
-    artist                     TEXT,
-    album                      TEXT,
-    duration_ms                INTEGER CHECK (duration_ms IS NULL OR duration_ms >= 0),
-    musical_key                TEXT,
-    tempo_bpm                  REAL CHECK (tempo_bpm IS NULL OR tempo_bpm >= 0),
-    -- Browse-facing summaries derived by projection rebuild logic from
-    -- capability/artifact state; they are not canonical ownership.
-    waveform_quality_current   INTEGER CHECK (
-        waveform_quality_current IS NULL
-            OR waveform_quality_current >= 0
-    ),
-    waveform_quality_target    INTEGER CHECK (
-        waveform_quality_target IS NULL
-            OR waveform_quality_target >= 0
-    ),
-    stems_state_summary        TEXT,
-    prep_readiness_summary     TEXT    NOT NULL
-        CHECK (prep_readiness_summary IN (
-            'not_required',
-            'ready',
-            'preparing',
-            'underprepared',
-            'blocked',
-            'failed'
-        )),
-    updated_at                 INTEGER NOT NULL
-) STRICT;
-
-CREATE INDEX LibraryBrowserRows_availability
-    ON LibraryBrowserRows (availability_state, updated_at DESC);
-
-CREATE INDEX LibraryBrowserRows_prep_readiness
-    ON LibraryBrowserRows (prep_readiness_summary, updated_at DESC);
-
-CREATE VIRTUAL TABLE LibraryBrowserRows_fts USING fts5(
-    title,
-    artist,
-    album,
-    tokenize = 'unicode61 remove_diacritics 1'
-);
-
 CREATE TABLE navigation_rows
 (
     navigation_row_id         INTEGER PRIMARY KEY,
@@ -1222,7 +871,7 @@ CREATE TABLE navigation_rows
     parent_navigation_row_id  INTEGER REFERENCES navigation_rows (navigation_row_id) ON DELETE CASCADE,
     family                    TEXT CHECK (
         family IS NULL
-            OR family IN ('Views', 'Collections', 'Preparation', 'Sources')
+            OR family IN ('Views', 'Sources')
     ),
     row_kind                  TEXT    NOT NULL CHECK (length(trim(row_kind)) > 0),
     display_name              TEXT    NOT NULL CHECK (length(trim(display_name)) > 0),
@@ -1257,7 +906,7 @@ CREATE TABLE ProjectionChangeLog
 (
     change_sequence  INTEGER PRIMARY KEY,
     projection_domain TEXT NOT NULL
-        CHECK (projection_domain IN ('library_browser', 'navigation')),
+        CHECK (projection_domain = 'navigation'),
     row_key          TEXT    NOT NULL CHECK (length(trim(row_key)) > 0),
     change_kind      TEXT    NOT NULL CHECK (length(trim(change_kind)) > 0),
     row_version      INTEGER NOT NULL CHECK (row_version >= 0),
@@ -1284,7 +933,7 @@ CREATE TABLE ProjectionCursors
 (
     subscriber_id      INTEGER NOT NULL REFERENCES ProjectionSubscribers (subscriber_id) ON DELETE CASCADE,
     projection_domain  TEXT    NOT NULL
-        CHECK (projection_domain IN ('library_browser', 'navigation')),
+        CHECK (projection_domain = 'navigation'),
     position           INTEGER NOT NULL CHECK (position >= 0),
     updated_at         INTEGER NOT NULL,
     PRIMARY KEY (subscriber_id, projection_domain)
@@ -1293,7 +942,7 @@ CREATE TABLE ProjectionCursors
 CREATE TABLE ProjectionRetentionWatermarks
 (
     projection_domain                  TEXT PRIMARY KEY
-        CHECK (projection_domain IN ('library_browser', 'navigation')),
+        CHECK (projection_domain = 'navigation'),
     live_subscriber_count              INTEGER NOT NULL CHECK (live_subscriber_count >= 0),
     live_min_position                  INTEGER CHECK (
         live_min_position IS NULL

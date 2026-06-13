@@ -90,7 +90,6 @@ The following never create or refresh track identity candidates by themselves:
 - BLAKE3 hash evidence without current primary-media promotion.
 - Path, title, filename, directory, or metadata similarity.
 - CUE file path proximity, CUE parsing, or inferred CUE-to-audio pairing.
-- `LibraryAssets.equivalence_fingerprint`.
 - Renderer requests or renderer-side grouping.
 - Image, CUE, unsupported, video-without-current-v0-promotion, playlist, prep, waveform, stem, sleeve, crate, or artwork
   state.
@@ -129,7 +128,7 @@ Track identity candidates v0 do not:
 - create playlists, crates, sleeves, prep facets, waveform or stem authority, artwork intelligence, or UI;
 - parse CUE sheets or infer CUE-to-audio pairing;
 - reconcile metadata or match different encodes;
-- use `LibraryAssets.equivalence_fingerprint` as content identity.
+- use any deleted or caller-supplied opaque identity key as content identity.
 
 ## Future Work
 

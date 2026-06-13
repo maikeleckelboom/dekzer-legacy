@@ -111,7 +111,7 @@ impl SqliteDurableStore {
             build_discovered_locations_from_files(&root_display_name, &batch.files),
             |_, _| {},
         )?;
-        self.reseed_navigation_and_library_browser_projections()?;
+        self.reseed_navigation_projection()?;
         Ok(result)
     }
 
@@ -144,7 +144,7 @@ impl SqliteDurableStore {
             .map(|file| file.file_id)
             .collect::<Vec<_>>();
         if !changed_file_ids.is_empty() {
-            self.reseed_navigation_and_library_browser_projections()?;
+            self.reseed_navigation_projection()?;
         }
 
         Ok(ExplicitImportResult {
@@ -169,7 +169,7 @@ impl SqliteDurableStore {
             )],
             |_, _| {},
         )?;
-        self.reseed_navigation_and_library_browser_projections()?;
+        self.reseed_navigation_projection()?;
         Ok(result)
     }
 
@@ -328,7 +328,7 @@ impl SqliteDurableStore {
             scan_run_id,
             reason: RootScanHierarchyObservationReason::Finalized,
         });
-        self.reseed_navigation_and_library_browser_projections()?;
+        self.reseed_navigation_projection()?;
         let queued_source_work_items = discovered_files
             .iter()
             .filter(|file| file.needs_probe)

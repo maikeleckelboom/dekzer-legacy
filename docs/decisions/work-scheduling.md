@@ -358,7 +358,7 @@ browse-readiness
     provisional source file recognition facts (extension + sniff)
     readiness summary placeholders (pending | unknown | blocked)
   Work in this lane may cause the classifier authority to produce provisional
-    role claims needed for honest browser rows. The lane itself does not own
+    role claims needed for honest contents rows. The lane itself does not own
     or write role claims; outputs are written only by their owning authorities.
   Work in this lane must not produce:
     full waveform

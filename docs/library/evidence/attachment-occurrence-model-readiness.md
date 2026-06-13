@@ -194,7 +194,7 @@ terms, or preferred-copy terms.
 Invalidation scope:
 
 - A-5 is an explicit snapshot read in the first implementation.
-- It must not attach occurrence truth to `LibraryBrowser` or navigation invalidations.
+- It must not attach occurrence truth to navigation invalidations.
 - The read is invalidated by writes to source lifecycle/state, source-file inventory, `SourceFacts`, `content_attachments`,
   or `source_file_attachment_links`.
 - A maintained occurrence invalidation scope is not required for the substrate slice. If a future UI needs live
@@ -222,23 +222,20 @@ A composite index such as `(attachment_id, source_id, source_file_id)` is allowe
 pagination and query-plan evidence shows the current `attachment_id` index is insufficient. That would be a performance
 index, not a new occurrence representation.
 
-## Dormant And Legacy Guard
+## Schema Guard
 
-Do not reuse, revive, or rename these as A-5 occurrence authority:
+Do not introduce a second occurrence authority, aliases, compatibility wrappers, or duplicate read paths for A-5.
+Attachment occurrence evidence must stay a derived read over `source_file_attachment_links`, `content_attachments`,
+`source_files`, source lifecycle state, and current `SourceFacts`.
 
-- `LibraryAssets`: internal legacy substrate with opaque `equivalence_fingerprint`; not content identity.
-- `LibraryAssetAttachments`, `SourceSegmentSets`, and `SourceSegments`: dormant/future segment promotion shape; not
-  attachment occurrence identity.
-- `LibraryBrowserRows`: browser projection over legacy asset rows; not occurrence evidence authority.
+Current non-occurrence tables keep their own roles:
+
 - `primary_media_candidates`: playable-media candidate projection; one row per attachment in v0, not per source-file
   occurrence.
 - `track_identity_candidates`, `track_identity_candidate_members`, and `track_identity_candidate_evidence`: exact
   primary-media candidate grouping; not A-5 occurrence grouping.
 - `track_identity_decisions` and related decision evidence tables: candidate decision authority; not occurrence
   preference or relocation decisions.
-
-No aliases, no dual read paths, no compatibility wrappers, and no legacy duplicate vocabulary should be introduced for
-A-5.
 
 ## Non-Goals
 

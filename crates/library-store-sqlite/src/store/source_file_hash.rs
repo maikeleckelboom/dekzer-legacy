@@ -15,12 +15,10 @@ use crate::authority::work::{
     RecordInlineArtifactInput, StartWorkRunInput, WorkItemsAuthorityTx, WorkRunsAuthorityTx,
 };
 use crate::authority::write_lane::AdmittedWrite;
-use crate::publication;
 use crate::store::sources::source_observation_basis_fingerprint;
 use crate::{LibrarySqliteError, LibrarySqliteResult};
 use library_domain::{
-    ArtifactKind, ArtifactRole, ProjectionDomain, SourceFileId, WorkItemState, WorkPriorityClass,
-    WorkRunOutcome,
+    ArtifactKind, ArtifactRole, SourceFileId, WorkItemState, WorkPriorityClass, WorkRunOutcome,
 };
 
 use super::SqliteDurableStore;
@@ -479,12 +477,6 @@ impl SqliteDurableStore {
                 &initial_basis,
                 &content_hash_value,
                 input.observed_at_ms,
-            )?;
-            publication::reseed_projection_domains(write, &[ProjectionDomain::LibraryBrowser])?;
-            publication::invalidate_projection_domain(
-                write,
-                ProjectionDomain::LibraryBrowser,
-                "source_file_blake3_hash",
             )?;
             Ok(result)
         })
@@ -1674,11 +1666,6 @@ mod tests {
         let second = fixture.run_hash(101, second_path).expect("hash second");
 
         assert_eq!(first.content_hash_value, second.content_hash_value);
-        assert_eq!(fixture.count_rows("LibraryAssets"), 0);
-        assert_eq!(fixture.count_rows("LibraryAssetAttachments"), 0);
-        assert_eq!(fixture.count_rows("SourceSegments"), 0);
-        assert_eq!(fixture.count_rows("SourceSegmentSets"), 0);
-        assert_eq!(fixture.count_rows("LibraryBrowserRows"), 0);
     }
 
     #[test]
@@ -1734,33 +1721,6 @@ mod tests {
     }
 
     #[test]
-    fn equivalence_fingerprint_is_not_used_as_blake3_hash_evidence() {
-        let fixture = HashJobFixture::new();
-        let path = fixture.write_source_file(100, "Album/track.flac", b"hash me");
-        fixture
-            .store
-            .with_write(|write| {
-                write.execute(
-                    "INSERT INTO LibraryAssets (
-                         library_asset_id,
-                         equivalence_fingerprint,
-                         created_at,
-                         updated_at
-                     )
-                     VALUES (1, 'eq:not-a-content-hash', 1, 1)",
-                    [],
-                )?;
-                Ok(())
-            })
-            .expect("insert library asset");
-
-        let result = fixture.run_hash(100, path).expect("hash file");
-
-        assert_ne!(result.content_hash_value, "eq:not-a-content-hash");
-        assert_eq!(result.content_hash_algorithm, "blake3");
-    }
-
-    #[test]
     fn cue_file_is_hashed_as_its_own_source_file_without_audio_pairing() {
         let fixture = HashJobFixture::new();
         fixture.write_source_file(100, "Album/track.flac", b"audio bytes");
@@ -1781,10 +1741,6 @@ mod tests {
                 .is_none(),
             "hashing a CUE file must not attach evidence to adjacent audio"
         );
-        assert_eq!(fixture.count_rows("LibraryAssets"), 0);
-        assert_eq!(fixture.count_rows("LibraryAssetAttachments"), 0);
-        assert_eq!(fixture.count_rows("SourceSegments"), 0);
-        assert_eq!(fixture.count_rows("SourceSegmentSets"), 0);
     }
 
     #[test]
@@ -2049,11 +2005,6 @@ mod tests {
             fixture.content_hash_value(100),
             fixture.content_hash_value(101)
         );
-        assert_eq!(fixture.count_rows("LibraryAssets"), 0);
-        assert_eq!(fixture.count_rows("LibraryAssetAttachments"), 0);
-        assert_eq!(fixture.count_rows("SourceSegments"), 0);
-        assert_eq!(fixture.count_rows("SourceSegmentSets"), 0);
-        assert_eq!(fixture.count_rows("LibraryBrowserRows"), 0);
     }
 
     #[test]
@@ -2076,11 +2027,6 @@ mod tests {
                 .expect("read audio facts")
                 .is_none()
         );
-        assert_eq!(fixture.count_rows("LibraryAssets"), 0);
-        assert_eq!(fixture.count_rows("LibraryAssetAttachments"), 0);
-        assert_eq!(fixture.count_rows("SourceSegments"), 0);
-        assert_eq!(fixture.count_rows("SourceSegmentSets"), 0);
-        assert_eq!(fixture.count_rows("LibraryBrowserRows"), 0);
     }
 
     fn file_kind_for_path(path: &str) -> &'static str {

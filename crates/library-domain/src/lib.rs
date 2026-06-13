@@ -2,32 +2,22 @@
 
 pub mod artifact;
 pub mod browser;
-pub mod capability;
 pub mod ids;
-pub mod library_asset;
 pub mod navigation;
-pub mod prep;
 pub mod projection;
 pub mod source;
 pub mod work;
 
 pub use artifact::{ArtifactKind, ArtifactRole, ArtifactStorageKind};
 pub use browser::LibraryBrowseScope;
-pub use capability::{
-    CapabilityInvalidationMode, CapabilityKind, CapabilityKindParseError, CapabilityStabilityClass,
-    CapabilityState,
-};
 pub use ids::{
-    ArtifactId, LibraryAssetId, PlaylistId, PrepPolicyId, ProjectionSubscriberId,
-    SourceDirectoryId, SourceFileId, SourceId, SourceLocationId, SourceSegmentId,
-    SourceSegmentSetId, WorkItemId, WorkRunId,
+    ArtifactId, ProjectionSubscriberId, SourceDirectoryId, SourceFileId, SourceId,
+    SourceLocationId, WorkItemId, WorkRunId,
 };
-pub use library_asset::LibraryAssetRetentionPolicy;
 pub use navigation::{
     EncodedNavigationSelector, NavigationSelector, NavigationSelectorDecodeError,
     compile_library_browse_scope, decode_selector, encode_selector,
 };
-pub use prep::{PrepAssignmentScopeKind, PrepScope, PrepTargetStabilityClass};
 pub use projection::ProjectionDomain;
 pub use source::{
     SourceAccessIssueKind, SourceAccessState, SourceAvailabilityState, SourcePresenceState,
@@ -66,14 +56,9 @@ mod tests {
         assert_id(SourceLocationId::new, SourceLocationId::get);
         assert_id(SourceDirectoryId::new, SourceDirectoryId::get);
         assert_id(SourceFileId::new, SourceFileId::get);
-        assert_id(SourceSegmentSetId::new, SourceSegmentSetId::get);
-        assert_id(SourceSegmentId::new, SourceSegmentId::get);
-        assert_id(LibraryAssetId::new, LibraryAssetId::get);
-        assert_id(PlaylistId::new, PlaylistId::get);
         assert_id(WorkItemId::new, WorkItemId::get);
         assert_id(WorkRunId::new, WorkRunId::get);
         assert_id(ArtifactId::new, ArtifactId::get);
-        assert_id(PrepPolicyId::new, PrepPolicyId::get);
         assert_id(ProjectionSubscriberId::new, ProjectionSubscriberId::get);
     }
 
@@ -144,29 +129,6 @@ mod tests {
             ]
         );
         assert_round_trip!(
-            CapabilityState,
-            [
-                (CapabilityState::Missing, "missing"),
-                (CapabilityState::Queued, "queued"),
-                (CapabilityState::Leased, "leased"),
-                (CapabilityState::Ready, "ready"),
-                (CapabilityState::Stale, "stale"),
-                (CapabilityState::Blocked, "blocked"),
-                (CapabilityState::Failed, "failed"),
-            ]
-        );
-        assert_round_trip!(
-            CapabilityStabilityClass,
-            [
-                (CapabilityStabilityClass::Provisional, "provisional"),
-                (CapabilityStabilityClass::Stable, "stable"),
-            ]
-        );
-        assert_round_trip!(
-            CapabilityInvalidationMode,
-            [(CapabilityInvalidationMode::MarkStale, "mark_stale")]
-        );
-        assert_round_trip!(
             WorkPriorityClass,
             [
                 (WorkPriorityClass::Urgent, "urgent"),
@@ -178,7 +140,6 @@ mod tests {
             WorkSubjectKind,
             [
                 (WorkSubjectKind::SourceFile, "source_file"),
-                (WorkSubjectKind::LibraryAsset, "library_asset"),
                 (WorkSubjectKind::ProjectionDomain, "projection_domain"),
             ]
         );
@@ -186,13 +147,6 @@ mod tests {
             MachineWorkKind,
             [
                 (MachineWorkKind::InspectSource, "inspect_source"),
-                (MachineWorkKind::AcceptSegmentation, "accept_segmentation"),
-                (
-                    MachineWorkKind::ResolveLibraryAsset,
-                    "resolve_library_asset"
-                ),
-                (MachineWorkKind::ComputeCapability, "compute_capability"),
-                (MachineWorkKind::RebindSource, "rebind_source"),
                 (MachineWorkKind::RebuildProjection, "rebuild_projection"),
             ]
         );
@@ -221,10 +175,7 @@ mod tests {
             ArtifactKind,
             [
                 (ArtifactKind::InspectionResult, "inspection_result"),
-                (ArtifactKind::SegmentationResult, "segmentation_result"),
-                (ArtifactKind::CapabilityResult, "capability_result"),
                 (ArtifactKind::ProjectionSnapshot, "projection_snapshot"),
-                (ArtifactKind::DiagnosticResult, "diagnostic_result"),
             ]
         );
         assert_round_trip!(
@@ -246,55 +197,13 @@ mod tests {
         );
         assert_round_trip!(
             ProjectionDomain,
-            [
-                (ProjectionDomain::LibraryBrowser, "library_browser"),
-                (ProjectionDomain::Navigation, "navigation"),
-            ]
+            [(ProjectionDomain::Navigation, "navigation")]
         );
-        assert_round_trip!(
-            LibraryAssetRetentionPolicy,
-            [
-                (LibraryAssetRetentionPolicy::KeepMetadata, "keep_metadata"),
-                (LibraryAssetRetentionPolicy::Purge, "purge"),
-            ]
-        );
-        assert_round_trip!(
-            PrepAssignmentScopeKind,
-            [
-                (PrepAssignmentScopeKind::Library, "library"),
-                (PrepAssignmentScopeKind::Source, "source"),
-                (PrepAssignmentScopeKind::LibraryAsset, "library_asset"),
-            ]
-        );
-        assert_round_trip!(
-            PrepTargetStabilityClass,
-            [
-                (PrepTargetStabilityClass::Provisional, "provisional"),
-                (PrepTargetStabilityClass::Stable, "stable"),
-            ]
-        );
-    }
-
-    #[test]
-    fn capability_kind_validates_slug_values() {
-        let waveform = CapabilityKind::parse(CapabilityKind::WAVEFORM)
-            .expect("known capability kind is valid");
-        assert_eq!(waveform.as_str(), "waveform");
-        assert_eq!(
-            CapabilityKind::parse("adapter.custom_kind-1")
-                .unwrap()
-                .as_str(),
-            "adapter.custom_kind-1"
-        );
-        assert_eq!(CapabilityKind::parse(""), None);
-        assert_eq!(CapabilityKind::parse("Waveform"), None);
-        assert_eq!(CapabilityKind::parse("wave form"), None);
     }
 
     #[test]
     fn work_subjects_encode_and_decode_storage_pairs() {
         let source_file = SourceFileId::new(10).unwrap();
-        let library_asset = LibraryAssetId::new(20).unwrap();
 
         assert_eq!(
             WorkSubject::SourceFile(source_file).kind(),
@@ -306,16 +215,6 @@ mod tests {
             Some(WorkSubject::SourceFile(source_file))
         );
         assert_eq!(WorkSubject::parse(WorkSubjectKind::SourceFile, "0"), None);
-
-        assert_eq!(
-            WorkSubject::LibraryAsset(library_asset).kind(),
-            WorkSubjectKind::LibraryAsset
-        );
-        assert_eq!(WorkSubject::LibraryAsset(library_asset).storage_id(), "20");
-        assert_eq!(
-            WorkSubject::parse(WorkSubjectKind::LibraryAsset, "20"),
-            Some(WorkSubject::LibraryAsset(library_asset))
-        );
 
         assert_eq!(
             WorkSubject::ProjectionDomain(ProjectionDomain::Navigation).kind(),

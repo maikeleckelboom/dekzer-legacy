@@ -915,28 +915,6 @@ mod tests {
                 .expect("count rows")
         }
 
-        fn count_table_if_exists(&self, table: &str) -> Option<i64> {
-            let connection = self.store.open_read_connection().expect("open read");
-            let exists = connection
-                .query_row(
-                    "SELECT COUNT(*)
-                     FROM sqlite_master
-                     WHERE type = 'table'
-                       AND name = ?1",
-                    [table],
-                    |row| row.get::<_, i64>(0),
-                )
-                .expect("check table")
-                > 0;
-            exists.then(|| {
-                connection
-                    .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
-                        row.get(0)
-                    })
-                    .expect("count table")
-            })
-        }
-
         fn change_file_basis(&self, source_file_id: i64) {
             self.store
                 .with_write(|write| {
@@ -1130,11 +1108,6 @@ mod tests {
         assert_eq!(fixture.count_rows("track_identity_candidates"), 1);
         assert_eq!(fixture.count_rows("track_identity_candidate_members"), 1);
         assert_eq!(fixture.count_rows("track_identity_candidate_evidence"), 2);
-        assert_eq!(
-            fixture.count_table_if_exists("Tracks"),
-            None,
-            "candidate production must not create canonical track tables"
-        );
     }
 
     #[test]
@@ -1225,7 +1198,7 @@ mod tests {
     }
 
     #[test]
-    fn no_cue_prep_waveform_stem_playlist_or_legacy_asset_rows_are_created() {
+    fn candidate_production_writes_only_track_identity_candidates() {
         let fixture = TrackIdentityCandidateFixture::new();
         fixture.insert_source_file(100, "Album/track.wav");
         fixture.insert_source_file(101, "Album/album.cue");
@@ -1234,36 +1207,9 @@ mod tests {
         fixture.promote(10);
         fixture.produce(10);
 
-        for table in [
-            "LibraryAssets",
-            "LibraryAssetAttachments",
-            "LibraryBrowserRows",
-            "SourceSegmentSets",
-            "SourceSegments",
-            "PrepAssignments",
-            "ResolvedLibraryAssetPrepTargets",
-            "Playlists",
-            "PlaylistEntries",
-        ] {
-            assert_eq!(fixture.count_rows(table), 0, "{table} must remain empty");
-        }
-        for absent_or_future_table in [
-            "Tracks",
-            "TrackRows",
-            "LibraryTracks",
-            "CueAudioAssociations",
-            "Waveforms",
-            "Stems",
-            "PrepRows",
-            "PreparationRows",
-        ] {
-            assert!(
-                matches!(
-                    fixture.count_table_if_exists(absent_or_future_table),
-                    None | Some(0)
-                ),
-                "{absent_or_future_table} must be absent or empty"
-            );
-        }
+        assert_eq!(fixture.count_rows("track_identity_candidates"), 1);
+        assert_eq!(fixture.count_rows("track_identity_candidate_members"), 1);
+        assert_eq!(fixture.count_rows("track_identity_candidate_evidence"), 1);
+        assert_eq!(fixture.count_rows("track_identity_decisions"), 0);
     }
 }

@@ -6,16 +6,14 @@ use super::{SqliteDurableStore, bootstrap::open_connection};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum MaintainedReadModelScope {
     NavigationRows,
-    LibraryBrowser,
 }
 
 impl MaintainedReadModelScope {
-    const ALL: [Self; 2] = [Self::NavigationRows, Self::LibraryBrowser];
+    const ALL: [Self; 1] = [Self::NavigationRows];
 
     const fn projection_domain(self) -> ProjectionDomain {
         match self {
             Self::NavigationRows => ProjectionDomain::Navigation,
-            Self::LibraryBrowser => ProjectionDomain::LibraryBrowser,
         }
     }
 }

@@ -700,7 +700,7 @@ flowchart TD
   J --> L
   K --> L
   L --> M["Main maps app-safe projections"]
-  M --> N["Renderer paints restored library browser"]
+  M --> N["Renderer paints restored library workspace"]
   N --> O["Event stream starts from new session cursor after reads succeed"]
   O --> P["Events are not used as persisted state"]
 ```

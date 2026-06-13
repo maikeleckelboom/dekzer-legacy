@@ -48,11 +48,8 @@ fn validate_residual_semantic_checks(connection: &Connection) -> LibrarySqliteRe
     validate_source_location_constraints(connection)?;
     validate_browser_user_order_constraints(connection)?;
     validate_navigation_rows_constraints(connection)?;
-    validate_library_browser_rows_constraints(connection)?;
-    validate_library_asset_metadata_corrections_constraints(connection)?;
     validate_work_item_constraints(connection)?;
     validate_artifact_constraints(connection)?;
-    validate_library_browser_fts_configuration(connection)?;
     validate_search_filter_index_fts_configuration(connection)?;
     validate_projection_subscribers_constraints(connection)?;
     Ok(())
@@ -185,7 +182,7 @@ fn validate_browser_user_order_constraints(connection: &Connection) -> LibrarySq
 fn validate_navigation_rows_constraints(connection: &Connection) -> LibrarySqliteResult<()> {
     let sql = read_required_normalized_table_sql(connection, "navigation_rows")?;
     for fragment in [
-        "family IN ('Views', 'Collections', 'Preparation', 'Sources')",
+        "family IN ('Views', 'Sources')",
         "parent_navigation_row_id IS NULL AND family IS NOT NULL",
         "parent_navigation_row_id IS NOT NULL AND family IS NULL",
     ] {
@@ -200,65 +197,15 @@ fn validate_navigation_rows_constraints(connection: &Connection) -> LibrarySqlit
     Ok(())
 }
 
-fn validate_library_browser_rows_constraints(connection: &Connection) -> LibrarySqliteResult<()> {
-    let sql = read_required_normalized_table_sql(connection, "LibraryBrowserRows")?;
-    for fragment in [
-        "availability_state IN ('available', 'unavailable', 'degraded')",
-        "prep_readiness_summary IN ( 'not_required', 'ready', 'preparing', 'underprepared', 'blocked', 'failed' )",
-    ] {
-        require_sql_fragment(
-            &sql,
-            fragment,
-            format!(
-                "LibraryBrowserRows must retain browse-summary constraint fragment {fragment:?}"
-            ),
-        )?;
-    }
-    Ok(())
-}
-
-fn validate_library_asset_metadata_corrections_constraints(
-    connection: &Connection,
-) -> LibrarySqliteResult<()> {
-    let sql = read_required_normalized_table_sql(connection, "LibraryAssetMetadataCorrections")?;
-    for fragment in [
-        "is_null_correction IN (0, 1)",
-        "is_null_correction = 1",
-        "value_text IS NULL",
-        "value_int IS NULL",
-        "is_null_correction = 0",
-        "value_text IS NOT NULL AND value_int IS NULL",
-        "value_text IS NULL AND value_int IS NOT NULL",
-        "retracted_at IS NULL OR retracted_at >= applied_at",
-    ] {
-        require_sql_fragment(
-            &sql,
-            fragment,
-            format!(
-                "LibraryAssetMetadataCorrections must retain correction constraint fragment {fragment:?}"
-            ),
-        )?;
-    }
-    Ok(())
-}
-
 fn validate_work_item_constraints(connection: &Connection) -> LibrarySqliteResult<()> {
     let sql = read_required_normalized_table_sql(connection, "WorkItems")?;
     for fragment in [
-        "subject_kind IN ('source_file', 'library_asset', 'projection_domain')",
-        "work_kind IN ( 'inspect_source', 'accept_segmentation', 'resolve_library_asset', 'compute_capability', 'rebind_source', 'rebuild_projection' )",
+        "subject_kind IN ('source_file', 'projection_domain')",
+        "work_kind IN ( 'inspect_source', 'rebuild_projection' )",
         "priority_class IN ('urgent', 'interactive', 'background')",
         "state IN ('queued', 'leased', 'completed', 'blocked', 'failed', 'canceled')",
-        "work_kind = 'compute_capability'",
-        "capability_kind IS NOT NULL",
-        "target_profile_key IS NOT NULL",
-        "target_quality IS NOT NULL",
-        "work_kind <> 'compute_capability'",
-        "capability_kind IS NULL",
-        "target_profile_key IS NULL",
-        "target_quality IS NULL",
         "state = 'leased' AND leased_until IS NOT NULL",
-        "subject_kind <> 'projection_domain' OR subject_id IN ('library_browser', 'navigation')",
+        "subject_kind <> 'projection_domain' OR subject_id = 'navigation'",
     ] {
         require_sql_fragment(
             &sql,
@@ -272,17 +219,15 @@ fn validate_work_item_constraints(connection: &Connection) -> LibrarySqliteResul
 fn validate_artifact_constraints(connection: &Connection) -> LibrarySqliteResult<()> {
     let sql = read_required_normalized_table_sql(connection, "Artifacts")?;
     for fragment in [
-        "subject_kind IN ('source_file', 'library_asset', 'projection_domain')",
-        "artifact_kind IN ( 'inspection_result', 'segmentation_result', 'capability_result', 'projection_snapshot', 'diagnostic_result' )",
+        "subject_kind IN ('source_file', 'projection_domain')",
+        "artifact_kind IN ( 'inspection_result', 'projection_snapshot' )",
         "artifact_role IN ( 'primary_result', 'preview_summary', 'manifest', 'diagnostic_payload', 'intermediate_output' )",
         "storage_kind IN ('inline_payload', 'file_store')",
-        "artifact_kind <> 'capability_result'",
-        "subject_kind = 'library_asset'",
-        "artifact_kind NOT IN ('inspection_result', 'segmentation_result')",
+        "artifact_kind <> 'inspection_result' OR subject_kind = 'source_file'",
         "subject_kind = 'source_file'",
         "artifact_kind <> 'projection_snapshot'",
         "subject_kind = 'projection_domain'",
-        "subject_kind <> 'projection_domain' OR subject_id IN ('library_browser', 'navigation')",
+        "subject_kind <> 'projection_domain' OR subject_id = 'navigation'",
     ] {
         require_sql_fragment(
             &sql,
@@ -300,26 +245,6 @@ fn validate_projection_subscribers_constraints(connection: &Connection) -> Libra
         "expires_at >= last_seen_at",
         "ProjectionSubscribers must retain the liveness ordering constraint".to_string(),
     )
-}
-
-fn validate_library_browser_fts_configuration(connection: &Connection) -> LibrarySqliteResult<()> {
-    let sql = read_required_normalized_table_sql(connection, "LibraryBrowserRows_fts")?;
-    for fragment in [
-        "USING fts5",
-        "title",
-        "artist",
-        "album",
-        "unicode61 remove_diacritics 1",
-    ] {
-        require_sql_fragment(
-            &sql,
-            fragment,
-            format!(
-                "LibraryBrowserRows_fts must retain searchable library-browser configuration fragment {fragment:?}"
-            ),
-        )?;
-    }
-    Ok(())
 }
 
 fn validate_search_filter_index_fts_configuration(

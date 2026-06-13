@@ -8,8 +8,6 @@ pub(crate) struct ArtifactRow {
     pub(crate) artifact_id: i64,
     pub(crate) subject_kind: String,
     pub(crate) subject_id: String,
-    pub(crate) capability_kind: Option<String>,
-    pub(crate) profile_key: Option<String>,
     pub(crate) artifact_kind: String,
     pub(crate) artifact_role: String,
     pub(crate) basis_fingerprint: String,
@@ -23,8 +21,6 @@ pub(crate) fn load_artifact_row(
         "SELECT artifact_id,
                 subject_kind,
                 subject_id,
-                capability_kind,
-                profile_key,
                 artifact_kind,
                 artifact_role,
                 basis_fingerprint
@@ -36,11 +32,9 @@ pub(crate) fn load_artifact_row(
                 artifact_id: row.get(0)?,
                 subject_kind: row.get(1)?,
                 subject_id: row.get(2)?,
-                capability_kind: row.get(3)?,
-                profile_key: row.get(4)?,
-                artifact_kind: row.get(5)?,
-                artifact_role: row.get(6)?,
-                basis_fingerprint: row.get(7)?,
+                artifact_kind: row.get(3)?,
+                artifact_role: row.get(4)?,
+                basis_fingerprint: row.get(5)?,
             })
         },
     )

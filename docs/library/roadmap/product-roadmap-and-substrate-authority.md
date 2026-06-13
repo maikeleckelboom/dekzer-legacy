@@ -75,8 +75,8 @@ The following layers are canonical.
 
 ### Canonical schema
 
-`content_attachments` — exact-byte identity keyed by `(content_hash_algorithm, content_hash_value)`. No `file_kind`, no
-`equivalence_fingerprint`, no track columns. `first_observed_at` is frozen at first insert.
+`content_attachments` — exact-byte identity keyed by `(content_hash_algorithm, content_hash_value)`. No `file_kind` and
+no track columns. `first_observed_at` is frozen at first insert.
 
 `source_file_attachment_links` — links source files to attachments. `UNIQUE(source_file_id)` enforces one current
 materialized attachment per source file. Staleness computed by join against current `SourceFacts`, not stored as a flag.
@@ -85,24 +85,22 @@ Materialization: `materialize_attachments_for_source(source_id, limit)` — stor
 service-owned scan/manual hash maintenance.
 
 Read boundary: `readSourceFileAttachment`, `readAttachmentSourceFiles`, and `readSourceAttachmentSummary` — explicit
-read-only identity reads. They do not hash, materialize, populate browser rows, or claim a maintained snapshot
-invalidation scope.
+read-only identity reads. They do not hash, materialize, populate product contents projections, or claim a maintained
+snapshot invalidation scope.
 
 Outcome fields: `attachments_created`, `attachments_refreshed`, `links_created`, `links_replaced`, `links_refreshed`,
 `skipped_stale_facts`, `skipped_no_blake3`, `skipped_no_facts`.
 
-### Dormant tables — exit criteria
+### Deleted compatibility surfaces
 
-These tables exist but must not be used for new functionality.
+The current baseline is greenfield. Removed compatibility surfaces are not migration targets, compatibility views, or
+aliases. Future media, track, preparation, playlist, or waveform work must build on the current source-file,
+`SourceFacts`, attachment, primary-media, track-candidate, and track-decision substrate instead of reviving deleted
+tables.
 
-| Table                     | Status  | Replaced by                                       | Exit criterion                                                                                                                                                                                                        | Current prohibition                                                                          |
-| ------------------------- | ------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `LibraryAssets`           | Dormant | `content_attachments` + future track/media layers | Deleted or renamed when media candidate and track identity replace all asset-prep and browser read paths. Named as mandatory deletion task in the media candidate slice — not optional cleanup.                       | No new content identity code may read or write it for any purpose.                           |
-| `LibraryAssetAttachments` | Dormant | `source_file_attachment_links`                    | Deleted when source segment / segment set story is fully replaced by CUE association + media candidate / subtrack model. Named as mandatory deletion task in that slice.                                              | No new attachment identity code may use it for any purpose.                                  |
-| `primaryMedia`            | Current narrow read policy | `primary_media_candidates` evidence projection | Active as a projection over media candidates. It remains non-default product doctrine until workflow-filter ownership explicitly chooses it. | Not track identity and not a fallback source-file browser. |
-
-Each must carry a TOMBSTONE comment in the migration file. The slice that removes a dormant table must include deletion
-as a mandatory task.
+`primaryMedia` is current as a narrow read policy over `primary_media_candidates`; it remains non-default product
+doctrine until workflow-filter ownership explicitly chooses it. It is not track identity and not a fallback source-file
+browser.
 
 ### Explicitly deferred
 
@@ -823,7 +821,7 @@ These substitutions are non-negotiable in product-facing surfaces, docs, and cod
 | Acoustic fingerprinting                 | Audio media candidates (C-1) exist                                       |
 | Track identity schema hardened          | C/D import interoperability gate lands first                             |
 | Auto-cleanup, removal, or merge         | Never without explicit user decision flow and record                     |
-| Browser rows populated from attachments | Browser population is a future projection layer                          |
+| Product contents rows populated from attachments | Product contents projection is a future layer                     |
 | Renderer-owned library truth            | Never                                                                    |
 | Playlists as central workflow model     | Crates/sleeves/routes designed first                                     |
 | Search from renderer                    | A-7 search/filter contract must land first                               |
@@ -839,11 +837,8 @@ These substitutions are non-negotiable in product-facing surfaces, docs, and cod
 
 As new canonical layers land, dormant surfaces are deleted. No permanent placeholders.
 
-**Rule:** Every dormant table has an explicit exit criterion in this document and a TOMBSTONE comment in the migration
-file. The slice that deletes it must include the deletion as a mandatory task, not optional cleanup.
-
-When a layer is replaced, the old table is deleted in the same slice — not queued for later, not aliased, not silently
-kept.
+**Rule:** When a layer is replaced, the old surface is deleted in the same slice — not queued for later, not aliased, not
+silently kept.
 
 ---
 

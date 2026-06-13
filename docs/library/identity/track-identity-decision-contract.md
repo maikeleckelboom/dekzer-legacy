@@ -44,7 +44,7 @@ A decision is over one `track_identity_candidate_id`.
 
 The candidate remains the evidence group. The decision records how that candidate was classified by a decision source.
 The decision does not own source-file inventory, attachment identity, primary-media promotion, CUE association, metadata
-reconciliation, preparation state, playlist membership, browser rows, waveform state, stem state, or artwork state.
+reconciliation, preparation state, playlist membership, contents rows, waveform state, stem state, or artwork state.
 
 V0 automatic production creates `accepted` decisions with `decision_source = system_exact_content_v0`. Explicit local
 user commands create `accepted`, `rejected`, or `deferred` decisions with `decision_source = user_local_v0`.
@@ -148,8 +148,8 @@ User accept requires current supporting evidence and snapshots it. User reject/d
 snapshot current evidence if any exists and otherwise record zero decision evidence rows. Reject/defer must not fabricate
 stale evidence as supporting evidence.
 
-The snapshot is provenance, not a new content identity authority. BLAKE3 evidence remains exact bytes evidence and
-`LibraryAssets.equivalence_fingerprint` must not be used as content identity.
+The snapshot is provenance, not a new content identity authority. BLAKE3 evidence remains exact bytes evidence and no
+caller-supplied opaque identity key may be used as content identity.
 
 `track_identity_decision_evidence` is a copied-provenance snapshot. Its candidate, member, candidate-evidence,
 primary-media, attachment, source-file attachment link, source-file, source, and probe artifact ids are retained as

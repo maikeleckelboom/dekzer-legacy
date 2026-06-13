@@ -41,10 +41,8 @@ pub fn read_rows(
          ORDER BY CASE
                       WHEN parent_navigation_row_id IS NOT NULL THEN 0
                       WHEN family = 'Views' THEN 0
-                      WHEN family = 'Collections' THEN 1
-                      WHEN family = 'Preparation' THEN 2
-                      WHEN family = 'Sources' THEN 3
-                      ELSE 4
+                      WHEN family = 'Sources' THEN 1
+                      ELSE 2
                   END ASC,
                   sibling_position ASC,
                   navigation_row_id ASC",

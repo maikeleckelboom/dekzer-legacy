@@ -112,7 +112,7 @@ If a previously accepted source location is missing, renamed, permission-denied,
 
 ### 9. Deletion and cascade laws
 
-Deleting or hiding a source location never deletes source files, directories, assets, attachments, or browser rows. It
+Deleting or hiding a source location never deletes source files, directories, attachments, or current contents rows. It
 only changes source-location configuration and source-level aggregate scope.
 
 Source deletion cascades substrate rows by schema. Literal directory parent relationships must also cascade in the

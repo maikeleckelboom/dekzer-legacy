@@ -125,7 +125,7 @@ models do not recompute it from `relative_path`.
 ## Non-goals
 
 - Locale-sensitive human collation (e.g., ICU locale-aware ordering)
-- Metadata title/artist/album natural ordering (library browser uses its own ordering)
+- Metadata title/artist/album natural ordering for future product row projections
 - Track identity ordering
 - Playlist, crate, sleeve, prep, waveform, stems, or artwork ordering
 - Renderer-side reordering of backend-paginated windows
@@ -136,23 +136,18 @@ The following surfaces have not yet been migrated to natural browse sort keys:
 
 | Surface                         | File                                                | Current ordering                          | Backend paginated        | Requires cursor change |
 | ------------------------------- | --------------------------------------------------- | ----------------------------------------- | ------------------------ | ---------------------- |
-| **Contents primary-media**      | `contents.rs` `PRIMARY_MEDIA_CONTENTS_ORDER_SQL`    | `lower(title/artist/album/relative_path)` | Yes                      | Yes                    |
-| **Library browser default**     | `library_browser.rs` `AGGREGATE_DEFAULT_ORDER`      | `lower(title/artist/album/relative_path)` | Offset-based (no cursor) | No                     |
-| **Library browser scoped**      | `library_browser.rs` `read_scoped_window_rows`      | `lower(title/artist/album/relative_path)` | Offset-based (no cursor) | No                     |
-| **Library browser prep-policy** | `library_browser.rs` `read_prep_policy_window_rows` | `lower(title/artist/album/relative_path)` | Offset-based (no cursor) | No                     |
-| **Library browser search**      | `library_browser.rs` search order clauses           | `lower(title/artist/album/relative_path)` | Offset-based (no cursor) | No                     |
-| **Navigation**                  | `navigation.rs` (projections)                       | `sibling_position`                        | No                       | N/A                    |
-| **Playlists**                   | `projections.rs`                                    | `lower(display_name)`                     | No                       | N/A                    |
+| **Contents primary-media** | `contents.rs` `PRIMARY_MEDIA_CONTENTS_ORDER_SQL` | `lower(title/artist/album/relative_path)` | Yes | Yes |
+| **Navigation** | `navigation.rs` (projections) | `sibling_position` | No | N/A |
 
 ### Rationale for deferral
 
-Primary-media and library-browser surfaces are metadata-ordered (title/artist/album).
+Primary-media rows are metadata-ordered (title/artist/album).
 The `lower(relative_path)` is used only as a final tie-break for rows with identical
 metadata values. The `[10]` before `[2]` class of bug in these tie-breaks is unlikely
 to be visible to users. Converting these requires either joining `source_files` to
 obtain `relative_path_browse_sort_key` in the projected row set, or computing
 a separate column on the projected table. Both paths carry migration complexity
-disproportionate to the user-facing impact.
+disproportionate to the current user-facing impact.
 
 Literal hierarchy and contents source-file ordering are now fixed.
 

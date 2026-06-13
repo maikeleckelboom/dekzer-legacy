@@ -4,7 +4,6 @@ use crate::authority::promotion::{
 };
 use crate::publication;
 use crate::time::unix_time_ms;
-use library_domain::ProjectionDomain;
 
 use super::SqliteDurableStore;
 
@@ -30,7 +29,7 @@ impl SqliteDurableStore {
             return Ok(());
         }
 
-        self.reseed_navigation_and_library_browser_projections()
+        self.reseed_navigation_projection()
     }
 
     #[allow(dead_code)]
@@ -42,22 +41,12 @@ impl SqliteDurableStore {
         if file_ids.is_empty() {
             return Ok(0);
         }
-        self.reseed_navigation_and_library_browser_projections()?;
+        self.reseed_navigation_projection()?;
         Ok(0)
     }
 
-    pub(super) fn reseed_navigation_and_library_browser_projections(
-        &self,
-    ) -> LibrarySqliteResult<()> {
-        self.with_write(|write| {
-            publication::reseed_projection_domains(
-                write,
-                &[
-                    ProjectionDomain::Navigation,
-                    ProjectionDomain::LibraryBrowser,
-                ],
-            )
-        })
+    pub(super) fn reseed_navigation_projection(&self) -> LibrarySqliteResult<()> {
+        self.with_write(|write| publication::reseed_current_projection_state(write))
     }
 
     pub fn reseed_current_projection_state(&self) -> LibrarySqliteResult<()> {

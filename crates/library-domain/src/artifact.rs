@@ -1,30 +1,21 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ArtifactKind {
     InspectionResult,
-    SegmentationResult,
-    CapabilityResult,
     ProjectionSnapshot,
-    DiagnosticResult,
 }
 
 impl ArtifactKind {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::InspectionResult => "inspection_result",
-            Self::SegmentationResult => "segmentation_result",
-            Self::CapabilityResult => "capability_result",
             Self::ProjectionSnapshot => "projection_snapshot",
-            Self::DiagnosticResult => "diagnostic_result",
         }
     }
 
     pub fn parse(value: &str) -> Option<Self> {
         match value {
             "inspection_result" => Some(Self::InspectionResult),
-            "segmentation_result" => Some(Self::SegmentationResult),
-            "capability_result" => Some(Self::CapabilityResult),
             "projection_snapshot" => Some(Self::ProjectionSnapshot),
-            "diagnostic_result" => Some(Self::DiagnosticResult),
             _ => None,
         }
     }

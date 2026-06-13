@@ -272,11 +272,9 @@ Conceptually:
 selected tree row
   -> resolve selector/binding target
   -> derive source_id and optional relative path prefix/scope
-  -> query scoped source_files (audio + video, present)
-  -> for each source_file with a promoted LibraryBrowserRow:
-       return a promoted library asset row
-  -> for each source_file without a promoted LibraryBrowserRow:
-       return a scanned source-file row
+  -> query scoped source_files according to the requested contents policy
+  -> for primaryMedia, join current primary_media_candidates with source_files, attachments, and SourceFacts
+  -> for sourceFileInventory/audioBrowse/playableMediaBrowse, return scoped source-file inventory rows
   -> return rows plus scan coverage metadata
   -> render contents table
 ```

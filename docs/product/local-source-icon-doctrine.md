@@ -65,7 +65,7 @@ The browser must not feel like Windows Explorer, Finder, or a generic file picke
 | File open/save dialogs                                             | Operating system                                               |
 | Source registration and relocation workflows                       | Dekzer-authored icons, with native meaning                     |
 | Main source tree                                                   | Dekzer-authored icons                                          |
-| Main library browser                                               | Dekzer-authored product icons                                  |
+| Main library browse surface                                        | Dekzer-authored product icons                                  |
 | Raw diagnostic file mode                                           | Native icons may be allowed behind an explicit diagnostic mode |
 | Prepared room, crates, sleeves, routes, history, analysis surfaces | Dekzer-authored product icons only                             |
 
@@ -74,7 +74,7 @@ browser language.
 
 ## Vetoes
 
-### No OS file-association icons in the normal library browser
+### No OS file-association icons in the normal library browse surface
 
 A Windows `.mp3` icon, Finder file icon, or user-default app icon is not a Dekzer track identity.
 
@@ -90,7 +90,7 @@ It does not store rendered SVGs, PNGs, native icon blobs, CSS classes, or platfo
 ### No native icon provider as product authority
 
 Native icon APIs may support diagnostics or OS-bound workflows. They do not decide the canonical visual identity of
-Dekzer browser rows.
+Dekzer browse rows.
 
 ### No platform cosplay
 
@@ -400,7 +400,7 @@ The local-source icon set should be compact, monochrome, and designed for dense 
 
 Do not rely on automated scale-down from 20px to 16px.
 
-Dense browser rows are a primary surface. At 16px, small details such as connector marks, folder tabs, drive boundaries,
+Dense browse rows are a primary surface. At 16px, small details such as connector marks, folder tabs, drive boundaries,
 and waveform cuts need optical adjustment to remain legible.
 
 The icon registry may expose the same canonical name at both sizes, but the underlying asset may differ.

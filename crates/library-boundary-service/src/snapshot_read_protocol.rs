@@ -312,9 +312,6 @@ const fn map_maintained_read_model_scope(
         store::MaintainedReadModelScope::NavigationRows => {
             protocol::MaintainedSnapshotScope::NavigationRows
         }
-        store::MaintainedReadModelScope::LibraryBrowser => {
-            protocol::MaintainedSnapshotScope::Contents
-        }
     }
 }
 

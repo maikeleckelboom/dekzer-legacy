@@ -19,11 +19,11 @@ scope:
   - external-library-provenance
 ---
 
-# Library Browser Representation Contract
+# Library Browse Representation Contract
 
 ## Purpose
 
-This document defines the canonical representation model for the Dekzer library browser.
+This document defines the canonical representation model for Dekzer library browse surfaces.
 
 The library is not a local file tree. Local Files is one representation inside the library, and it is the rawest one.
 Dekzer also needs collection projections, crates, playlists, smart lists, external library adapters, history, sleeves,

@@ -2003,7 +2003,7 @@ mod tests {
     }
 
     #[test]
-    fn decision_production_does_not_group_by_path_or_equivalence_fingerprint() {
+    fn decision_production_does_not_group_by_similar_path_names() {
         let fixture = TrackIdentityDecisionFixture::new();
         fixture.insert_source_file(100, "Album/track.wav");
         fixture.insert_source_file(101, "Album/track copy.wav");
@@ -2011,22 +2011,6 @@ mod tests {
         fixture.link_attachment(101, HASH_B);
         fixture.commit_current_facts(100, HASH_A);
         fixture.commit_current_facts(101, HASH_B);
-        fixture
-            .store
-            .with_write(|write| {
-                write.execute(
-                    "INSERT INTO LibraryAssets (
-                         library_asset_id,
-                         equivalence_fingerprint,
-                         created_at,
-                         updated_at
-                     )
-                     VALUES (1, 'same-looking-track', 1, 1)",
-                    [],
-                )?;
-                Ok(())
-            })
-            .expect("insert legacy asset");
         fixture.promote_and_candidate();
 
         fixture.produce_decisions(10);
@@ -2046,7 +2030,7 @@ mod tests {
     }
 
     #[test]
-    fn decision_production_leaves_contents_cue_metadata_and_prep_surfaces_unchanged() {
+    fn decision_production_preserves_contents_rows_and_current_schema() {
         let fixture = TrackIdentityDecisionFixture::new();
         fixture.insert_source_file(100, "Album/track.wav");
         fixture.insert_source_file(101, "Album/album.cue");
@@ -2077,41 +2061,9 @@ mod tests {
         assert_eq!(result.state, StoreContentsState::Ready);
         assert_eq!(result.rows.len(), 2);
         assert!(result.rows.iter().all(|row| row.primary_media.is_none()));
-
-        for table in [
-            "LibraryAssetAttachments",
-            "LibraryBrowserRows",
-            "SourceSegmentSets",
-            "SourceSegments",
-            "PrepAssignments",
-            "ResolvedLibraryAssetPrepTargets",
-            "Playlists",
-            "PlaylistEntries",
-        ] {
-            assert_eq!(fixture.count_rows(table), 0, "{table} must remain empty");
-        }
-        for absent_or_future_table in [
-            "canonical_tracks",
-            "tracks",
-            "library_tracks",
-            "track_identities",
-            "Tracks",
-            "TrackRows",
-            "LibraryTracks",
-            "CueAudioAssociations",
-            "Waveforms",
-            "Stems",
-            "PrepRows",
-            "PreparationRows",
-        ] {
-            assert!(
-                matches!(
-                    fixture.count_table_if_exists(absent_or_future_table),
-                    None | Some(0)
-                ),
-                "{absent_or_future_table} must be absent or empty"
-            );
-        }
+        assert_eq!(fixture.count_rows("track_identity_candidates"), 1);
+        assert_eq!(fixture.count_rows("track_identity_decisions"), 1);
+        assert_eq!(fixture.count_rows("track_identity_decision_evidence"), 1);
 
         let columns = fixture
             .store

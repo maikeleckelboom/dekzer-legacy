@@ -95,11 +95,11 @@ This is relevant for beatgrid and waveform payload storage policy.
 ### Product-facing enrichment behavior
 
 c16218dc5a70de0a5eb6b231e6c1f00a4393e183
-feat(library): surface inventory-backed browser rows immediately and enrich them progressively through probe and
+feat(library): surface inventory-backed browse rows immediately and enrich them progressively through probe and
 analysis
 
 e175202820e17e473336029323cb5bc22db1b5fc
-feat(library): surface inventory-backed browser rows immediately and enrich them progressively through probe and
+feat(library): surface inventory-backed browse rows immediately and enrich them progressively through probe and
 analysis
 
 These are important product behavior commits. They reinforce the Dekzer rule that rows become visible from

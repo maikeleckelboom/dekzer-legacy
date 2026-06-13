@@ -664,30 +664,6 @@ mod tests {
                 .expect("count rows")
         }
 
-        fn count_table_if_exists(&self, table: &str) -> Option<i64> {
-            let connection = self.read_connection();
-            let exists: i64 = connection
-                .query_row(
-                    "SELECT COUNT(*)
-                     FROM sqlite_schema
-                     WHERE type IN ('table', 'view')
-                       AND name = ?1",
-                    [table],
-                    |row| row.get(0),
-                )
-                .expect("check table exists");
-            if exists == 0 {
-                return None;
-            }
-            Some(
-                connection
-                    .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
-                        row.get(0)
-                    })
-                    .expect("count optional table"),
-            )
-        }
-
         fn attachment_id_for_hash(&self, hash_value: &str) -> i64 {
             let connection = self.read_connection();
             connection
@@ -1285,75 +1261,6 @@ mod tests {
             vec![101]
         );
         assert_eq!(cue_links[0].file_kind, "cue_sheet");
-    }
-
-    #[test]
-    fn materialization_creates_no_browser_segments_tracks_or_prep_rows() {
-        let mut fixture = AttachmentIdentityFixture::new();
-        fixture.record_source_file(100, "Album/track.flac", 10, 100);
-        fixture.commit_blake3_fact(100, HASH_A, "audio");
-
-        fixture.materialize(10);
-
-        assert_eq!(fixture.count_rows("LibraryAssets"), 0);
-        assert_eq!(fixture.count_rows("LibraryAssetAttachments"), 0);
-        assert_eq!(fixture.count_rows("LibraryBrowserRows"), 0);
-        assert_eq!(fixture.count_rows("SourceSegmentSets"), 0);
-        assert_eq!(fixture.count_rows("SourceSegments"), 0);
-        assert_eq!(fixture.count_rows("PrepAssignments"), 0);
-        assert_eq!(fixture.count_rows("ResolvedLibraryAssetPrepTargets"), 0);
-        for absent_or_future_table in [
-            "Tracks",
-            "TrackRows",
-            "LibraryTracks",
-            "PrepRows",
-            "PreparationRows",
-        ] {
-            assert!(
-                matches!(
-                    fixture.count_table_if_exists(absent_or_future_table),
-                    None | Some(0)
-                ),
-                "{absent_or_future_table} must be absent or empty"
-            );
-        }
-    }
-
-    #[test]
-    fn equivalence_fingerprint_is_not_attachment_identity() {
-        let mut fixture = AttachmentIdentityFixture::new();
-        fixture.record_source_file(100, "Album/track.flac", 10, 100);
-        fixture.commit_blake3_fact(100, HASH_C, "audio");
-        fixture
-            .read_connection()
-            .execute(
-                "INSERT INTO LibraryAssets (
-                     library_asset_id,
-                     equivalence_fingerprint,
-                     created_at,
-                     updated_at
-                 )
-                 VALUES (1, 'eq:not-content-identity', 1, 1)",
-                [],
-            )
-            .expect("insert legacy library asset");
-
-        let result = fixture.materialize(10);
-
-        assert_eq!(result.attachments_created, 1);
-        assert_eq!(fixture.count_rows("LibraryAssets"), 1);
-        assert_eq!(fixture.count_rows("LibraryAssetAttachments"), 0);
-        let connection = fixture.read_connection();
-        let content_hash_value: String = connection
-            .query_row(
-                "SELECT content_hash_value
-                 FROM content_attachments",
-                [],
-                |row| row.get(0),
-            )
-            .expect("read content attachment hash");
-        assert_eq!(content_hash_value, HASH_C);
-        assert_ne!(content_hash_value, "eq:not-content-identity");
     }
 
     fn source_file_domain_id(value: i64) -> SourceFileId {
