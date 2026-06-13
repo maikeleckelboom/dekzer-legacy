@@ -38,7 +38,7 @@ export type LocalBrowseItemMediaRelevance =
   | 'unsupported'
   | 'unknown'
 
-export type LocalBrowseProfile = 'audioBrowse' | 'mediaBrowse' | 'allFiles'
+export type LocalBrowseProfile = 'audio' | 'playable' | 'allFiles'
 
 export type LocalBrowseItemFailureCode =
   | 'unsupportedPlatform'

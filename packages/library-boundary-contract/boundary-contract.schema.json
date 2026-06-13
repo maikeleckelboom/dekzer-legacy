@@ -2404,8 +2404,8 @@
     "LocalBrowseProfile": {
       "type": "string",
       "enum": [
-        "audioBrowse",
-        "mediaBrowse",
+        "audio",
+        "playable",
         "allFiles"
       ]
     },

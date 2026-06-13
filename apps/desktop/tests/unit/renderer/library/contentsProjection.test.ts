@@ -399,10 +399,10 @@ describe('projectContents', () => {
 
   it('does not render verified-empty policy labels while nextCursor exists', () => {
     const verifiedEmptyLabels = [
-      'No audio items in this scope.',
+      'No audio files found in this view.',
       'No video items in this scope.',
       'No companion files in this scope.',
-      'No files in this scope.'
+      'No files found in this view.'
     ]
 
     for (const profile of [
@@ -508,7 +508,7 @@ describe('projectContents', () => {
     expect(empty.rows[0]).toMatchObject({
       kind: 'state',
       state: 'empty',
-      label: 'No playable media in this scope.'
+      label: 'No playable media found in this view.'
     })
 
     const partial = projectForSelection(browserState({}), 'navigation-row:7', {
@@ -827,7 +827,7 @@ describe('projectContents', () => {
     expect(authoritative.rows[0]).toMatchObject({
       kind: 'state',
       state: 'empty',
-      label: 'No playable media in this scope.'
+      label: 'No playable media found in this view.'
     })
   })
 
@@ -846,8 +846,8 @@ describe('projectContents', () => {
     expect(contents.rows[0]).toMatchObject({
       kind: 'state',
       state: 'empty',
-      label: 'No audio items in this scope.',
-      detail: 'No audio items in this scope.'
+      label: 'No audio files found in this view.',
+      detail: 'No audio files found in this view.'
     })
   })
 
@@ -950,8 +950,8 @@ describe('projectContents', () => {
     expect(audioBrowse.rows[0]).toMatchObject({
       kind: 'state',
       state: 'empty',
-      label: 'No audio items in this scope.',
-      detail: 'No audio items in this scope.'
+      label: 'No audio files found in this view.',
+      detail: 'No audio files found in this view.'
     })
 
     const playableMediaBrowse = projectForSelection(
@@ -968,7 +968,7 @@ describe('projectContents', () => {
     expect(playableMediaBrowse.rows[0]).toMatchObject({
       kind: 'state',
       state: 'empty',
-      label: 'No playable media in this scope.'
+      label: 'No playable media found in this view.'
     })
 
     const video = projectForSelection(
@@ -1022,7 +1022,7 @@ describe('projectContents', () => {
     expect(allFiles.rows[0]).toMatchObject({
       kind: 'state',
       state: 'empty',
-      label: 'No files in this scope.'
+      label: 'No files found in this view.'
     })
   })
 
@@ -1413,6 +1413,7 @@ function localBrowseWindow(options: {
   readonly nextOffset?: number
 }): LoadedLocalBrowseItems {
   return {
+    profile: 'audio',
     identity: {
       entryPointKind: 'music',
       resolvedRootPath: 'C:\\Users\\Maikel\\Music',
@@ -1430,6 +1431,7 @@ function localBrowseWindow(options: {
 
 function localBrowseWindowStateKey(window: LoadedLocalBrowseItems): string {
   return localBrowseWindowKey({
+    profile: window.profile,
     entryPointKind: window.identity.entryPointKind,
     resolvedRootPath: window.identity.resolvedRootPath,
     resolvedParentPath: window.identity.resolvedParentPath,

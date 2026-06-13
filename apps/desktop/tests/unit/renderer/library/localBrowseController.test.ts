@@ -1,9 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
+import { ref } from 'vue'
 
 import {
   createLocalBrowseController,
+  localBrowseWindowKeyForIdentity,
   type LocalBrowseReadApi
 } from '../../../../src/renderer/library/localBrowse/controller'
+import { localBrowseWindowKey } from '../../../../src/renderer/library/localBrowse/types'
+import type { ProfileKey } from '../../../../src/renderer/library/browseProfile/types'
 import type { BrowserState } from '../../../../src/renderer/library/state'
 import {
   projectState,
@@ -16,6 +20,21 @@ import type {
 } from '../../../../src/shared/library/localBrowse/items'
 
 describe('createLocalBrowseController', () => {
+  it('keys local browse windows by profile', () => {
+    const target = {
+      profile: 'playable' as const,
+      entryPointKind: 'music' as const,
+      resolvedRootPath: 'C:\\Users\\Maikel\\Music',
+      resolvedParentPath: 'C:\\Users\\Maikel\\Music',
+      label: 'Music'
+    }
+
+    expect(localBrowseWindowKey(target)).toBe(
+      'playable:music:C%3A%5CUsers%5CMaikel%5CMusic:C%3A%5CUsers%5CMaikel%5CMusic'
+    )
+    expect(localBrowseWindowKeyForIdentity(target, 'playable')).toBe(localBrowseWindowKey(target))
+  })
+
   it('reads entry points and item windows with boundary identities', async () => {
     const itemRequests: ReadLocalBrowseItemsRequest[] = []
     const readItems = vi.fn(async (request: ReadLocalBrowseItemsRequest) => {
@@ -75,7 +94,7 @@ describe('createLocalBrowseController', () => {
       entryPointKind: 'music',
       resolvedRootPath: 'C:\\Users\\Maikel\\Music',
       resolvedParentPath: 'C:\\Users\\Maikel\\Music',
-      profile: 'audioBrowse',
+      profile: 'audio',
       offset: 0,
       limit: 50
     })
@@ -93,10 +112,76 @@ describe('createLocalBrowseController', () => {
       entryPointKind: 'music',
       resolvedRootPath: 'C:\\Users\\Maikel\\Music',
       resolvedParentPath: 'C:\\Users\\Maikel\\Music\\Albums',
-      profile: 'audioBrowse',
+      profile: 'audio',
       offset: 0,
       limit: 50
     })
+  })
+
+  it('uses selected profile for reads and preserves it for read-more', async () => {
+    const itemRequests: ReadLocalBrowseItemsRequest[] = []
+    const profile = ref<ProfileKey>('playable')
+    const readItems = vi.fn(async (request: ReadLocalBrowseItemsRequest) => {
+      itemRequests.push(structuredClone(request))
+
+      return {
+        state: 'read' as const,
+        status: 'complete' as const,
+        windowIdentity: {
+          entryPointKind: request.entryPointKind,
+          resolvedRootPath: request.resolvedRootPath,
+          resolvedParentPath: request.resolvedParentPath
+        },
+        offset: request.offset,
+        limit: request.limit,
+        totalItems: request.offset === 0 ? 2 : 2,
+        items:
+          request.offset === 0
+            ? [directoryItem()]
+            : [
+                {
+                  ...directoryItem(),
+                  displayName: 'More',
+                  identity: {
+                    ...directoryItem().identity,
+                    resolvedItemPath: 'C:\\Users\\Maikel\\Music\\More'
+                  }
+                }
+              ],
+        failure: null
+      }
+    })
+    const controller = createLocalBrowseController(testLocalBrowseApi({ readItems }), { profile })
+    controller.start()
+
+    await controller.refreshEntryPoints()
+    let projection = projectTree({
+      sourceReadStates: new Map(),
+      directoryReadStates: new Map(),
+      localBrowseEntryPointsState: controller.entryPointsState.value,
+      localBrowseItemStates: controller.itemStates.value
+    })
+    const musicNodeId = requiredNodeIdByLabel(projection, 'Music')
+    await controller.requestNodeChildren(musicNodeId, projection)
+
+    projection = projectTree({
+      profile: 'playable',
+      sourceReadStates: new Map(),
+      directoryReadStates: new Map(),
+      localBrowseEntryPointsState: controller.entryPointsState.value,
+      localBrowseItemStates: controller.itemStates.value
+    })
+    await controller.requestNodeMore(musicNodeId, projection)
+
+    expect(itemRequests.map((request) => request.profile)).toEqual(['playable', 'playable'])
+    expect(itemRequests[1]).toMatchObject({
+      resolvedParentPath: 'C:\\Users\\Maikel\\Music',
+      offset: 1
+    })
+
+    profile.value = 'allFiles'
+    await controller.requestNodeChildren(musicNodeId, projection)
+    expect(itemRequests[2]?.profile).toBe('allFiles')
   })
 })
 

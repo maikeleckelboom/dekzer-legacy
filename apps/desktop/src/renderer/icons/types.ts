@@ -12,6 +12,7 @@ export type IconRole =
   | 'state.warning'
   | 'state.unknown'
   | 'action.more'
+  | 'action.browseView'
   | 'action.scan'
   | 'action.remove'
   | 'navigation.collection'

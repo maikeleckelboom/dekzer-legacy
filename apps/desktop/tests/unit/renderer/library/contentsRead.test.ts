@@ -100,7 +100,7 @@ describe('createContentsReadController', () => {
     ).toBe('directory:7:11:playableMedia:audio,video:recursive')
   })
 
-  it('maps all activated built-in filters to distinct contents identities', async () => {
+  it('maps browse profiles to distinct contents identities', async () => {
     const requests: ContentsReadRequest[] = []
     const contentsApi: LibraryContentsApi = {
       async read(request): Promise<ContentsReadResult> {
@@ -113,20 +113,14 @@ describe('createContentsReadController', () => {
     controller.start()
 
     await controller.readForBinding(directoryBinding())
-    controller.setActiveFilter('video')
+    controller.setProfile('playable')
     await controller.readForBinding(directoryBinding())
-    controller.setActiveFilter('media')
-    await controller.readForBinding(directoryBinding())
-    controller.setActiveFilter('companionFiles')
-    await controller.readForBinding(directoryBinding())
-    controller.setActiveFilter('allSourceFiles')
+    controller.setProfile('allFiles')
     await controller.readForBinding(directoryBinding())
 
     expect(requests.map((request) => request.policy)).toEqual([
       { kind: 'audioBrowse' },
-      { kind: 'playableMedia', mediaKinds: ['video'] },
       { kind: 'playableMediaBrowse' },
-      { kind: 'sourceFileInventory', fileClasses: ['unsupported'] },
       { kind: 'sourceFileInventory', fileClasses: ['audio', 'video', 'image', 'unsupported'] }
     ])
     expect(
@@ -135,14 +129,12 @@ describe('createContentsReadController', () => {
       )
     ).toEqual([
       'directory:7:11:audioBrowse:recursive',
-      'directory:7:11:playableMedia:video:recursive',
       'directory:7:11:playableMediaBrowse:recursive',
-      'directory:7:11:sourceFileInventory:unsupported:recursive',
       'directory:7:11:sourceFileInventory:audio,video,image,unsupported:recursive'
     ])
   })
 
-  it('retains accepted rows while a filter switch is pending', async () => {
+  it('clears accepted rows and cursor when a profile switch is pending', async () => {
     vi.useFakeTimers()
     const contentsApi = deferredContentsApi()
     const controller = createContentsReadController(contentsApi)
@@ -152,18 +144,16 @@ describe('createContentsReadController', () => {
     contentsApi.resolveNext(readyContents(requestAt(contentsApi, 0), [contentsRow('a', 'A.wav')]))
     await initial
 
-    controller.setActiveFilter('media')
+    controller.setProfile('playable')
     const switched = controller.readForBinding(directoryBinding())
 
     expect(controller.state.value).toMatchObject({
-      kind: 'ready',
-      requestKey: 'directory:7:11:audioBrowse:recursive',
+      kind: 'idle',
       pending: {
         requestKey: 'directory:7:11:playableMediaBrowse:recursive',
-        presentation: 'deferred'
+        presentation: 'visible'
       }
     })
-    expect(visibleLabels(controller.state.value)).toEqual(['A.wav'])
 
     contentsApi.resolveNext(readyContents(requestAt(contentsApi, 1), [contentsRow('b', 'B.mp4')]))
     await expect(switched).resolves.toBe(true)
@@ -388,6 +378,43 @@ describe('createContentsReadController', () => {
     contentsApi.resolveNext(readyContents(requestAt(contentsApi, 1), [contentsRow('b', 'B.wav')]))
     await expect(read).resolves.toBe(true)
     expect(visibleLabels(controller.state.value)).toEqual(['B.wav'])
+  })
+
+  it('profile changes clear accepted cursor and warm snapshots', async () => {
+    vi.useFakeTimers()
+    const contentsApi = deferredContentsApi()
+    const controller = createContentsReadController(contentsApi)
+
+    controller.start()
+    controller.preloadForBinding(directoryBinding())
+    await vi.advanceTimersByTimeAsync(loadingThresholdPlusMargin())
+    contentsApi.resolveNext(
+      readyContents(requestAt(contentsApi, 0), [contentsRow('a', 'A.wav')], 'ready', 'cursor-a')
+    )
+    await flushPromises()
+
+    await expect(controller.readForBinding(directoryBinding())).resolves.toBe(true)
+    expect(controller.state.value).toMatchObject({
+      kind: 'ready',
+      nextCursor: 'cursor-a'
+    })
+
+    controller.setProfile('allFiles')
+    expect(controller.state.value).toEqual({
+      kind: 'idle',
+      detail: 'No contents scope is active.'
+    })
+
+    const read = controller.readForBinding(directoryBinding())
+    expect(contentsApi.requests).toHaveLength(2)
+    expect(contentsApi.requests[1]).toMatchObject({
+      policy: {
+        kind: 'sourceFileInventory',
+        fileClasses: ['audio', 'video', 'image', 'unsupported']
+      }
+    })
+    contentsApi.resolveNext(readyContents(requestAt(contentsApi, 1), [contentsRow('b', 'B.png')]))
+    await expect(read).resolves.toBe(true)
   })
 
   it('late prefetch completion after force does not overwrite the refreshed warm snapshot', async () => {

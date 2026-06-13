@@ -75,7 +75,7 @@ export type LocalBrowseOperation = { "kind": "browseChildren" } | { "kind": "cho
 
 export type LocalBrowseSourceAdmissionRequestKind = "defaultMusicFolder" | "selectedDirectory" | "parentDirectory";
 
-export type LocalBrowseProfile = "audioBrowse" | "mediaBrowse" | "allFiles";
+export type LocalBrowseProfile = "audio" | "playable" | "allFiles";
 
 export type LocalBrowseEntryPointFailureCode = "unsupportedPlatform" | "knownFolderUnavailable" | "systemDriveUnavailable" | "volumeEnumerationUnavailable" | "metadataUnavailable";
 

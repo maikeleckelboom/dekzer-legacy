@@ -9,6 +9,7 @@ import type { BrowserTreeNodeId } from '../tree/types'
 import type { RowBinding } from '../state'
 import {
   localBrowseRootTarget,
+  localBrowseProfileForTarget,
   localBrowseWindowKey,
   localBrowseWindowKeyFromIdentity,
   type LoadedLocalBrowseItems,
@@ -17,6 +18,7 @@ import {
   type LocalBrowseItemState,
   type LocalBrowseMoreTarget
 } from './types'
+import { defaultProfile, type ProfileKey } from '../browseProfile/types'
 
 const readLimit = 50
 const safeEntryPointsReadFailure = 'Unable to read local browse entry points.'
@@ -46,9 +48,10 @@ export type LocalBrowseController = {
 }
 
 export function useLocalBrowseController(
-  libraryApi: LocalBrowseReadApi = getRendererApi().library
+  libraryApi: LocalBrowseReadApi = getRendererApi().library,
+  options: { readonly profile?: Ref<ProfileKey> } = {}
 ): LocalBrowseController {
-  const controller = createLocalBrowseController(libraryApi)
+  const controller = createLocalBrowseController(libraryApi, options)
 
   onMounted(() => {
     controller.start()
@@ -61,9 +64,13 @@ export function useLocalBrowseController(
   return controller
 }
 
-export function createLocalBrowseController(libraryApi: LocalBrowseReadApi): LocalBrowseController {
+export function createLocalBrowseController(
+  libraryApi: LocalBrowseReadApi,
+  options: { readonly profile?: Ref<ProfileKey> } = {}
+): LocalBrowseController {
   const entryPointsState = ref<LocalBrowseEntryPointsState>({ kind: 'unread' })
   const itemStates = shallowRef<ReadonlyMap<string, LocalBrowseItemState>>(new Map())
+  const profile = options.profile ?? ref<ProfileKey>(defaultProfile)
   let started = false
   let entryPointReadSequence = 0
   let itemReadSequence = 0
@@ -164,7 +171,7 @@ export function createLocalBrowseController(libraryApi: LocalBrowseReadApi): Loc
 
     switch (binding.kind) {
       case 'localBrowseEntryPoint':
-        return readItems(localBrowseRootTarget(binding.target))
+        return readItems(localBrowseRootTarget(binding.target, profile.value))
       case 'localBrowseItem':
         return binding.target === undefined ? false : readItems(binding.target)
       case 'localBrowseMore':
@@ -183,7 +190,8 @@ export function createLocalBrowseController(libraryApi: LocalBrowseReadApi): Loc
     }
 
     const binding = projection.bindingsById.get(nodeId)
-    const target = binding === undefined ? undefined : windowTargetFromBinding(binding)
+    const target =
+      binding === undefined ? undefined : windowTargetFromBinding(binding, profile.value)
 
     if (target === undefined) {
       return false
@@ -240,7 +248,7 @@ export function createLocalBrowseController(libraryApi: LocalBrowseReadApi): Loc
 
     for (const binding of projection.bindingsById.values()) {
       if (binding.kind === 'localBrowseEntryPoint') {
-        const target = localBrowseRootTarget(binding.target)
+        const target = localBrowseRootTarget(binding.target, profile.value)
         const state = itemStates.value.get(localBrowseWindowKey(target))
 
         if (state?.kind === 'loaded') {
@@ -259,7 +267,7 @@ export function createLocalBrowseController(libraryApi: LocalBrowseReadApi): Loc
       const binding = projection.bindingsById.get(nodeId)
 
       if (binding?.kind === 'localBrowseEntryPoint') {
-        addTarget(localBrowseRootTarget(binding.target))
+        addTarget(localBrowseRootTarget(binding.target, profile.value))
       } else if (binding?.kind === 'localBrowseItem' && binding.target !== undefined) {
         addTarget(binding.target)
       }
@@ -340,7 +348,7 @@ export function createLocalBrowseController(libraryApi: LocalBrowseReadApi): Loc
 
       setItemState(requestKey, {
         kind: 'loaded',
-        window: loadedWindowFromResult(result, target.label)
+        window: loadedWindowFromResult(result, target)
       })
       return true
     } catch {
@@ -418,7 +426,7 @@ export function createLocalBrowseController(libraryApi: LocalBrowseReadApi): Loc
 
       setItemState(requestKey, {
         kind: 'loaded',
-        window: appendLoadedWindow(state.window, loadedWindowFromResult(result, target.label))
+        window: appendLoadedWindow(state.window, loadedWindowFromResult(result, target))
       })
       return true
     } catch {
@@ -520,7 +528,7 @@ function readItemsRequest(
     entryPointKind: target.entryPointKind,
     resolvedRootPath: target.resolvedRootPath,
     resolvedParentPath: target.resolvedParentPath,
-    profile: 'audioBrowse',
+    profile: localBrowseProfileForTarget(target),
     offset,
     limit: readLimit
   }
@@ -533,7 +541,7 @@ function loadedWindowFromResult(
       readonly state: 'read'
     }
   >,
-  label: string
+  target: LocalBrowseDirectoryTarget
 ): LoadedLocalBrowseItems {
   const nextOffset =
     result.offset + result.items.length < result.totalItems
@@ -541,8 +549,9 @@ function loadedWindowFromResult(
       : undefined
 
   return {
+    profile: target.profile,
     identity: result.windowIdentity,
-    label,
+    label: target.label,
     items: result.items,
     totalItems: result.totalItems,
     status: result.status,
@@ -562,6 +571,7 @@ function appendLoadedWindow(
       : undefined
 
   return {
+    profile: current.profile,
     identity: current.identity,
     label: current.label,
     items: [...current.items, ...next.items],
@@ -591,9 +601,12 @@ function isExpectedWindow(
   )
 }
 
-function windowTargetFromBinding(binding: RowBinding): LocalBrowseDirectoryTarget | undefined {
+function windowTargetFromBinding(
+  binding: RowBinding,
+  profile: ProfileKey = defaultProfile
+): LocalBrowseDirectoryTarget | undefined {
   if (binding.kind === 'localBrowseEntryPoint') {
-    return localBrowseRootTarget(binding.target)
+    return localBrowseRootTarget(binding.target, profile)
   }
 
   if (binding.kind === 'localBrowseItem') {
@@ -605,15 +618,17 @@ function windowTargetFromBinding(binding: RowBinding): LocalBrowseDirectoryTarge
 
 export function localBrowseStateForBinding(
   itemStates: ReadonlyMap<string, LocalBrowseItemState>,
-  binding: RowBinding
+  binding: RowBinding,
+  profile: ProfileKey = defaultProfile
 ): LocalBrowseItemState | undefined {
-  const target = windowTargetFromBinding(binding)
+  const target = windowTargetFromBinding(binding, profile)
 
   return target === undefined ? undefined : itemStates.get(localBrowseWindowKey(target))
 }
 
 export function localBrowseWindowKeyForIdentity(
-  identity: LoadedLocalBrowseItems['identity']
+  identity: LoadedLocalBrowseItems['identity'],
+  profile: ProfileKey = defaultProfile
 ): string {
-  return localBrowseWindowKeyFromIdentity(identity)
+  return localBrowseWindowKeyFromIdentity(identity, profile)
 }

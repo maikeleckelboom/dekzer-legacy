@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
 import { Icon } from '../icons'
+import { profileLabel, profileOptions, type ProfileKey } from './browseProfile/types'
+import { createProfileController } from './browseProfile/controller'
 import { useLibraryHierarchyRead } from './boundary/hierarchyRead'
 import { useContentsRead } from './boundary/contentsRead'
 import { useLocalRootActions } from './boundary/localRootActions'
@@ -51,11 +53,13 @@ const buttonBaseClass =
 const primaryButtonClass = `${buttonBaseClass} min-w-38.5 border border-(--color-accent) bg-(--color-accent) text-(--color-background) hover:brightness-110`
 const secondaryButtonClass = `${buttonBaseClass} min-w-31.5 border border-(--color-border) bg-(--color-background) text-(--color-text) hover:border-(--color-accent) hover:text-(--color-accent)`
 const dangerButtonClass = `${buttonBaseClass} border border-(--color-accent) bg-(--color-background) text-(--color-accent) hover:brightness-110`
+const iconButtonClass = `${buttonBaseClass} h-9 w-9 min-w-0 border border-(--color-border) bg-(--color-background) p-0 text-(--color-text) hover:border-(--color-accent) hover:text-(--color-accent)`
 
 const viewStateStore = createViewStateStore()
+const browseProfile = createProfileController()
 const hierarchyRead = useLibraryHierarchyRead()
-const localBrowse = useLocalBrowseController()
-const contentsRead = useContentsRead()
+const localBrowse = useLocalBrowseController(undefined, { profile: browseProfile.profile })
+const contentsRead = useContentsRead(undefined, { profile: browseProfile.profile })
 const rootActions = useLocalRootActions()
 const boundaryEvents = useBoundaryEvents()
 const sourceLifecycleRead = useSourceLifecycleRead()
@@ -80,6 +84,8 @@ const sourceRevealRequest = ref<{
   readonly nodeId: BrowserTreeNodeId
   readonly sequence: number
 }>()
+const browseProfileMenuOpen = ref(false)
+const browseProfileMenuRef = ref<HTMLElement>()
 let sourceRevealSequence = 0
 
 const restoreState = {
@@ -105,6 +111,7 @@ const sourceReadinessByNodeId = computed(() =>
 )
 
 const browserState = computed<BrowserState>(() => ({
+  profile: browseProfile.profile.value,
   sourceReadinessByNodeId: sourceReadinessByNodeId.value,
   sourceReadStates: hierarchyRead.sourceReadStates.value,
   directoryReadStates: hierarchyRead.directoryReadStates.value,
@@ -117,6 +124,8 @@ const browserState = computed<BrowserState>(() => ({
     ? {}
     : { navigationReadResult: hierarchyRead.navigationReadResult.value })
 }))
+
+const selectedBrowseProfileLabel = computed(() => profileLabel(browseProfile.profile.value))
 
 const browserProjection = computed(() => projectState(browserState.value))
 
@@ -217,6 +226,16 @@ watch(
   { immediate: true }
 )
 
+watch(
+  () => browseProfile.profile.value,
+  async () => {
+    contentsRead.clear()
+    await localBrowse.refreshBrowserWindows(expandedNodeIds.value, browserProjection.value)
+    requestContentsForCurrentSelection({ force: true })
+    saveViewState()
+  }
+)
+
 watch(browserProjection, (projection) => {
   applyPendingSourceRegistration(projection)
 
@@ -277,6 +296,14 @@ watch(
   },
   { immediate: true }
 )
+
+onMounted(() => {
+  document.addEventListener('pointerdown', handleBrowseProfileOutsidePointerDown)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('pointerdown', handleBrowseProfileOutsidePointerDown)
+})
 
 watch(
   [sourceLifecycleSourceIds, () => hierarchyRead.hostStatus.value?.state],
@@ -341,6 +368,7 @@ function saveViewState(): void {
   viewStateStore.save({
     version: 1,
     expandedNodeIds: [...expandedNodeIds.value],
+    profile: browseProfile.profile.value,
     ...(selectedNodeId.value === undefined ? {} : { selectedNodeId: selectedNodeId.value })
   })
 }
@@ -364,8 +392,33 @@ async function restoreViewState(): Promise<void> {
 
     applyRestoredSelection(result.viewState.selectedNodeId, projection.bindingsById)
     applyRestoredExpansion(result.viewState.expandedNodeIds, projection.bindingsById)
+    browseProfile.restoreProfile(result.viewState.profile)
   } catch {
     restoreState.readCompleted = true
+  }
+}
+
+function toggleBrowseProfileMenu(): void {
+  browseProfileMenuOpen.value = !browseProfileMenuOpen.value
+}
+
+function selectBrowseProfile(profile: ProfileKey): void {
+  browseProfile.setProfile(profile)
+  browseProfileMenuOpen.value = false
+}
+
+function closeBrowseProfileMenu(): void {
+  browseProfileMenuOpen.value = false
+}
+
+function handleBrowseProfileOutsidePointerDown(event: PointerEvent): void {
+  if (!browseProfileMenuOpen.value) {
+    return
+  }
+
+  const target = event.target
+  if (!(target instanceof Node) || !browseProfileMenuRef.value?.contains(target)) {
+    browseProfileMenuOpen.value = false
   }
 }
 
@@ -589,6 +642,7 @@ function clearBrowserView(): void {
 
   viewStateStore.save({
     version: 1,
+    profile: browseProfile.profile.value,
     expandedNodeIds: []
   })
 }
@@ -653,6 +707,43 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
       </h2>
 
       <div class="flex flex-wrap items-center justify-end gap-2">
+        <div ref="browseProfileMenuRef" class="relative inline-flex">
+          <button
+            type="button"
+            :class="iconButtonClass"
+            aria-label="Browse view"
+            :aria-expanded="browseProfileMenuOpen"
+            aria-haspopup="listbox"
+            :title="`Browse view: ${selectedBrowseProfileLabel}`"
+            @click="toggleBrowseProfileMenu"
+            @keydown.escape.stop.prevent="closeBrowseProfileMenu"
+          >
+            <Icon role="action.browseView" size="md" />
+          </button>
+
+          <div
+            v-if="browseProfileMenuOpen"
+            class="absolute right-0 top-full z-20 mt-1 min-w-40 border border-(--color-border) bg-(--color-background) py-1 shadow-lg"
+            role="listbox"
+            aria-label="Browse view"
+            tabindex="-1"
+            @keydown.escape.stop.prevent="closeBrowseProfileMenu"
+          >
+            <button
+              v-for="option in profileOptions"
+              :key="option.key"
+              type="button"
+              class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm text-(--color-text) hover:bg-(--color-surface) focus-visible:bg-(--color-surface) focus-visible:outline-none"
+              :class="browseProfile.profile.value === option.key ? 'font-bold' : 'font-normal'"
+              role="option"
+              :aria-selected="browseProfile.profile.value === option.key"
+              @click="selectBrowseProfile(option.key)"
+            >
+              <span>{{ option.label }}</span>
+            </button>
+          </div>
+        </div>
+
         <button
           type="button"
           :class="primaryButtonClass"

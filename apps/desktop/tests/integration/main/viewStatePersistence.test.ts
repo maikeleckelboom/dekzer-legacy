@@ -49,7 +49,8 @@ describe('persisted library view state', () => {
       writeViewStateToHost(fakeHost(dir), {
         version: 1,
         selectedNodeId: 'navigation-row:7',
-        expandedNodeIds: ['navigation-row:7', 'source-directory:12', 'navigation-row:7']
+        expandedNodeIds: ['navigation-row:7', 'source-directory:12', 'navigation-row:7'],
+        profile: 'playable'
       })
     ).resolves.toEqual({ state: 'written' })
 
@@ -58,7 +59,8 @@ describe('persisted library view state', () => {
       viewState: {
         version: 1,
         selectedNodeId: 'navigation-row:7',
-        expandedNodeIds: ['navigation-row:7', 'source-directory:12']
+        expandedNodeIds: ['navigation-row:7', 'source-directory:12'],
+        profile: 'playable'
       }
     })
   })
@@ -70,6 +72,10 @@ describe('persisted library view state', () => {
     expect(isValidViewState({ version: 2, expandedNodeIds: [] })).toBe(false)
     expect(isValidViewState({ version: 1, selectedNodeId: 42, expandedNodeIds: [] })).toBe(false)
     expect(isValidViewState({ version: 1, expandedNodeIds: ['valid', 42] })).toBe(false)
+    expect(isValidViewState({ version: 1, expandedNodeIds: [], profile: 'allFiles' })).toBe(true)
+    expect(isValidViewState({ version: 1, expandedNodeIds: [], profile: 'invalidProfile' })).toBe(
+      false
+    )
 
     expect(writeViewStateThroughHost(fakeHost(dir), { version: 1 })).toEqual({
       state: 'failed',

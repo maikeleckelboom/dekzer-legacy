@@ -470,7 +470,9 @@ describe('panel runtime wiring', () => {
     const panel = readRendererSource('panel.vue')
 
     expect(panel).toContain("import { useLocalBrowseController } from './localBrowse/controller'")
-    expect(panel).toContain('const localBrowse = useLocalBrowseController()')
+    expect(panel).toContain(
+      'const localBrowse = useLocalBrowseController(undefined, { profile: browseProfile.profile })'
+    )
     expect(panel).toContain('void localBrowse.refreshEntryPoints()')
     expect(panel).toContain('refreshLocalBrowseEntryPoints: () => localBrowse.refreshEntryPoints()')
   })

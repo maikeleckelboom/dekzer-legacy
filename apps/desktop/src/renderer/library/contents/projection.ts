@@ -15,6 +15,7 @@ import {
   type LoadedLocalBrowseItems,
   type LocalBrowseItemState
 } from '../localBrowse/types'
+import { defaultProfile, emptyStateLabel } from '../browseProfile/types'
 import type { BrowserProjection } from '../tree/projection'
 import type { BrowserState, RowBinding } from '../state'
 import type { BrowserTreeNodeId } from '../tree/types'
@@ -204,7 +205,9 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
         folderOperations: binding.entry.availableOperations,
         folderDetail: binding.entry.identity.resolvedPath ?? binding.entry.displayName,
         windowState: options.state.localBrowseItemStates?.get(
-          localBrowseWindowKey(localBrowseRootTarget(binding.target))
+          localBrowseWindowKey(
+            localBrowseRootTarget(binding.target, options.state.profile ?? defaultProfile)
+          )
         )
       })
     case 'localBrowseItem':
@@ -1255,9 +1258,9 @@ function contentsCountSubject(result: ContentsResult, count: number): string {
 function policyEmptyLabel(policy: ContentsResult['policy']): string {
   switch (policy.kind) {
     case 'playableMediaBrowse':
-      return 'No playable media in this scope.'
+      return emptyStateLabel('playable')
     case 'audioBrowse':
-      return 'No audio items in this scope.'
+      return emptyStateLabel('audio')
     case 'sourceFileInventory':
       return sourceFileInventoryEmptyLabel(policy)
     case 'playableMedia':
@@ -1268,9 +1271,9 @@ function policyEmptyLabel(policy: ContentsResult['policy']): string {
 function trueEmptyLabel(policy: ContentsResult['policy']): string {
   switch (policy.kind) {
     case 'playableMediaBrowse':
-      return 'No playable media in this scope.'
+      return emptyStateLabel('playable')
     case 'audioBrowse':
-      return 'No audio items in this scope.'
+      return emptyStateLabel('audio')
     case 'sourceFileInventory':
       return sourceFileInventoryEmptyLabel(policy)
     case 'playableMedia':
@@ -1296,7 +1299,7 @@ function sourceFileInventoryEmptyLabel(
   }
 
   if (fileClasses === 'audio,video,image,unsupported') {
-    return 'No files in this scope.'
+    return emptyStateLabel('allFiles')
   }
 
   return 'No requested files in this scope.'

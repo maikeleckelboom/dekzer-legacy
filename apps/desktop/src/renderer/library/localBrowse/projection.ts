@@ -28,10 +28,12 @@ import {
   type LocalBrowseItemState,
   type LocalBrowseMoreTarget
 } from './types'
+import type { ProfileKey } from '../browseProfile/types'
 
 export const localBrowseSectionNodeId = 'local-browse:section'
 
 type LocalBrowseProjectionOptions = {
+  readonly profile: ProfileKey
   readonly entryPointsState?: LocalBrowseEntryPointsState
   readonly itemStates?: ReadonlyMap<string, LocalBrowseItemState>
   readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
@@ -95,6 +97,7 @@ export function projectLocalBrowseSection(
       entries.map((entry) =>
         projectEntryPoint({
           entry,
+          profile: options.profile,
           itemStates: options.itemStates ?? new Map(),
           bindingsById: options.bindingsById
         })
@@ -122,6 +125,7 @@ function localBrowseSectionNode(
 
 function projectEntryPoint(options: {
   readonly entry: LocalBrowseEntryPoint
+  readonly profile: ProfileKey
   readonly itemStates: ReadonlyMap<string, LocalBrowseItemState>
   readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
 }): BrowserTreeNode {
@@ -147,6 +151,7 @@ function projectEntryPoint(options: {
     ...projectEntryPointChildren({
       ownerId: nodeId,
       entry: options.entry,
+      profile: options.profile,
       target,
       itemStates: options.itemStates,
       bindingsById: options.bindingsById
@@ -157,6 +162,7 @@ function projectEntryPoint(options: {
 function projectEntryPointChildren(options: {
   readonly ownerId: string
   readonly entry: LocalBrowseEntryPoint
+  readonly profile: ProfileKey
   readonly target: LocalBrowseEntryPointTarget | undefined
   readonly itemStates: ReadonlyMap<string, LocalBrowseItemState>
   readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
@@ -170,10 +176,12 @@ function projectEntryPointChildren(options: {
     return { children: { kind: 'none' } }
   }
 
+  const rootTarget = localBrowseRootTarget(target, options.profile)
+
   return projectLocalBrowseChildren({
     ownerId: options.ownerId,
-    target: localBrowseRootTarget(target),
-    state: options.itemStates.get(localBrowseWindowKey(localBrowseRootTarget(target))),
+    target: rootTarget,
+    state: options.itemStates.get(localBrowseWindowKey(rootTarget)),
     itemStates: options.itemStates,
     bindingsById: options.bindingsById
   })
@@ -181,13 +189,14 @@ function projectEntryPointChildren(options: {
 
 function projectLocalBrowseItem(options: {
   readonly item: LocalBrowseItem
+  readonly profile: ProfileKey
   readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
   readonly itemStates: ReadonlyMap<string, LocalBrowseItemState>
 }): BrowserTreeNode {
   const item = options.item
   const nodeId = localBrowseItemNodeId(item)
   const target = hasLocalBrowseOperation(item.availableOperations, 'browseChildren')
-    ? directoryTargetForItem(item)
+    ? directoryTargetForItem(item, options.profile)
     : undefined
 
   options.bindingsById.set(nodeId, {
@@ -301,6 +310,7 @@ function projectLoadedLocalBrowseWindow(options: {
   const projectedItems = options.window.items.map((item) =>
     projectLocalBrowseItem({
       item,
+      profile: options.window.profile,
       itemStates: options.itemStates,
       bindingsById: options.bindingsById
     })
@@ -492,6 +502,7 @@ function trackedMoreNode(
 
   const target: LocalBrowseMoreTarget = {
     ownerNodeId: options.ownerId,
+    profile: options.window.profile,
     entryPointKind: options.window.identity.entryPointKind,
     resolvedRootPath: options.window.identity.resolvedRootPath,
     resolvedParentPath: options.window.identity.resolvedParentPath,
@@ -552,12 +563,16 @@ function displayableEntryPoints(
   })
 }
 
-function directoryTargetForItem(item: LocalBrowseItem): LocalBrowseDirectoryTarget | undefined {
+function directoryTargetForItem(
+  item: LocalBrowseItem,
+  profile: ProfileKey
+): LocalBrowseDirectoryTarget | undefined {
   if (!hasLocalBrowseOperation(item.availableOperations, 'browseChildren')) {
     return undefined
   }
 
   return {
+    profile,
     entryPointKind: item.identity.entryPointKind,
     resolvedRootPath: item.identity.resolvedRootPath,
     resolvedParentPath: item.identity.resolvedItemPath,

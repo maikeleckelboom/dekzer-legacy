@@ -2,6 +2,7 @@ export type PersistedLibraryViewState = {
   readonly version: 1
   readonly selectedNodeId?: string
   readonly expandedNodeIds: readonly string[]
+  readonly profile?: 'audio' | 'playable' | 'allFiles'
 }
 
 export type LibraryViewStateReadResult =

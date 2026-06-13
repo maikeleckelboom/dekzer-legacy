@@ -790,7 +790,7 @@ async function validatesLocalBrowseItemReadRequestAndReply(): Promise<void> {
     resolvedParentPath: 'C:\\Users\\DJ\\Music',
     offset: 0,
     limit: 50,
-    profile: 'audioBrowse'
+    profile: 'audio'
   } as const
   const reply = await client.readLocalBrowseItems(request)
 

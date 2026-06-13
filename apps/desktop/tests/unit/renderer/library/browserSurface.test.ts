@@ -18,6 +18,17 @@ describe('library browser surface containment', () => {
       'sticky top-0 z-10 border-b border-(--color-border) bg-(--color-background)'
     )
   })
+
+  it('keeps browse profile control icon-only and accessible in the header', () => {
+    const panel = readRendererSource('panel.vue')
+
+    expect(panel).toContain('aria-label="Browse view"')
+    expect(panel).toContain('Browse view: ${selectedBrowseProfileLabel}')
+    expect(panel).toContain('<Icon role="action.browseView" size="md" />')
+    expect(panel).not.toContain('Browse profile:')
+    expect(panel).toContain('role="listbox"')
+    expect(panel).toContain(':aria-selected="browseProfile.profile.value === option.key"')
+  })
 })
 
 function readRendererSource(relativePath: string): string {

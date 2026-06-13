@@ -5,9 +5,11 @@ import type {
 } from '../../../shared/library/localBrowse/entryPoints'
 import type {
   LocalBrowseItem,
+  LocalBrowseProfile,
   LocalBrowseWindowIdentity,
   ReadLocalBrowseItemsResult
 } from '../../../shared/library/localBrowse/items'
+import { mapProfileToLocalBrowseProfile, type ProfileKey } from '../browseProfile/types'
 
 export type LocalBrowseEntryPointsState =
   | {
@@ -42,6 +44,7 @@ export type LocalBrowseEntryPointTarget = {
 }
 
 export type LocalBrowseDirectoryTarget = {
+  readonly profile: ProfileKey
   readonly entryPointKind: LocalBrowseEntryPointKind
   readonly resolvedRootPath: string
   readonly resolvedParentPath: string
@@ -67,6 +70,7 @@ export type LocalBrowseMoreState =
     }
 
 export type LoadedLocalBrowseItems = {
+  readonly profile: ProfileKey
   readonly identity: LocalBrowseWindowIdentity
   readonly label: string
   readonly items: readonly LocalBrowseItem[]
@@ -119,9 +123,11 @@ export function targetForEntryPoint(
 }
 
 export function localBrowseRootTarget(
-  target: LocalBrowseEntryPointTarget
+  target: LocalBrowseEntryPointTarget,
+  profile: ProfileKey
 ): LocalBrowseDirectoryTarget {
   return {
+    profile,
     entryPointKind: target.entryPointKind,
     resolvedRootPath: target.resolvedRootPath,
     resolvedParentPath: target.resolvedRootPath,
@@ -131,17 +137,28 @@ export function localBrowseRootTarget(
 
 export function localBrowseWindowKey(target: LocalBrowseDirectoryTarget): string {
   return [
+    target.profile,
     target.entryPointKind,
     encodeURIComponent(target.resolvedRootPath),
     encodeURIComponent(target.resolvedParentPath)
   ].join(':')
 }
 
-export function localBrowseWindowKeyFromIdentity(identity: LocalBrowseWindowIdentity): string {
+export function localBrowseWindowKeyFromIdentity(
+  identity: LocalBrowseWindowIdentity,
+  profile: ProfileKey
+): string {
   return localBrowseWindowKey({
+    profile,
     entryPointKind: identity.entryPointKind,
     resolvedRootPath: identity.resolvedRootPath,
     resolvedParentPath: identity.resolvedParentPath,
     label: ''
   })
+}
+
+export function localBrowseProfileForTarget(
+  target: LocalBrowseDirectoryTarget
+): LocalBrowseProfile {
+  return mapProfileToLocalBrowseProfile(target.profile)
 }

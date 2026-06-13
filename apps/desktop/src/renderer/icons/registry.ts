@@ -12,6 +12,7 @@ import spinnerIos20Regular from './vendor/spinner_ios_20_regular.svg?raw'
 import warning20Regular from './vendor/warning_20_regular.svg?raw'
 import info20Regular from './vendor/info_20_regular.svg?raw'
 import moreHorizontal20Regular from './vendor/more_horizontal_20_regular.svg?raw'
+import listBar20Regular from './vendor/list_bar_20_regular.svg?raw'
 import scan20Regular from './vendor/scan_20_regular.svg?raw'
 import dismissCircle20Regular from './vendor/dismiss_circle_20_regular.svg?raw'
 import compassNorthwest20Regular from './vendor/compass_northwest_20_regular.svg?raw'
@@ -41,6 +42,7 @@ const iconRegistry = {
   'state.warning': iconAsset(warning20Regular),
   'state.unknown': iconAsset(info20Regular),
   'action.more': iconAsset(moreHorizontal20Regular),
+  'action.browseView': iconAsset(listBar20Regular),
   'action.scan': iconAsset(scan20Regular),
   'action.remove': iconAsset(dismissCircle20Regular),
   'navigation.collection': iconAsset(compassNorthwest20Regular),

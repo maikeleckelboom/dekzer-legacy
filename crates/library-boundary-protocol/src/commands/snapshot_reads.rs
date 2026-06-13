@@ -328,8 +328,8 @@ pub enum LocalBrowseSourceAdmissionRequestKind {
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
 pub enum LocalBrowseProfile {
-    AudioBrowse,
-    MediaBrowse,
+    Audio,
+    Playable,
     AllFiles,
 }
 
@@ -2551,7 +2551,7 @@ mod tests {
             entry_point_kind: LocalBrowseEntryPointKind::Music,
             resolved_root_path: "C:\\Users\\DJ\\Music".to_string(),
             resolved_parent_path: "C:\\Users\\DJ\\Music\\Albums".to_string(),
-            profile: LocalBrowseProfile::AudioBrowse,
+            profile: LocalBrowseProfile::Audio,
             offset: 5,
             limit: 25,
         });
@@ -2579,7 +2579,7 @@ mod tests {
                 entry_point_kind: LocalBrowseEntryPointKind::Music,
                 ref resolved_root_path,
                 ref resolved_parent_path,
-                profile: LocalBrowseProfile::AudioBrowse,
+                profile: LocalBrowseProfile::Audio,
                 offset: 5,
                 limit: 25,
             }) if resolved_root_path == "C:\\Users\\DJ\\Music"
@@ -2684,7 +2684,7 @@ mod tests {
             entry_point_kind: LocalBrowseEntryPointKind::Music,
             resolved_root_path: "C:\\Users\\DJ\\Music".to_string(),
             resolved_parent_path: "C:\\Users\\DJ\\Music".to_string(),
-            profile: LocalBrowseProfile::AudioBrowse,
+            profile: LocalBrowseProfile::Audio,
             offset: 0,
             limit: 50,
         });
@@ -2697,7 +2697,7 @@ mod tests {
                         "entryPointKind": "music",
                         "resolvedRootPath": "C:\\Users\\DJ\\Music",
                         "resolvedParentPath": "C:\\Users\\DJ\\Music",
-                        "profile": "audioBrowse",
+                        "profile": "audio",
                         "offset": 0,
                         "limit": 50
                     }

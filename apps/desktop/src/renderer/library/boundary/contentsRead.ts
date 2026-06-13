@@ -9,11 +9,7 @@ import type {
 } from '../../../shared/library/contents/read'
 import type { RendererApi } from '../../../shared/rendererApi'
 import type { RowBinding } from '../state'
-import {
-  builtInContentsFilter,
-  defaultContentsFilterId,
-  type BuiltInContentsFilterId
-} from '../contents/filters'
+import { defaultProfile, mapProfileToContentsPolicy, type ProfileKey } from '../browseProfile/types'
 
 export type ContentsBoundaryState =
   | {
@@ -52,8 +48,8 @@ export type ContentsPendingRead = {
 
 export type ContentsReadController = {
   readonly state: Ref<ContentsBoundaryState>
-  readonly activeFilterId: Ref<BuiltInContentsFilterId>
-  readonly setActiveFilter: (filterId: BuiltInContentsFilterId) => void
+  readonly profile: Ref<ProfileKey>
+  readonly setProfile: (profile: ProfileKey) => void
   readonly readForBinding: (
     binding: RowBinding | undefined,
     options?: ReadOptions
@@ -83,7 +79,7 @@ const safeContentsRequestFailure = 'Unable to request library contents.'
 
 type ContentsReadTarget = {
   readonly scope: NonNullable<Parameters<LibraryContentsApi['read']>[0]['scope']>
-  readonly filterId: BuiltInContentsFilterId
+  readonly profile: ProfileKey
   readonly policy: ContentsReadPolicy
   readonly scopeDepth: ContentsScopeDepth
   readonly requestKey: string
@@ -103,9 +99,10 @@ type SpeculativeRead = {
 }
 
 export function useContentsRead(
-  contentsApi: LibraryContentsApi = getRendererApi().library.contents
+  contentsApi: LibraryContentsApi = getRendererApi().library.contents,
+  options: { readonly profile?: Ref<ProfileKey> } = {}
 ): ContentsReadController {
-  const controller = createContentsReadController(contentsApi)
+  const controller = createContentsReadController(contentsApi, options)
 
   onMounted(() => {
     controller.start()
@@ -124,15 +121,13 @@ function getRendererApi(): RendererApi {
 
 export function createContentsReadController(
   contentsApi: LibraryContentsApi,
-  options: { readonly initialFilterId?: BuiltInContentsFilterId } = {}
+  options: { readonly profile?: Ref<ProfileKey> } = {}
 ): ContentsReadController {
   const state = ref<ContentsBoundaryState>({
     kind: 'idle',
     detail: 'No contents scope has been requested.'
   })
-  const activeFilterId = ref<BuiltInContentsFilterId>(
-    options.initialFilterId ?? defaultContentsFilterId
-  )
+  const profile = options.profile ?? ref<ProfileKey>(defaultProfile)
   let readSequence = 0
   let started = false
   let thresholdTimer: ReturnType<typeof setTimeout> | undefined = undefined
@@ -162,20 +157,20 @@ export function createContentsReadController(
     }
   }
 
-  function setActiveFilter(filterId: BuiltInContentsFilterId): void {
-    if (activeFilterId.value === filterId) {
+  function setProfile(nextProfile: ProfileKey): void {
+    if (profile.value === nextProfile) {
       return
     }
 
-    activeFilterId.value = filterId
-    clearPreloadTimer()
+    profile.value = nextProfile
+    clear()
   }
 
   async function readForBinding(
     binding: RowBinding | undefined,
     options: ReadOptions = {}
   ): Promise<boolean> {
-    const target = contentsReadTargetForBinding(binding, activeFilterId.value)
+    const target = contentsReadTargetForBinding(binding, profile.value)
 
     if (target === undefined) {
       clear()
@@ -296,7 +291,7 @@ export function createContentsReadController(
   }
 
   function preloadForBinding(binding: RowBinding | undefined): void {
-    const target = contentsReadTargetForBinding(binding, activeFilterId.value)
+    const target = contentsReadTargetForBinding(binding, profile.value)
 
     clearPreloadTimer()
 
@@ -318,7 +313,7 @@ export function createContentsReadController(
   }
 
   function cancelPreloadForBinding(binding: RowBinding | undefined): void {
-    const target = contentsReadTargetForBinding(binding, activeFilterId.value)
+    const target = contentsReadTargetForBinding(binding, profile.value)
 
     if (target === undefined || scheduledPreloadKey !== target.requestKey) {
       return
@@ -636,8 +631,8 @@ export function createContentsReadController(
 
   return {
     state,
-    activeFilterId,
-    setActiveFilter,
+    profile,
+    setProfile,
     readForBinding,
     preloadForBinding,
     cancelPreloadForBinding,
@@ -650,7 +645,7 @@ export function createContentsReadController(
 
 function contentsReadTargetForBinding(
   binding: RowBinding | undefined,
-  filterId: BuiltInContentsFilterId
+  profile: ProfileKey
 ): ContentsReadTarget | undefined {
   const scope = contentsScopeForBinding(binding)
 
@@ -658,13 +653,13 @@ function contentsReadTargetForBinding(
     return undefined
   }
 
-  const filter = builtInContentsFilter(filterId)
+  const policy = mapProfileToContentsPolicy(profile)
   return {
     scope,
-    filterId,
-    policy: filter.policy,
-    scopeDepth: filter.scopeDepth,
-    requestKey: contentsRequestKey(scope, filter.policy, filter.scopeDepth)
+    profile,
+    policy,
+    scopeDepth: 'recursive',
+    requestKey: contentsRequestKey(scope, policy, 'recursive')
   }
 }
 

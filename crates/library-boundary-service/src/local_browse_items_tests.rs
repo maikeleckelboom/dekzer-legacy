@@ -202,7 +202,7 @@ fn read_local_browse_items(
         entry_point_kind,
         root,
         parent,
-        protocol::LocalBrowseProfile::AudioBrowse,
+        protocol::LocalBrowseProfile::Audio,
         offset,
         limit,
     )
@@ -532,6 +532,68 @@ fn default_audio_browse_profile_keeps_musical_rows_and_hides_noise() {
     assert_eq!(
         cue.media_relevance,
         Some(protocol::LocalBrowseItemMediaRelevance::CompanionMetadata)
+    );
+}
+
+#[cfg(windows)]
+#[test]
+fn playable_profile_keeps_audio_video_and_cue_rows_but_hides_noise() {
+    let root = TempDir::new().expect("create local root");
+    std::fs::create_dir(root.path().join("Album")).expect("create album");
+    std::fs::write(root.path().join("Track.flac"), []).expect("write track");
+    std::fs::write(root.path().join("Album.cue"), []).expect("write cue");
+    std::fs::write(root.path().join("cover.png"), []).expect("write image");
+    std::fs::write(root.path().join("desktop.ini"), []).expect("write desktop ini");
+    std::fs::write(root.path().join("clip.mp4"), []).expect("write video");
+    let (_tempdir, _context, service) = open_test_service_with_local_browse_root(
+        protocol::LocalBrowseEntryPointKind::Music,
+        root.path(),
+    );
+
+    let reply = read_local_browse_items_with_profile(
+        &service,
+        protocol::LocalBrowseEntryPointKind::Music,
+        root.path(),
+        root.path(),
+        protocol::LocalBrowseProfile::Playable,
+        0,
+        20,
+    );
+
+    assert_eq!(reply.status, protocol::LocalBrowseItemsReadStatus::Complete);
+    assert_eq!(
+        item_names(&reply),
+        vec!["Album", "Album.cue", "clip.mp4", "Track.flac"]
+    );
+}
+
+#[cfg(windows)]
+#[test]
+fn all_files_profile_keeps_images_unsupported_and_unknown_noise() {
+    let root = TempDir::new().expect("create local root");
+    std::fs::create_dir(root.path().join("Album")).expect("create album");
+    std::fs::write(root.path().join("Track.flac"), []).expect("write track");
+    std::fs::write(root.path().join("cover.png"), []).expect("write image");
+    std::fs::write(root.path().join("desktop.ini"), []).expect("write desktop ini");
+    let (_tempdir, _context, service) = open_test_service_with_local_browse_root(
+        protocol::LocalBrowseEntryPointKind::Music,
+        root.path(),
+    );
+
+    let reply = read_local_browse_items_with_profile(
+        &service,
+        protocol::LocalBrowseEntryPointKind::Music,
+        root.path(),
+        root.path(),
+        protocol::LocalBrowseProfile::AllFiles,
+        0,
+        20,
+    );
+
+    assert_eq!(reply.status, protocol::LocalBrowseItemsReadStatus::Complete);
+    assert_eq!(
+        item_names(&reply),
+        vec!["Album", "cover.png", "Track.flac", "desktop.ini"]
     );
 }
 

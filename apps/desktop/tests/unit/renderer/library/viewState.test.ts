@@ -30,7 +30,8 @@ describe('createViewStateStore', () => {
     store.save({
       version: 1,
       selectedNodeId: 'node-a',
-      expandedNodeIds
+      expandedNodeIds,
+      profile: 'playable'
     })
     expandedNodeIds.push('node-b')
     await resolveAll()
@@ -38,7 +39,34 @@ describe('createViewStateStore', () => {
     expect(writes[0]?.state).toEqual({
       version: 1,
       selectedNodeId: 'node-a',
-      expandedNodeIds: ['node-a']
+      expandedNodeIds: ['node-a'],
+      profile: 'playable'
+    })
+  })
+
+  it('persists valid browse profile and drops invalid profile values', async () => {
+    const { api, writes, resolveAll } = createQueuedWriteApi()
+    const store = createViewStateStore(api)
+
+    store.save({ version: 1, expandedNodeIds: [], profile: 'allFiles' })
+    await resolveAll()
+
+    expect(writes[0]?.state).toEqual({
+      version: 1,
+      expandedNodeIds: [],
+      profile: 'allFiles'
+    })
+
+    store.save({
+      version: 1,
+      expandedNodeIds: [],
+      profile: 'invalid'
+    } as unknown as PersistedLibraryViewState)
+    await resolveAll()
+
+    expect(writes[1]?.state).toEqual({
+      version: 1,
+      expandedNodeIds: []
     })
   })
 

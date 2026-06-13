@@ -454,7 +454,7 @@ fn item_visible_for_profile(
 ) -> bool {
     match profile {
         protocol::LocalBrowseProfile::AllFiles => true,
-        protocol::LocalBrowseProfile::MediaBrowse => match key.item_kind {
+        protocol::LocalBrowseProfile::Playable => match key.item_kind {
             protocol::LocalBrowseItemKind::Directory
             | protocol::LocalBrowseItemKind::RejectedRoot
             | protocol::LocalBrowseItemKind::Inaccessible => true,
@@ -469,7 +469,7 @@ fn item_visible_for_profile(
             protocol::LocalBrowseItemKind::UnsupportedFile
             | protocol::LocalBrowseItemKind::Unknown => false,
         },
-        protocol::LocalBrowseProfile::AudioBrowse => match key.item_kind {
+        protocol::LocalBrowseProfile::Audio => match key.item_kind {
             protocol::LocalBrowseItemKind::Directory
             | protocol::LocalBrowseItemKind::RejectedRoot
             | protocol::LocalBrowseItemKind::Inaccessible => true,
@@ -734,7 +734,7 @@ pub(crate) fn classify_item_file_for_test(
                     .unwrap_or_else(|| Path::new(""))
                     .to_string_lossy()
                     .into_owned(),
-                profile: protocol::LocalBrowseProfile::AudioBrowse,
+                profile: protocol::LocalBrowseProfile::Audio,
                 offset: 0,
                 limit: 1,
             },

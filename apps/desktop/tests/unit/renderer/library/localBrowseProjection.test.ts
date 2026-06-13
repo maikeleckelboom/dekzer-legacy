@@ -97,6 +97,7 @@ describe('local browse tree projection', () => {
 
   it('projects local browse child row kinds without source bindings', () => {
     const rootTarget = {
+      profile: 'audio' as const,
       entryPointKind: 'music' as const,
       resolvedRootPath: 'C:\\Users\\Maikel\\Music',
       resolvedParentPath: 'C:\\Users\\Maikel\\Music',
@@ -106,7 +107,7 @@ describe('local browse tree projection', () => {
       ...browserState({ entries: [musicEntryPoint()] }),
       localBrowseItemStates: new Map([
         [
-          'music:C%3A%5CUsers%5CMaikel%5CMusic:C%3A%5CUsers%5CMaikel%5CMusic',
+          'audio:music:C%3A%5CUsers%5CMaikel%5CMusic:C%3A%5CUsers%5CMaikel%5CMusic',
           {
             kind: 'loaded',
             window: {
@@ -115,6 +116,7 @@ describe('local browse tree projection', () => {
                 resolvedRootPath: rootTarget.resolvedRootPath,
                 resolvedParentPath: rootTarget.resolvedParentPath
               },
+              profile: rootTarget.profile,
               label: rootTarget.label,
               items: [
                 item('directory', 'Albums', 'C:\\Users\\Maikel\\Music\\Albums'),
@@ -160,6 +162,49 @@ describe('local browse tree projection', () => {
     expect(
       [...projection.bindingsById.values()].filter((binding) => binding.kind === 'localBrowseItem')
     ).toHaveLength(5)
+  })
+
+  it('does not reuse a loaded window from another profile', () => {
+    const rootTarget = {
+      profile: 'audio' as const,
+      entryPointKind: 'music' as const,
+      resolvedRootPath: 'C:\\Users\\Maikel\\Music',
+      resolvedParentPath: 'C:\\Users\\Maikel\\Music',
+      label: 'Music'
+    }
+    const projection = projectTree({
+      ...browserState({ entries: [musicEntryPoint()] }),
+      profile: 'playable',
+      localBrowseItemStates: new Map([
+        [
+          'audio:music:C%3A%5CUsers%5CMaikel%5CMusic:C%3A%5CUsers%5CMaikel%5CMusic',
+          {
+            kind: 'loaded',
+            window: {
+              profile: rootTarget.profile,
+              identity: {
+                entryPointKind: rootTarget.entryPointKind,
+                resolvedRootPath: rootTarget.resolvedRootPath,
+                resolvedParentPath: rootTarget.resolvedParentPath
+              },
+              label: rootTarget.label,
+              items: [item('mediaFile', 'track.flac', 'C:\\Users\\Maikel\\Music\\track.flac')],
+              totalItems: 1,
+              status: 'complete',
+              failure: null,
+              limit: 50
+            }
+          }
+        ]
+      ])
+    })
+    const music =
+      projection.nodes[0]?.children.kind === 'loaded'
+        ? projection.nodes[0].children.nodes[0]
+        : undefined
+
+    expect(firstLoadedChildLabels(music)).toEqual([])
+    expect(music?.children.kind).toBe('deferred')
   })
 })
 

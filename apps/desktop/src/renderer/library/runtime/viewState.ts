@@ -3,6 +3,7 @@ import type {
   LibraryViewStateWriteResult,
   PersistedLibraryViewState
 } from '../../../shared/library/viewState/persistence'
+import { isProfileKey } from '../browseProfile/types'
 
 export type ViewStateApi = {
   readonly library: {
@@ -28,7 +29,8 @@ function normalizeViewStateForPersist(state: PersistedLibraryViewState): Persist
   return {
     version: 1,
     ...(state.selectedNodeId === undefined ? {} : { selectedNodeId: state.selectedNodeId }),
-    expandedNodeIds: [...new Set(state.expandedNodeIds)]
+    expandedNodeIds: [...new Set(state.expandedNodeIds)],
+    ...(isProfileKey(state.profile) ? { profile: state.profile } : {})
   }
 }
 

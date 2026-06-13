@@ -26,7 +26,8 @@ export async function readViewStateFromHost(
       viewState: {
         version: parsed.version,
         ...(parsed.selectedNodeId === undefined ? {} : { selectedNodeId: parsed.selectedNodeId }),
-        expandedNodeIds: deduplicateStringIds(parsed.expandedNodeIds)
+        expandedNodeIds: deduplicateStringIds(parsed.expandedNodeIds),
+        ...(parsed.profile === undefined ? {} : { profile: parsed.profile })
       }
     }
   } catch {
@@ -46,7 +47,8 @@ export async function writeViewStateToHost(
       ...(viewState.selectedNodeId === undefined
         ? {}
         : { selectedNodeId: viewState.selectedNodeId }),
-      expandedNodeIds: deduplicateStringIds(viewState.expandedNodeIds)
+      expandedNodeIds: deduplicateStringIds(viewState.expandedNodeIds),
+      ...(viewState.profile === undefined ? {} : { profile: viewState.profile })
     })
     const filePath = viewStateFilePath(host)
     const tempPath = `${filePath}.tmp`
@@ -91,7 +93,11 @@ export function isValidViewState(value: unknown): value is PersistedLibraryViewS
     if (typeof obj.selectedNodeId !== 'string') return false
   }
   if (!Array.isArray(obj.expandedNodeIds)) return false
-  return obj.expandedNodeIds.every((id: unknown) => typeof id === 'string')
+  if (!obj.expandedNodeIds.every((id: unknown) => typeof id === 'string')) return false
+  if ('profile' in obj && obj.profile !== undefined) {
+    return obj.profile === 'audio' || obj.profile === 'playable' || obj.profile === 'allFiles'
+  }
+  return true
 }
 
 function deduplicateStringIds(ids: readonly string[]): readonly string[] {
