@@ -128,8 +128,19 @@ function labelClassForRow(row: ContentRow): string {
   }
 }
 
-function resolveContentActionIcon(): IconRole {
-  return 'action.more'
+function resolveContentActionIcon(action: ContentRow['action']): IconRole {
+  switch (action?.kind) {
+    case 'chooseMusicFolder':
+    case 'requestLocalBrowseAdmission':
+      return 'folder.plain'
+    case 'loadChildren':
+    case 'loadContentsPage':
+    case 'loadLocalBrowseChildren':
+    case 'loadLocalBrowseMore':
+    case 'loadSearchPage':
+    default:
+      return 'action.more'
+  }
 }
 
 function statusBadgeClass(view: StatusView): string {
@@ -255,7 +266,7 @@ function resolveStatusActionIcon(action: StatusAction): IconRole {
                   class="inline-flex min-h-8 shrink-0 items-center justify-center gap-2 rounded-sm border border-(--color-border) bg-(--color-surface) px-2.5 py-1 text-xs font-bold text-(--color-text) transition hover:border-(--color-accent) hover:text-(--color-accent) focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background)"
                   @click="activateRowAction(row)"
                 >
-                  <Icon :role="resolveContentActionIcon()" size="xs" />
+                  <Icon :role="resolveContentActionIcon(row.action)" size="xs" />
                   <span>{{ row.action.label }}</span>
                 </button>
               </div>

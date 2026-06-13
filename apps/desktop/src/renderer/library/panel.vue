@@ -30,12 +30,12 @@ import { createLibrarySearchController } from './runtime/librarySearch'
 import { useSearchFilterRead } from './runtime/searchFilterState'
 import { useRootLifecycle } from './runtime/rootLifecycle'
 import {
-  deriveSourceActionModel,
   hasVisibleSourceRootBinding,
   resolveVisibleSourceRegistration,
   sourceRegistrationIntent,
   type SourceRegistrationIntent
 } from './runtime/sourceActions'
+import { projectLibraryToolbar } from './runtime/toolbarProjection'
 import { projectSourceReadinessByNodeId } from './runtime/sourceReadiness'
 import { projectStatusContext } from './sourceStatus/context'
 import { projectStatusView, type StatusAction } from './sourceStatus/projection'
@@ -58,7 +58,6 @@ const buttonBaseClass =
   'inline-flex min-h-9 items-center justify-center gap-2 rounded-sm px-3 py-2 text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background) disabled:cursor-not-allowed disabled:opacity-60'
 
 const primaryButtonClass = `${buttonBaseClass} min-w-38.5 border border-(--color-accent) bg-(--color-accent) text-(--color-background) hover:brightness-110`
-const dangerButtonClass = `${buttonBaseClass} border border-(--color-accent) bg-(--color-background) text-(--color-accent) hover:brightness-110`
 const iconButtonClass = `${buttonBaseClass} h-9 w-9 min-w-0 border border-(--color-border) bg-(--color-background) p-0 text-(--color-text) hover:border-(--color-accent) hover:text-(--color-accent)`
 
 const viewStateStore = createViewStateStore()
@@ -143,6 +142,16 @@ const selectedBrowseProfileLabel = computed(() => profileLabel(browseProfile.pro
 
 const browserProjection = computed(() => projectState(browserState.value))
 
+const toolbarModel = computed(() =>
+  projectLibraryToolbar({
+    projection: browserProjection.value,
+    selectedNodeId: selectedNodeId.value,
+    selectedBrowseProfileLabel: selectedBrowseProfileLabel.value,
+    addMusicFolderLabel: rootActions.rootChoiceButtonLabel.value,
+    canAddMusicFolder: rootLifecycle.canAddMusicFolder.value
+  })
+)
+
 const sourceLifecycleSourceIds = computed(() =>
   sourceLifecycleIdsForBrowserContext({
     projection: hierarchyRead.browserProjection.value,
@@ -190,7 +199,7 @@ const selectedContentsProjection = computed(() => {
 })
 
 const contentsProjection = computed(() => {
-  if (librarySearch.searchActive.value) {
+  if (toolbarModel.value.search.visible && librarySearch.searchActive.value) {
     return projectSearchFilterContents({
       state: searchFilterRead.state.value,
       activeQuery: librarySearch.activeQuery.value,
@@ -200,34 +209,6 @@ const contentsProjection = computed(() => {
 
   return selectedContentsProjection.value
 })
-
-const sourceActionModel = computed(() =>
-  deriveSourceActionModel({
-    projection: browserProjection.value,
-    selectedNodeId: selectedNodeId.value,
-    localRootsReadState: rootActions.localRootsReadState.value,
-    scanStatus: rootActions.scanStatus.value,
-    removeSourceStatus: rootActions.removeSourceStatus.value,
-    refreshStatus: rootLifecycle.refreshStatus.value
-  })
-)
-
-const selectedBrowserBinding = computed<RowBinding | undefined>(() => {
-  const selectedId = selectedNodeId.value
-  const projection = browserProjection.value
-
-  if (selectedId === undefined || projection === undefined) {
-    return undefined
-  }
-
-  return projection.bindingsById.get(selectedId)
-})
-
-const showAddMusicFolderToolbarAction = computed(
-  () => selectedBrowserBinding.value?.kind === 'localBrowseSection'
-)
-
-const removeSourceRootId = computed(() => sourceActionModel.value.selectedRemovableSourceRootId)
 
 const sourceStatusContext = computed(() =>
   projectStatusContext({
@@ -543,6 +524,10 @@ function closeBrowseProfileMenu(): void {
 }
 
 function openSearch(): void {
+  if (!toolbarModel.value.search.enabled) {
+    return
+  }
+
   librarySearch.openSearch()
   void nextTick(() => {
     searchInputRef.value?.focus()
@@ -735,16 +720,6 @@ function refreshContentsForCurrentSelection(): Promise<boolean> {
   return contentsRead.readForBinding(projection.bindingsById.get(selectedId), { force: true })
 }
 
-async function handleRemoveSource(): Promise<void> {
-  const rootId = removeSourceRootId.value
-
-  if (rootId === undefined) {
-    return
-  }
-
-  await rootLifecycle.removeSource(rootId)
-}
-
 async function handleStatusAction(action: StatusAction): Promise<void> {
   if (!action.enabled) {
     return
@@ -900,6 +875,8 @@ function activateContentRowAction(row: ContentRow): void {
         await localBrowse.refreshBrowserWindows(expandedNodeIds.value, browserProjection.value)
       }
     })
+  } else if (action.kind === 'chooseMusicFolder') {
+    void rootLifecycle.addMusicFolder()
   } else if (action.kind === 'loadContentsPage') {
     void contentsRead.readForBinding(browserProjection.value?.bindingsById.get(action.nodeId), {
       cursor: action.cursor
@@ -936,24 +913,25 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
 
       <div class="flex flex-wrap items-center justify-end gap-2">
         <button
-          v-if="!librarySearch.searchOpen.value"
+          v-if="toolbarModel.search.visible && !librarySearch.searchOpen.value"
           type="button"
           :class="iconButtonClass"
-          aria-label="Search library"
-          title="Search library"
+          :aria-label="toolbarModel.search.label"
+          :title="toolbarModel.search.title"
+          :disabled="!toolbarModel.search.enabled"
           @click="openSearch"
         >
           <Icon role="action.search" size="md" />
         </button>
 
-        <div v-else class="inline-flex items-center gap-1">
+        <div v-else-if="toolbarModel.search.visible" class="inline-flex items-center gap-1">
           <input
             ref="searchInputRef"
             v-model="librarySearch.searchText.value"
             type="search"
             class="h-9 w-44 rounded-sm border border-(--color-border) bg-(--color-background) px-3 py-2 text-sm font-semibold text-(--color-text) outline-none transition placeholder:text-(--color-text-muted) hover:border-(--color-accent) focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background)"
-            aria-label="Search library"
-            placeholder="Search library"
+            :aria-label="toolbarModel.search.label"
+            :placeholder="toolbarModel.search.placeholder"
             @keydown.escape.stop.prevent="handleSearchEscape"
           />
           <button
@@ -968,14 +946,19 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
           </button>
         </div>
 
-        <div ref="browseProfileMenuRef" class="relative inline-flex">
+        <div
+          v-if="toolbarModel.browseProfile.visible"
+          ref="browseProfileMenuRef"
+          class="relative inline-flex"
+        >
           <button
             type="button"
             :class="iconButtonClass"
-            aria-label="Browse view"
+            :aria-label="toolbarModel.browseProfile.label"
             :aria-expanded="browseProfileMenuOpen"
             aria-haspopup="listbox"
-            :title="`Browse view: ${selectedBrowseProfileLabel}`"
+            :title="toolbarModel.browseProfile.title"
+            :disabled="!toolbarModel.browseProfile.enabled"
             @click="toggleBrowseProfileMenu"
             @keydown.escape.stop.prevent="closeBrowseProfileMenu"
           >
@@ -986,7 +969,7 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
             v-if="browseProfileMenuOpen"
             class="absolute right-0 top-full z-20 mt-1 min-w-40 border border-(--color-border) bg-(--color-background) py-1 shadow-lg"
             role="listbox"
-            aria-label="Browse view"
+            :aria-label="toolbarModel.browseProfile.label"
             tabindex="-1"
             @keydown.escape.stop.prevent="closeBrowseProfileMenu"
           >
@@ -1006,25 +989,14 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
         </div>
 
         <button
-          v-if="showAddMusicFolderToolbarAction"
+          v-if="toolbarModel.addMusicFolder.visible"
           type="button"
           :class="primaryButtonClass"
-          :disabled="!rootLifecycle.canAddMusicFolder.value"
+          :disabled="!toolbarModel.addMusicFolder.enabled"
+          :title="toolbarModel.addMusicFolder.reason"
           @click="rootLifecycle.addMusicFolder"
         >
-          {{ rootActions.rootChoiceButtonLabel.value }}
-        </button>
-
-        <button
-          v-if="sourceActionModel.removeVisible"
-          type="button"
-          :class="dangerButtonClass"
-          :disabled="!sourceActionModel.removeEnabled"
-          :title="sourceActionModel.reasonUnavailable"
-          @click="handleRemoveSource"
-        >
-          <Icon role="action.remove" size="md" />
-          <span>{{ rootActions.removeSourceButtonLabel.value }}</span>
+          {{ toolbarModel.addMusicFolder.label }}
         </button>
       </div>
     </header>

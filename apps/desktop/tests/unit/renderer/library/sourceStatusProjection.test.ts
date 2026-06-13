@@ -118,6 +118,29 @@ describe('source status projection', () => {
     expect(view.actions).toEqual([])
   })
 
+  it('does not offer broad system root admission from a loose media file', () => {
+    const projection = localBrowseProjection(
+      {
+        kind: 'localBrowseItem',
+        item: {
+          ...localItem([admission('parentDirectory', 'C:/')], 'mediaFile'),
+          identity: {
+            entryPointKind: 'systemDriveRoot',
+            resolvedRootPath: 'C:/',
+            resolvedItemPath: 'C:/loose.flac'
+          }
+        }
+      },
+      'loose.flac'
+    )
+    const view = statusView(
+      projectStatusContext({ projection, selectedNodeId: 'selected', selectedTitle: 'loose.flac' })
+    )
+
+    expect(view.badge).toBe('Choose a narrower folder')
+    expect(view.actions).toEqual([])
+  })
+
   it('registered source row shows scan/rescan, remove, and maintenance when allowed', () => {
     const view = registeredView({
       sourceLifecycle: lifecycle({ lastSuccessfulScanAtMs: 20 }),
@@ -125,6 +148,7 @@ describe('source status projection', () => {
     })
 
     expect(view.badge).toBe('Maintenance needed')
+    expect(view.detail).toContain('Preparing source. Pending work: hash 3. 3 items total.')
     expect(view.actions).toEqual([
       expect.objectContaining({ kind: 'scanSource', label: 'Rescan source', enabled: true }),
       expect.objectContaining({ kind: 'runMaintenance', label: 'Run maintenance', enabled: true }),
@@ -153,6 +177,31 @@ describe('source status projection', () => {
       enabled: false,
       reason: 'A source scan is still running.'
     })
+  })
+
+  it('summarizes maintenance backlog by product categories', () => {
+    const view = registeredView({
+      sourceMaintenance: maintenance({
+        remainingHashCandidates: 2,
+        remainingProbeCandidates: 1,
+        remainingPlayableMediaPromotionCandidates: 4,
+        remainingTrackIdentityCandidateProductionCandidates: 3,
+        remainingTrackIdentityDecisionProductionCandidates: 5,
+        attachmentLinks: {
+          currentLinksCount: 0,
+          staleLinksCount: 6,
+          sourceFilesWithCurrentBlake3ObservationsCount: 0,
+          sourceFilesWithAttachmentLinksCount: 0,
+          sourceFilesMissingAttachmentLinksCount: 7,
+          unmaterializedBlake3ObservationsCount: 0
+        }
+      })
+    })
+
+    expect(view.detail).toContain(
+      'Preparing source. Pending work: hash 2, probe 1, promotion 4, identity 8, attachment 13. 28 items total.'
+    )
+    expect(view.detail).not.toContain('maintenance items pending')
   })
 
   it('missing, unavailable, and blocked sources project compact badges', () => {

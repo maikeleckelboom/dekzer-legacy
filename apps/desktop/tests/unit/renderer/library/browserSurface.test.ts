@@ -22,8 +22,8 @@ describe('library browser surface containment', () => {
   it('keeps browse profile control icon-only and accessible in the header', () => {
     const panel = readRendererSource('panel.vue')
 
-    expect(panel).toContain('aria-label="Browse view"')
-    expect(panel).toContain('Browse view: ${selectedBrowseProfileLabel}')
+    expect(panel).toContain(':aria-label="toolbarModel.browseProfile.label"')
+    expect(panel).toContain(':title="toolbarModel.browseProfile.title"')
     expect(panel).toContain('<Icon role="action.browseView" size="md" />')
     expect(panel).not.toContain('Browse profile:')
     expect(panel).toContain('role="listbox"')
@@ -33,10 +33,10 @@ describe('library browser surface containment', () => {
   it('keeps library search control compact, icon-first, and accessible', () => {
     const panel = readRendererSource('panel.vue')
 
-    expect(panel).toContain('aria-label="Search library"')
-    expect(panel).toContain('title="Search library"')
+    expect(panel).toContain(':aria-label="toolbarModel.search.label"')
+    expect(panel).toContain(':title="toolbarModel.search.title"')
     expect(panel).toContain('<Icon role="action.search" size="md" />')
-    expect(panel).toContain('placeholder="Search library"')
+    expect(panel).toContain(':placeholder="toolbarModel.search.placeholder"')
     expect(panel).toContain('@keydown.escape.stop.prevent="handleSearchEscape"')
     expect(panel).toContain('aria-label="Clear search"')
     expect(panel).toContain("action.kind === 'loadSearchPage'")

@@ -247,9 +247,37 @@ function localBrowseItemState(
     return 'resolutionFailed'
   }
 
+  if (
+    isUnsafeSystemDriveAdmission(
+      item.identity.entryPointKind,
+      item.identity.resolvedRootPath,
+      item.availableOperations
+    )
+  ) {
+    return 'broadRoot'
+  }
+
   return sourceAdmissionOperation(item.availableOperations) === undefined
     ? 'localBrowseOnly'
     : 'eligible'
+}
+
+function isUnsafeSystemDriveAdmission(
+  entryPointKind: string,
+  resolvedRootPath: string,
+  operations: Parameters<typeof sourceAdmissionOperation>[0]
+): boolean {
+  const operation = sourceAdmissionOperation(operations)
+
+  return (
+    entryPointKind === 'systemDriveRoot' &&
+    operation !== undefined &&
+    normalizePathKey(operation.resolvedPath) === normalizePathKey(resolvedRootPath)
+  )
+}
+
+function normalizePathKey(path: string): string {
+  return path.replaceAll('/', '\\').replace(/\\+$/, '').toLowerCase()
 }
 
 function findNode(

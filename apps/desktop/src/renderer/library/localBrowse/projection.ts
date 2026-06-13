@@ -111,7 +111,7 @@ export function projectLocalBrowseSection(
 
 function localBrowseSectionNode(
   children: BrowserTreeChildren,
-  detail = 'Local filesystem entry points.'
+  detail = 'Music, Downloads, Desktop, and Home are starting points for adding sources.'
 ): BrowserTreeNode {
   return {
     id: localBrowseSectionNodeId,
@@ -554,13 +554,38 @@ function trackedMoreNode(
 function displayableEntryPoints(
   entries: readonly LocalBrowseEntryPoint[]
 ): readonly LocalBrowseEntryPoint[] {
-  return entries.filter((entry) => {
-    if (entry.status === 'unsupportedPlatform') {
-      return false
-    }
+  return [
+    ...entries.filter((entry) => {
+      if (entry.status === 'unsupportedPlatform') {
+        return false
+      }
 
-    return targetForEntryPoint(entry) !== undefined
-  })
+      return targetForEntryPoint(entry) !== undefined
+    })
+  ].sort(
+    (left, right) =>
+      entryPointPriority(left).localeCompare(entryPointPriority(right)) ||
+      left.displayName.localeCompare(right.displayName)
+  )
+}
+
+function entryPointPriority(entry: LocalBrowseEntryPoint): string {
+  switch (entry.identity.entryPointKind) {
+    case 'music':
+      return '0'
+    case 'downloads':
+      return '1'
+    case 'desktop':
+      return '2'
+    case 'userHome':
+      return '3'
+    case 'removableVolumeRoot':
+      return '4'
+    case 'localDataVolumeRoot':
+      return '5'
+    case 'systemDriveRoot':
+      return '6'
+  }
 }
 
 function directoryTargetForItem(

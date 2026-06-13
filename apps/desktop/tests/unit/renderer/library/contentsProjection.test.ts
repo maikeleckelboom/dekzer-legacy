@@ -41,6 +41,7 @@ import {
   type LoadedLocalBrowseItems,
   type LocalBrowseItemState
 } from '../../../../src/renderer/library/localBrowse/types'
+import type { ProfileKey } from '../../../../src/renderer/library/browseProfile/types'
 
 describe('projectContents', () => {
   it('projects selected source contents from contents state', () => {
@@ -219,7 +220,7 @@ describe('projectContents', () => {
     })
 
     expect(rootContents.kind).toBe('ready')
-    expect(rootContents.title).toBe('Music')
+    expect(rootContents.title).toBe('Local Files: Music')
     expect(rootContents.rows.map((row) => row.label)).toEqual(['Albums', 'loose.flac'])
     expect(
       rootContents.rows.every((row) => row.action?.kind !== 'requestLocalBrowseAdmission')
@@ -237,7 +238,7 @@ describe('projectContents', () => {
     })
 
     expect(albumContents.kind).toBe('ready')
-    expect(albumContents.title).toBe('Albums')
+    expect(albumContents.title).toBe('Local folder: Albums')
     expect(albumContents.rows.map((row) => row.label)).toEqual(['track.flac'])
     expect(
       albumContents.rows.every((row) => row.action?.kind !== 'requestLocalBrowseAdmission')
@@ -258,12 +259,15 @@ describe('projectContents', () => {
     })
 
     expect(contents.kind).toBe('notLoaded')
-    expect(contents.rows.map((row) => row.label)).toEqual(['Local folder contents not loaded'])
+    expect(contents.title).toBe('Local Files: Music')
+    expect(contents.detail).toContain('Preview local folders and media evidence')
+    expect(contents.rows.map((row) => row.label)).toEqual(['Folder preview not loaded'])
     expect(contents.rows[0]).toMatchObject({
       state: 'notLoaded',
       action: {
         kind: 'loadLocalBrowseChildren',
-        nodeId: entryNode.id
+        nodeId: entryNode.id,
+        label: 'Load preview'
       }
     })
   })
@@ -281,12 +285,187 @@ describe('projectContents', () => {
     })
 
     expect(contents.kind).toBe('ready')
-    expect(contents.title).toBe('Local browse')
-    expect(contents.detail).toBe('Choose a folder to add as a music source.')
-    expect(contents.rows).toEqual([])
+    expect(contents.title).toBe('Local Files')
+    expect(contents.detail).toContain('managed source')
+    expect(contents.rows).toEqual([
+      expect.objectContaining({
+        kind: 'state',
+        label: 'Add a music folder',
+        action: {
+          kind: 'chooseMusicFolder',
+          label: 'Add music folder'
+        }
+      })
+    ])
     expect(`${contents.title} ${contents.detail}`).not.toMatch(
       /Unknown|Unsupported|No library contents/
     )
+  })
+
+  it('demotes system-drive root preview to plausible music-source candidates', () => {
+    const systemRoot = 'C:\\'
+    const rootWindow = localBrowseWindow({
+      label: 'System Drive',
+      entryPointKind: 'systemDriveRoot',
+      resolvedRootPath: systemRoot,
+      resolvedParentPath: systemRoot,
+      items: [
+        localBrowseItem('rejectedRoot', 'Windows', 'C:\\Windows', {
+          identity: {
+            entryPointKind: 'systemDriveRoot',
+            resolvedRootPath: systemRoot,
+            resolvedItemPath: 'C:\\Windows'
+          },
+          status: 'rejected',
+          failure: {
+            code: 'rejectedRoot',
+            detail: 'system-owned directory is not directly admissible as a source root'
+          }
+        }),
+        localBrowseItem('directory', 'Music', 'C:\\Music', {
+          identity: {
+            entryPointKind: 'systemDriveRoot',
+            resolvedRootPath: systemRoot,
+            resolvedItemPath: 'C:\\Music'
+          },
+          availableOperations: [
+            { kind: 'browseChildren' },
+            { kind: 'chooseDescendant' },
+            {
+              kind: 'requestSourceAdmission',
+              requestKind: 'selectedDirectory',
+              resolvedPath: 'C:\\Music'
+            }
+          ]
+        })
+      ]
+    })
+    const state = browserState({
+      navigationReadResult: emptyNavigation(),
+      entries: [
+        localBrowseEntryPoint({
+          identity: { entryPointKind: 'systemDriveRoot', resolvedPath: systemRoot },
+          displayName: 'System Drive',
+          availableOperations: [{ kind: 'browseChildren' }, { kind: 'chooseDescendant' }]
+        })
+      ],
+      localBrowseItemStates: new Map([
+        [localBrowseWindowStateKey(rootWindow), { kind: 'loaded', window: rootWindow }]
+      ])
+    })
+    const projection = browserProjection(state)
+    const entryNode = firstLocalBrowseEntryNode(projection)
+    const contents = projectContents({
+      state,
+      selectedNodeId: entryNode.id,
+      bindingsById: projection.bindingsById
+    })
+
+    expect(contents.title).toBe('Local Files: System Drive')
+    expect(contents.detail).toContain('plausible music-source candidate')
+    expect(contents.rows.map((row) => row.label)).toEqual(['Music'])
+    expect(contents.rows.some((row) => row.label === 'Windows')).toBe(false)
+  })
+
+  it('keeps raw local inventory out of normal admission but available in All Files', () => {
+    const items = [
+      localBrowseItem('directory', 'Albums', 'C:\\Users\\Maikel\\Music\\Albums'),
+      localBrowseItem('unsupportedFile', 'notes.txt', 'C:\\Users\\Maikel\\Music\\notes.txt', {
+        fileKind: 'textDoc',
+        mediaRelevance: 'unsupported'
+      }),
+      localBrowseItem('unknown', 'mystery', 'C:\\Users\\Maikel\\Music\\mystery', {
+        status: 'unknown',
+        fileKind: 'unknown',
+        mediaRelevance: 'unknown'
+      })
+    ]
+    const audioWindow = localBrowseWindow({
+      label: 'Music',
+      resolvedParentPath: 'C:\\Users\\Maikel\\Music',
+      items
+    })
+    const inventoryWindow = localBrowseWindow({
+      profile: 'allFiles',
+      label: 'Music',
+      resolvedParentPath: 'C:\\Users\\Maikel\\Music',
+      items
+    })
+
+    const audioState = browserState({
+      navigationReadResult: emptyNavigation(),
+      entries: [localBrowseEntryPoint()],
+      localBrowseItemStates: new Map([
+        [localBrowseWindowStateKey(audioWindow), { kind: 'loaded', window: audioWindow }]
+      ])
+    })
+    const audioProjection = browserProjection(audioState)
+    const audioEntryNode = firstLocalBrowseEntryNode(audioProjection)
+    const audioContents = projectContents({
+      state: audioState,
+      selectedNodeId: audioEntryNode.id,
+      bindingsById: audioProjection.bindingsById
+    })
+
+    expect(audioContents.rows.map((row) => row.label)).toEqual(['Albums'])
+
+    const inventoryState = browserState({
+      profile: 'allFiles',
+      navigationReadResult: emptyNavigation(),
+      entries: [localBrowseEntryPoint()],
+      localBrowseItemStates: new Map([
+        [localBrowseWindowStateKey(inventoryWindow), { kind: 'loaded', window: inventoryWindow }]
+      ])
+    })
+    const inventoryProjection = browserProjection(inventoryState)
+    const inventoryEntryNode = firstLocalBrowseEntryNode(inventoryProjection)
+    const inventoryContents = projectContents({
+      state: inventoryState,
+      selectedNodeId: inventoryEntryNode.id,
+      bindingsById: inventoryProjection.bindingsById
+    })
+
+    expect(inventoryContents.detail).toContain('local inventory items shown')
+    expect(inventoryContents.rows.map((row) => row.label)).toEqual([
+      'Albums',
+      'notes.txt',
+      'mystery'
+    ])
+  })
+
+  it('marks duplicate local browse occurrence as already added without add action', () => {
+    const rootWindow = localBrowseWindow({
+      label: 'Music',
+      resolvedParentPath: 'C:\\Users\\Maikel\\Music',
+      items: [
+        localBrowseItem('directory', 'Admitted', 'C:\\Users\\Maikel\\Music\\Admitted', {
+          status: 'duplicateOfAdmittedSource',
+          availableOperations: [{ kind: 'browseChildren' }, { kind: 'chooseDescendant' }]
+        })
+      ]
+    })
+    const state = browserState({
+      navigationReadResult: emptyNavigation(),
+      entries: [localBrowseEntryPoint()],
+      localBrowseItemStates: new Map([
+        [localBrowseWindowStateKey(rootWindow), { kind: 'loaded', window: rootWindow }]
+      ])
+    })
+    const projection = browserProjection(state)
+    const entryNode = firstLocalBrowseEntryNode(projection)
+    const contents = projectContents({
+      state,
+      selectedNodeId: entryNode.id,
+      bindingsById: projection.bindingsById
+    })
+
+    expect(contents.rows).toEqual([
+      expect.objectContaining({
+        label: 'Admitted',
+        detail: 'Already added as a library source.'
+      })
+    ])
+    expect(contents.rows[0]?.action).toBeUndefined()
   })
 
   it('projects protected reparse local browse items as terminal state without echoing the item', () => {
@@ -1161,13 +1340,22 @@ describe('projectContents', () => {
     expect(cursorInvalid.rows[0]).not.toMatchObject({ state: 'empty' })
   })
 
-  it('projects empty selection, unsupported selection, and host state', () => {
+  it('projects library start, unsupported selection, and host state', () => {
     const state = browserState({})
     const projection = browserProjection(state)
 
     expect(projectContents({ state, bindingsById: projection.bindingsById })).toMatchObject({
-      kind: 'emptySelection',
-      title: 'Library contents'
+      kind: 'libraryStart',
+      title: 'Start your library',
+      rows: [
+        expect.objectContaining({
+          label: 'Add a music folder',
+          action: {
+            kind: 'chooseMusicFolder',
+            label: 'Add music folder'
+          }
+        })
+      ]
     })
     expect(
       projectContents({
@@ -1263,6 +1451,7 @@ function browserState(options: {
   readonly directoryStates?: ReadonlyMap<string, DirectoryState>
   readonly entries?: readonly LocalBrowseEntryPoint[]
   readonly localBrowseItemStates?: ReadonlyMap<string, LocalBrowseItemState>
+  readonly profile?: ProfileKey
 }): BrowserState {
   const sourceStates = new Map<string, SourceState>()
 
@@ -1271,6 +1460,7 @@ function browserState(options: {
   }
 
   return {
+    ...(options.profile === undefined ? {} : { profile: options.profile }),
     navigationReadResult: options.navigationReadResult ?? {
       state: 'ready',
       rows: [sourceNavigationRow()]
@@ -1416,7 +1606,9 @@ function sourceEntryPoint(): EntryPoint {
   }
 }
 
-function localBrowseEntryPoint(): LocalBrowseEntryPoint {
+function localBrowseEntryPoint(
+  overrides: Partial<LocalBrowseEntryPoint> = {}
+): LocalBrowseEntryPoint {
   return {
     identity: {
       entryPointKind: 'music',
@@ -1434,7 +1626,8 @@ function localBrowseEntryPoint(): LocalBrowseEntryPoint {
         resolvedPath: 'C:\\Users\\Maikel\\Music'
       }
     ],
-    failure: null
+    failure: null,
+    ...overrides
   }
 }
 
@@ -1474,17 +1667,21 @@ function localBrowseItem(
 }
 
 function localBrowseWindow(options: {
+  readonly profile?: ProfileKey
+  readonly entryPointKind?: LoadedLocalBrowseItems['identity']['entryPointKind']
+  readonly resolvedRootPath?: string
   readonly label: string
   readonly resolvedParentPath: string
   readonly items: readonly LocalBrowseItem[]
   readonly totalItems?: number
   readonly nextOffset?: number
 }): LoadedLocalBrowseItems {
+  const resolvedRootPath = options.resolvedRootPath ?? 'C:\\Users\\Maikel\\Music'
   return {
-    profile: 'audio',
+    profile: options.profile ?? 'audio',
     identity: {
-      entryPointKind: 'music',
-      resolvedRootPath: 'C:\\Users\\Maikel\\Music',
+      entryPointKind: options.entryPointKind ?? 'music',
+      resolvedRootPath,
       resolvedParentPath: options.resolvedParentPath
     },
     label: options.label,

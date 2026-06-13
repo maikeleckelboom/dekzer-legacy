@@ -6,7 +6,11 @@ import type {
   PlayableMedia
 } from '../../../shared/library/contents/read'
 import type { ContentsBoundaryState } from '../boundary/contentsRead'
-import type { LocalBrowseOperation } from '../../../shared/library/localBrowse/entryPoints'
+import type {
+  LocalBrowseEntryPointKind,
+  LocalBrowseEntryPointStatus,
+  LocalBrowseOperation
+} from '../../../shared/library/localBrowse/entryPoints'
 import type { LocalBrowseItem } from '../../../shared/library/localBrowse/items'
 import {
   localBrowseRootTarget,
@@ -14,13 +18,15 @@ import {
   type LoadedLocalBrowseItems,
   type LocalBrowseItemState
 } from '../localBrowse/types'
-import { defaultProfile, emptyStateLabel } from '../browseProfile/types'
+import { defaultProfile, emptyStateLabel, type ProfileKey } from '../browseProfile/types'
 import type { BrowserProjection } from '../tree/projection'
 import type { BrowserState, RowBinding } from '../state'
 import type { BrowserTreeNodeId } from '../tree/types'
 import { formatSourceDisplayName } from '../tree/sourcePresentation'
+import { sourceAdmissionOperation } from '../localBrowse/projection'
 
 export type ContentProjectionKind =
+  | 'libraryStart'
   | 'emptySelection'
   | 'unsupported'
   | 'notLoaded'
@@ -78,6 +84,10 @@ export type ContentRowAction =
       >['requestKind']
       readonly label: string
     }
+  | {
+      readonly kind: 'chooseMusicFolder'
+      readonly label: string
+    }
 
 export type ContentRow = {
   readonly id: string
@@ -116,12 +126,16 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
 
   if (selectedNodeId === undefined) {
     return stateProjection({
-      kind: 'emptySelection',
+      kind: 'libraryStart',
       ownerId: 'selection',
-      title: 'Library contents',
+      title: 'Start your library',
       state: 'empty',
-      label: 'Nothing selected',
-      detail: 'Select a source or folder to see its contents.'
+      label: 'Add a music folder',
+      detail: 'Add a music folder to begin, or select an existing source.',
+      action: {
+        kind: 'chooseMusicFolder',
+        label: 'Add music folder'
+      }
     })
   }
 
@@ -195,16 +209,31 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
     case 'localBrowseSection':
       return {
         kind: 'ready',
-        title: 'Local browse',
-        detail: 'Choose a folder to add as a music source.',
-        rows: []
+        title: 'Local Files',
+        detail:
+          'Choose a plausible music folder to add as a managed source, or pick another folder manually.',
+        rows: [
+          stateRow({
+            ownerId: selectedNodeId,
+            state: 'empty',
+            label: 'Add a music folder',
+            detail: 'Music, Downloads, Desktop, and Home are starting points.',
+            action: {
+              kind: 'chooseMusicFolder',
+              label: 'Add music folder'
+            }
+          })
+        ]
       }
     case 'localBrowseEntryPoint':
       return projectLocalBrowseFolderContents({
         ownerId: selectedNodeId,
-        title: binding.entry.displayName,
+        title: `Local Files: ${binding.entry.displayName}`,
         targetNodeId: selectedNodeId,
         folderDetail: binding.entry.identity.resolvedPath ?? binding.entry.displayName,
+        profile: options.state.profile ?? defaultProfile,
+        entryPointKind: binding.entry.identity.entryPointKind,
+        localStatus: binding.entry.status,
         windowState: options.state.localBrowseItemStates?.get(
           localBrowseWindowKey(
             localBrowseRootTarget(binding.target, options.state.profile ?? defaultProfile)
@@ -215,9 +244,12 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
       if (binding.target !== undefined) {
         return projectLocalBrowseFolderContents({
           ownerId: selectedNodeId,
-          title: binding.item.displayName,
+          title: `Local folder: ${binding.item.displayName}`,
           targetNodeId: selectedNodeId,
           folderDetail: localBrowseItemDetail(binding.item),
+          profile: binding.target.profile,
+          entryPointKind: binding.item.identity.entryPointKind,
+          localStatus: binding.item.status,
           windowState: options.state.localBrowseItemStates?.get(
             localBrowseWindowKey(binding.target)
           )
@@ -701,25 +733,29 @@ function projectLocalBrowseFolderContents(options: {
   readonly title: string
   readonly targetNodeId: BrowserTreeNodeId
   readonly folderDetail: string
+  readonly profile: ProfileKey
+  readonly entryPointKind: LocalBrowseEntryPointKind
+  readonly localStatus: LocalBrowseEntryPointStatus | LocalBrowseItem['status']
   readonly windowState: LocalBrowseItemState | undefined
 }): ContentProjection {
   const state = options.windowState
+  const selectionDetail = localBrowseSelectionDetail(options)
 
   if (state === undefined) {
     return {
       kind: 'notLoaded',
       title: options.title,
-      detail: options.folderDetail,
+      detail: selectionDetail,
       rows: [
         stateRow({
           ownerId: options.ownerId,
           state: 'notLoaded',
-          label: 'Local folder contents not loaded',
-          detail: 'Local folder contents have not been loaded.',
+          label: 'Folder preview not loaded',
+          detail: 'Load a local preview before deciding whether this belongs in the library.',
           action: {
             kind: 'loadLocalBrowseChildren',
             nodeId: options.targetNodeId,
-            label: 'Load contents'
+            label: 'Load preview'
           }
         })
       ]
@@ -730,13 +766,13 @@ function projectLocalBrowseFolderContents(options: {
     return {
       kind: 'loading',
       title: options.title,
-      detail: options.folderDetail,
+      detail: selectionDetail,
       rows: [
         stateRow({
           ownerId: options.ownerId,
           state: 'loading',
-          label: 'Loading local folder contents',
-          detail: state.detail ?? 'Loading local folder contents.'
+          label: 'Loading folder preview',
+          detail: state.detail ?? 'Loading local folder preview.'
         })
       ]
     }
@@ -746,12 +782,12 @@ function projectLocalBrowseFolderContents(options: {
     return {
       kind: 'failed',
       title: options.title,
-      detail: options.folderDetail,
+      detail: selectionDetail,
       rows: [
         stateRow({
           ownerId: options.ownerId,
           state: 'failed',
-          label: 'Local folder unavailable',
+          label: 'Local folder preview unavailable',
           detail: state.detail,
           action: {
             kind: 'loadLocalBrowseChildren',
@@ -764,7 +800,9 @@ function projectLocalBrowseFolderContents(options: {
   }
 
   const window = state.window
-  const contentRows = window.items.filter(isVisibleLocalBrowsePreviewItem).map(localBrowseItemRow)
+  const contentRows = window.items
+    .filter((item) => isVisibleLocalBrowsePreviewItem(item, window))
+    .map(localBrowseItemRow)
   const moreRow =
     window.nextOffset === undefined ? undefined : localBrowseMoreContentRow(options.ownerId, window)
   const rows = [...contentRows, ...(moreRow === undefined ? [] : [moreRow])]
@@ -775,8 +813,8 @@ function projectLocalBrowseFolderContents(options: {
       title: options.title,
       detail:
         state.kind === 'refreshing'
-          ? (state.detail ?? 'Refreshing local folder contents.')
-          : localBrowseWindowDetail(window),
+          ? (state.detail ?? 'Refreshing local folder preview.')
+          : localBrowseWindowDetail(window, contentRows.length),
       rows
     }
   }
@@ -784,13 +822,13 @@ function projectLocalBrowseFolderContents(options: {
   return {
     kind: 'ready',
     title: options.title,
-    detail: localBrowseWindowDetail(window),
+    detail: localBrowseWindowDetail(window, contentRows.length),
     rows: [
       stateRow({
         ownerId: options.ownerId,
         state: localBrowseWindowState(window),
         label: localBrowseWindowStateLabel(window),
-        detail: window.failure?.detail ?? localBrowseWindowDetail(window)
+        detail: window.failure?.detail ?? localBrowseWindowDetail(window, contentRows.length)
       })
     ]
   }
@@ -836,7 +874,43 @@ function localBrowseItemRow(item: LocalBrowseItem): ContentRow {
   }
 }
 
-function isVisibleLocalBrowsePreviewItem(item: LocalBrowseItem): boolean {
+function localBrowseSelectionDetail(options: {
+  readonly folderDetail: string
+  readonly profile: ProfileKey
+  readonly entryPointKind: LocalBrowseEntryPointKind
+  readonly localStatus: LocalBrowseEntryPointStatus | LocalBrowseItem['status']
+}): string {
+  if (options.localStatus === 'duplicateOfAdmittedSource') {
+    return 'Already added as a library source. Use the managed source entry for scans and maintenance.'
+  }
+
+  if (options.entryPointKind === 'systemDriveRoot') {
+    return 'Broad filesystem root. Choose a specific music folder before adding it as a source.'
+  }
+
+  if (options.profile === 'allFiles') {
+    return `All Files shows local inventory for diagnostics. ${options.folderDetail}`
+  }
+
+  return `Preview local folders and media evidence before adding a managed source. ${options.folderDetail}`
+}
+
+function isVisibleLocalBrowsePreviewItem(
+  item: LocalBrowseItem,
+  window: LoadedLocalBrowseItems
+): boolean {
+  if (window.profile === 'allFiles') {
+    return true
+  }
+
+  if (isSystemDriveRootWindow(window)) {
+    return (
+      item.status === 'duplicateOfAdmittedSource' ||
+      (item.itemKind === 'directory' &&
+        sourceAdmissionOperation(item.availableOperations) !== undefined)
+    )
+  }
+
   if (isTerminalLocalBrowseItem(item)) {
     return true
   }
@@ -850,6 +924,18 @@ function isVisibleLocalBrowsePreviewItem(item: LocalBrowseItem): boolean {
     item.mediaRelevance !== 'unsupported' &&
     (item.fileKind === 'audio' || item.fileKind === 'cueSheet')
   )
+}
+
+function isSystemDriveRootWindow(window: LoadedLocalBrowseItems): boolean {
+  return (
+    window.identity.entryPointKind === 'systemDriveRoot' &&
+    localBrowsePathKey(window.identity.resolvedRootPath) ===
+      localBrowsePathKey(window.identity.resolvedParentPath)
+  )
+}
+
+function localBrowsePathKey(path: string): string {
+  return path.replaceAll('/', '\\').replace(/\\+$/, '').toLowerCase()
 }
 
 function isTerminalLocalBrowseItem(item: LocalBrowseItem): boolean {
@@ -933,16 +1019,34 @@ function localBrowseMoreContentRow(
   }
 }
 
-function localBrowseWindowDetail(window: LoadedLocalBrowseItems): string {
+function localBrowseWindowDetail(window: LoadedLocalBrowseItems, visibleRowCount: number): string {
   if (window.failure !== null) {
     return window.failure.detail
   }
 
-  if (window.totalItems === 0) {
-    return 'No local items are available in this folder.'
+  if (window.profile === 'allFiles') {
+    if (window.totalItems === 0) {
+      return 'No local inventory items are available in this folder.'
+    }
+
+    return `${visibleRowCount} of ${window.totalItems} local inventory items shown.`
   }
 
-  return `${window.items.length} of ${window.totalItems} local items loaded.`
+  if (isSystemDriveRootWindow(window)) {
+    if (visibleRowCount === 0) {
+      return 'Broad root preview is limited to plausible music folders.'
+    }
+
+    return `${visibleRowCount} plausible music-source ${
+      visibleRowCount === 1 ? 'candidate' : 'candidates'
+    } shown from this broad root.`
+  }
+
+  if (window.totalItems === 0) {
+    return 'No local music-source evidence is available in this folder.'
+  }
+
+  return `${visibleRowCount} of ${window.totalItems} local preview items shown.`
 }
 
 function localBrowseWindowState(
@@ -965,7 +1069,7 @@ function localBrowseWindowState(
 function localBrowseWindowStateLabel(window: LoadedLocalBrowseItems): string {
   switch (window.status) {
     case 'complete':
-      return 'No local items'
+      return window.profile === 'allFiles' ? 'No local inventory items' : 'No preview evidence'
     case 'partialFailure':
       return 'Local items partially unavailable'
     case 'failed':
@@ -1390,6 +1494,10 @@ function localBrowseMoreRow(
 function localBrowseItemDetail(
   item: Extract<RowBinding, { readonly kind: 'localBrowseItem' }>['item']
 ): string {
+  if (item.status === 'duplicateOfAdmittedSource') {
+    return 'Already added as a library source.'
+  }
+
   if (item.failure !== null) {
     return item.failure.detail
   }

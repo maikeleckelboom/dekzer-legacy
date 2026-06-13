@@ -5,7 +5,10 @@ import {
   projectState,
   type BrowserProjection
 } from '../../../../src/renderer/library/tree/projection'
-import type { LocalBrowseEntryPoint } from '../../../../src/shared/library/localBrowse/entryPoints'
+import type {
+  LocalBrowseEntryPoint,
+  LocalBrowseEntryPointKind
+} from '../../../../src/shared/library/localBrowse/entryPoints'
 import type {
   LocalBrowseItem,
   LocalBrowseItemKind
@@ -25,6 +28,28 @@ describe('local browse tree projection', () => {
     expect(projection.bindingsById.get('local-browse:section')).toEqual({
       kind: 'localBrowseSection'
     })
+  })
+
+  it('orders music and user folders before broad drive roots', () => {
+    const projection = projectTree(
+      browserState({
+        entries: [
+          entryPoint('systemDriveRoot', 'System Drive', 'C:\\'),
+          entryPoint('downloads', 'Downloads', 'C:\\Users\\Maikel\\Downloads'),
+          entryPoint('music', 'Music', 'C:\\Users\\Maikel\\Music'),
+          entryPoint('desktop', 'Desktop', 'C:\\Users\\Maikel\\Desktop'),
+          entryPoint('userHome', 'Home', 'C:\\Users\\Maikel')
+        ]
+      })
+    )
+
+    expect(firstLoadedChildLabels(projection.nodes[0])).toEqual([
+      'Music',
+      'Downloads',
+      'Desktop',
+      'Home',
+      'System Drive'
+    ])
   })
 
   it('keeps local browse entries out of source bindings', () => {
@@ -258,6 +283,21 @@ function musicEntryPoint(overrides: Partial<LocalBrowseEntryPoint> = {}): LocalB
     failure: null,
     ...overrides
   }
+}
+
+function entryPoint(
+  entryPointKind: LocalBrowseEntryPointKind,
+  displayName: string,
+  resolvedPath: string
+): LocalBrowseEntryPoint {
+  return musicEntryPoint({
+    identity: {
+      entryPointKind,
+      resolvedPath
+    },
+    displayName,
+    availableOperations: [{ kind: 'browseChildren' }, { kind: 'chooseDescendant' }]
+  })
 }
 
 function item(

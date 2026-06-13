@@ -113,8 +113,8 @@ export function projectStatusView(input: StatusViewInput): StatusView {
         role: 'navigation',
         title: context.title,
         tone: 'muted',
-        detail: context.detail,
-        actions: []
+        actions: [],
+        ...(context.detail === undefined ? {} : { detail: context.detail })
       }
     case 'readState':
       return {
@@ -321,21 +321,21 @@ function maintenanceSummary(
   maintenance: ReadSourceMaintenanceReply | undefined,
   integrity: ReadSourceIntegrityReply | undefined
 ): string | undefined {
-  const remaining = maintenanceRemaining(maintenance, integrity)
-  if (remaining > 0) {
-    return `${remaining} maintenance ${remaining === 1 ? 'item' : 'items'} pending.`
-  }
+  const backlog = maintenanceBacklog(maintenance, integrity)
+  if (backlog.total > 0) {
+    const categories = backlog.categories
+      .map((category) => `${category.label} ${category.count}`)
+      .join(', ')
 
-  const staleLinks =
-    maintenance?.attachmentLinks?.staleLinksCount ??
-    integrity?.attachmentIntegrity?.staleLinksCount ??
-    0
-  const missingLinks =
-    maintenance?.attachmentLinks?.sourceFilesMissingAttachmentLinksCount ??
-    integrity?.attachmentIntegrity?.missingLinksCount ??
-    0
-  if (staleLinks + missingLinks > 0) {
-    return 'Attachment integrity needs maintenance.'
+    if (categories.length > 0) {
+      return `Preparing source. Pending work: ${categories}. ${backlog.total} ${
+        backlog.total === 1 ? 'item' : 'items'
+      } total.`
+    }
+
+    return `Preparing source. Analysis and identity work is pending. ${backlog.total} ${
+      backlog.total === 1 ? 'item' : 'items'
+    } total.`
   }
 
   return undefined
@@ -534,7 +534,7 @@ function localBrowseDetail(
     case 'resolutionFailed':
       return detail ?? 'Could not fully resolve this location.'
     case 'alreadyAdded':
-      return 'Already added.'
+      return 'Already added as a library source. Use the managed source entry for scans and maintenance.'
     case 'localBrowseOnly':
       return 'Not a music-source candidate.'
   }
@@ -559,28 +559,63 @@ function hasMaintenanceBacklog(
   maintenance: ReadSourceMaintenanceReply | undefined,
   integrity: ReadSourceIntegrityReply | undefined
 ): boolean {
-  return maintenanceRemaining(maintenance, integrity) > 0
+  return maintenanceBacklog(maintenance, integrity).total > 0
 }
 
-function maintenanceRemaining(
+function maintenanceBacklog(
   maintenance: ReadSourceMaintenanceReply | undefined,
   integrity: ReadSourceIntegrityReply | undefined
-): number {
-  return (
-    (maintenance?.remainingHashCandidates ??
-      integrity?.evidenceAndMaintenance.remainingHashCandidates ??
-      0) +
-    (maintenance?.remainingProbeCandidates ??
-      integrity?.evidenceAndMaintenance.remainingProbeCandidates ??
-      0) +
-    (maintenance?.remainingPlayableMediaPromotionCandidates ??
-      integrity?.evidenceAndMaintenance.remainingPlayableMediaPromotionCandidates ??
-      0) +
+): {
+  readonly total: number
+  readonly categories: readonly { readonly label: string; readonly count: number }[]
+} {
+  const hash =
+    maintenance?.remainingHashCandidates ??
+    integrity?.evidenceAndMaintenance.remainingHashCandidates ??
+    0
+  const probe =
+    maintenance?.remainingProbeCandidates ??
+    integrity?.evidenceAndMaintenance.remainingProbeCandidates ??
+    0
+  const promotion =
+    maintenance?.remainingPlayableMediaPromotionCandidates ??
+    integrity?.evidenceAndMaintenance.remainingPlayableMediaPromotionCandidates ??
+    0
+  const identity =
     (maintenance?.remainingTrackIdentityCandidateProductionCandidates ??
       integrity?.evidenceAndMaintenance.remainingTrackIdentityCandidateProductionCandidates ??
       0) +
     (maintenance?.remainingTrackIdentityDecisionProductionCandidates ??
       integrity?.evidenceAndMaintenance.remainingTrackIdentityDecisionProductionCandidates ??
       0)
-  )
+  const attachment = maintenanceAttachmentRemaining(maintenance, integrity)
+
+  const categories = [
+    { label: 'hash', count: hash },
+    { label: 'probe', count: probe },
+    { label: 'promotion', count: promotion },
+    { label: 'identity', count: identity },
+    { label: 'attachment', count: attachment }
+  ].filter((category) => category.count > 0)
+
+  return {
+    total: hash + probe + promotion + identity + attachment,
+    categories
+  }
+}
+
+function maintenanceAttachmentRemaining(
+  maintenance: ReadSourceMaintenanceReply | undefined,
+  integrity: ReadSourceIntegrityReply | undefined
+): number {
+  const staleLinks =
+    maintenance?.attachmentLinks?.staleLinksCount ??
+    integrity?.attachmentIntegrity?.staleLinksCount ??
+    0
+  const missingLinks =
+    maintenance?.attachmentLinks?.sourceFilesMissingAttachmentLinksCount ??
+    integrity?.attachmentIntegrity?.missingLinksCount ??
+    0
+
+  return staleLinks + missingLinks
 }
