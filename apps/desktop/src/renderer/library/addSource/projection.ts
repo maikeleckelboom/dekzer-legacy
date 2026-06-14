@@ -134,7 +134,7 @@ export function projectAddSourceProjection(
       return startProjection(options.entryPointsState, addSourceView)
     case 'localBrowseEntryPoint':
       return folderProjection({
-        ownerId: selectedNodeId,
+        selectedNodeId,
         title: binding.entry.displayName,
         targetNodeId: selectedNodeId,
         folderDetail: binding.entry.identity.resolvedPath ?? binding.entry.displayName,
@@ -152,7 +152,7 @@ export function projectAddSourceProjection(
       }
 
       return folderProjection({
-        ownerId: selectedNodeId,
+        selectedNodeId,
         title: binding.item.displayName,
         targetNodeId: selectedNodeId,
         folderDetail: localBrowseItemDetail(binding.item),
@@ -240,7 +240,7 @@ function startProjection(
         'Inventory is for inspection. It shows local files without adding or indexing a folder.',
       rows: [
         stateRow({
-          ownerId: 'add-source-inventory',
+          rowId: 'add-source-inventory',
           state: 'empty',
           label: 'Select a suggested folder',
           detail: 'Choose a folder to inspect its local files.'
@@ -258,7 +258,7 @@ function startProjection(
       detail: 'Add a folder to manage it as a music source.',
       rows: [
         stateRow({
-          ownerId: 'add-source-suggestions',
+          rowId: 'add-source-suggestions',
           state: 'loading',
           label: 'Loading suggested folders',
           detail: entryPointsState.detail ?? 'Loading suggested folders.'
@@ -276,7 +276,7 @@ function startProjection(
       detail: 'Add a folder to manage it as a music source.',
       rows: [
         stateRow({
-          ownerId: 'add-source-suggestions',
+          rowId: 'add-source-suggestions',
           state: 'failed',
           label: 'Suggested folders unavailable',
           detail: entryPointsState.detail ?? 'Suggested folders are not available right now.',
@@ -301,7 +301,7 @@ function startProjection(
       'Suggested folders are shortcuts into local browse. Add a folder to manage it as a music source. Inventory is for inspection.',
     rows: [
       stateRow({
-        ownerId: 'add-source',
+        rowId: 'add-source',
         state: 'empty',
         label: 'Suggested folders',
         detail:
@@ -317,7 +317,7 @@ function startProjection(
 }
 
 function folderProjection(options: {
-  readonly ownerId: BrowserTreeNodeId
+  readonly selectedNodeId: BrowserTreeNodeId
   readonly title: string
   readonly targetNodeId: BrowserTreeNodeId
   readonly folderDetail: string
@@ -341,7 +341,7 @@ function folderProjection(options: {
       detail: folderSelectionDetail(options, selection),
       rows: [
         stateRow({
-          ownerId: options.ownerId,
+          rowId: options.selectedNodeId,
           state: 'notLoaded',
           label:
             options.addSourceView === 'inventory' ? 'Inventory not loaded' : 'Preview not loaded',
@@ -367,7 +367,7 @@ function folderProjection(options: {
       detail: folderSelectionDetail(options, selection),
       rows: [
         stateRow({
-          ownerId: options.ownerId,
+          rowId: options.selectedNodeId,
           state: 'loading',
           label: options.addSourceView === 'inventory' ? 'Loading inventory' : 'Loading preview',
           detail: state.detail ?? 'Loading folder contents.'
@@ -384,7 +384,7 @@ function folderProjection(options: {
       detail: folderSelectionDetail(options, selection),
       rows: [
         stateRow({
-          ownerId: options.ownerId,
+          rowId: options.selectedNodeId,
           state: 'failed',
           label: 'Folder unavailable',
           detail: state.detail,
@@ -403,7 +403,9 @@ function folderProjection(options: {
     .filter((item) => isVisibleAddSourcePreviewItem(item, window))
     .map(localBrowseItemRow)
   const moreRow =
-    window.nextOffset === undefined ? undefined : localBrowseMoreContentRow(options.ownerId, window)
+    window.nextOffset === undefined
+      ? undefined
+      : localBrowseMoreContentRow(options.selectedNodeId, window)
   const rows = [...contentRows, ...(moreRow === undefined ? [] : [moreRow])]
 
   if (rows.length > 0) {
@@ -426,7 +428,7 @@ function folderProjection(options: {
     detail: localBrowseWindowDetail(window, contentRows.length, selection),
     rows: [
       stateRow({
-        ownerId: options.ownerId,
+        rowId: options.selectedNodeId,
         state: localBrowseWindowState(window, selection),
         label: localBrowseWindowStateLabel(window, selection),
         detail:
@@ -437,7 +439,7 @@ function folderProjection(options: {
 }
 
 function itemProjection(
-  ownerId: BrowserTreeNodeId,
+  selectedNodeId: BrowserTreeNodeId,
   item: LocalBrowseItem,
   addSourceView: AddSourceView
 ): AddSourceProjection {
@@ -449,7 +451,7 @@ function itemProjection(
       detail: item.failure?.detail ?? localBrowseItemDetail(item),
       rows: [
         stateRow({
-          ownerId,
+          rowId: selectedNodeId,
           state: localBrowseTerminalRowState(item),
           label: localBrowseTerminalLabel(item),
           detail: item.failure?.detail ?? localBrowseItemDetail(item)
@@ -590,7 +592,7 @@ function isVisibleAddSourcePreviewItem(
 }
 
 function localBrowseMoreContentRow(
-  ownerId: BrowserTreeNodeId,
+  selectedNodeId: BrowserTreeNodeId,
   window: LoadedLocalBrowseItems
 ): AddSourceRow | undefined {
   const offset = window.nextOffset
@@ -600,7 +602,7 @@ function localBrowseMoreContentRow(
   }
 
   return {
-    id: `contents-local-browse-load-more:${ownerId}:${offset}`,
+    id: `contents-local-browse-load-more:${selectedNodeId}:${offset}`,
     kind: 'more',
     label:
       window.more?.kind === 'failed'
@@ -623,16 +625,16 @@ function localBrowseMoreContentRow(
       : {
           action: {
             kind: 'loadLocalBrowseMore',
-            nodeId: ownerId,
+            nodeId: selectedNodeId,
             label: window.more?.kind === 'failed' ? 'Retry' : 'Load more'
           }
         })
   }
 }
 
-function localBrowseMoreRow(ownerId: BrowserTreeNodeId, detail: string): AddSourceRow {
+function localBrowseMoreRow(rowId: BrowserTreeNodeId, detail: string): AddSourceRow {
   return {
-    id: ownerId,
+    id: rowId,
     kind: 'more',
     label: 'Load more',
     detail,
@@ -836,14 +838,14 @@ function localBrowsePathKey(path: string): string {
 }
 
 function stateRow(options: {
-  readonly ownerId: string
+  readonly rowId: string
   readonly state: Exclude<AddSourceRow['state'], undefined>
   readonly label: string
   readonly detail: string
   readonly action?: AddSourceAction
 }): AddSourceRow {
   return {
-    id: `add-source-state:${options.ownerId}:${options.state}`,
+    id: `add-source-state:${options.rowId}:${options.state}`,
     kind: 'state',
     label: options.label,
     detail: options.detail,

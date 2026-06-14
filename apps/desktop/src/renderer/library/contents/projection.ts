@@ -218,7 +218,7 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
     return stateProjection({
       surface: librarySurface,
       kind: 'libraryStart',
-      ownerId: 'selection',
+      stateRowId: 'selection',
       title: 'Start your library',
       state: 'empty',
       label: 'Add a music folder',
@@ -235,7 +235,7 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
   if (binding === undefined) {
     return stateProjection({
       kind: 'unsupported',
-      ownerId: selectedNodeId,
+      stateRowId: selectedNodeId,
       title: 'Selection unavailable',
       state: 'unsupported',
       label: 'Selection unavailable',
@@ -269,7 +269,7 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
       return stateProjection({
         surface: librarySurface,
         kind: 'unsupported',
-        ownerId: selectedNodeId,
+        stateRowId: selectedNodeId,
         title: binding.navigationRow.displayName,
         state: 'unsupported',
         label: 'Contents unavailable',
@@ -286,7 +286,7 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
               : binding.state === 'notLoaded'
                 ? 'notLoaded'
                 : 'ready',
-        ownerId: selectedNodeId,
+        stateRowId: selectedNodeId,
         title: 'Status',
         state: contentStateFromReadState(binding.state),
         label: formatReadStateLabel(binding.state),
@@ -340,7 +340,7 @@ function projectHostContents(
     return stateProjection({
       surface: librarySurface,
       kind: 'failed',
-      ownerId: 'host',
+      stateRowId: 'host',
       title: 'Library engine unavailable',
       state: 'failed',
       label: 'Library engine failed to start',
@@ -352,7 +352,7 @@ function projectHostContents(
     return stateProjection({
       surface: librarySurface,
       kind: 'unsupported',
-      ownerId: 'host',
+      stateRowId: 'host',
       title: 'Library engine unavailable',
       state: 'unsupported',
       label: 'Library engine unavailable',
@@ -487,8 +487,8 @@ function projectSourceContents(options: {
   const useAcceptedFallback =
     acceptedSnapshot === undefined && hasCrossScopePending(options.contentsState)
   return projectContentsState({
-    ownerId:
-      acceptedSnapshot?.ownerId ??
+    projectionId:
+      acceptedSnapshot?.retainedNodeId ??
       (useAcceptedFallback ? 'accepted-contents' : options.selectedNodeId),
     title: acceptedSnapshot?.title ?? (useAcceptedFallback ? 'Library contents' : title),
     contentsState: options.contentsState
@@ -512,8 +512,8 @@ function projectDirectoryContents(options: {
   const useAcceptedFallback =
     acceptedSnapshot === undefined && hasCrossScopePending(options.contentsState)
   return projectContentsState({
-    ownerId:
-      acceptedSnapshot?.ownerId ??
+    projectionId:
+      acceptedSnapshot?.retainedNodeId ??
       (useAcceptedFallback ? 'accepted-contents' : options.selectedNodeId),
     title: acceptedSnapshot?.title ?? (useAcceptedFallback ? 'Library contents' : title),
     contentsState: options.contentsState
@@ -521,7 +521,7 @@ function projectDirectoryContents(options: {
 }
 
 type AcceptedSnapshotProjection = {
-  readonly ownerId: BrowserTreeNodeId
+  readonly retainedNodeId: BrowserTreeNodeId
   readonly title: string
 }
 
@@ -613,7 +613,7 @@ function acceptedSnapshotProjectionFromBindings(
         binding.target.entryPoint.sourceId === scope.sourceId
       ) {
         return {
-          ownerId: nodeId,
+          retainedNodeId: nodeId,
           title: formatSourceDisplayName(binding.target.label)
         }
       }
@@ -625,7 +625,7 @@ function acceptedSnapshotProjectionFromBindings(
         binding.target.entryPoint.sourceLocationId === scope.sourceLocationId
       ) {
         return {
-          ownerId: nodeId,
+          retainedNodeId: nodeId,
           title: formatSourceDisplayName(binding.target.label)
         }
       }
@@ -638,7 +638,7 @@ function acceptedSnapshotProjectionFromBindings(
       binding.directoryId === scope.directoryId
     ) {
       return {
-        ownerId: nodeId,
+        retainedNodeId: nodeId,
         title: binding.label ?? 'Selected folder'
       }
     }
@@ -664,7 +664,7 @@ function acceptedSnapshotProjectionFromState(
 
     if (row !== undefined) {
       return {
-        ownerId: `navigation-row:${row.navigationRowId}`,
+        retainedNodeId: `navigation-row:${row.navigationRowId}`,
         title: formatSourceDisplayName(row.displayName)
       }
     }
@@ -679,7 +679,7 @@ function acceptedSnapshotProjectionFromState(
   }
 
   return {
-    ownerId: row.id,
+    retainedNodeId: row.id,
     title: row.label
   }
 }
@@ -713,7 +713,7 @@ function parseAcceptedContentsScope(requestKey: string): AcceptedContentsScope |
 }
 
 function projectContentsState(options: {
-  readonly ownerId: BrowserTreeNodeId
+  readonly projectionId: BrowserTreeNodeId
   readonly title: string
   readonly contentsState: ContentsBoundaryState | undefined
 }): ContentProjection {
@@ -722,7 +722,7 @@ function projectContentsState(options: {
   if (state === undefined) {
     return stateProjection({
       kind: 'loading',
-      ownerId: options.ownerId,
+      stateRowId: options.projectionId,
       title: options.title,
       state: 'loading',
       label: 'Loading contents',
@@ -734,7 +734,7 @@ function projectContentsState(options: {
     if (state.pending !== undefined) {
       return stateProjection({
         kind: 'notLoaded',
-        ownerId: options.ownerId,
+        stateRowId: options.projectionId,
         title: options.title,
         state: 'notLoaded',
         label: 'Contents pending',
@@ -744,7 +744,7 @@ function projectContentsState(options: {
 
     return stateProjection({
       kind: 'notLoaded',
-      ownerId: options.ownerId,
+      stateRowId: options.projectionId,
       title: options.title,
       state: 'notLoaded',
       label: 'Contents not loaded',
@@ -755,7 +755,7 @@ function projectContentsState(options: {
   if (state.kind === 'loading') {
     return stateProjection({
       kind: 'loading',
-      ownerId: options.ownerId,
+      stateRowId: options.projectionId,
       title: options.title,
       state: 'loading',
       label: 'Loading contents',
@@ -766,7 +766,7 @@ function projectContentsState(options: {
   if (state.kind === 'failed') {
     return stateProjection({
       kind: 'failed',
-      ownerId: options.ownerId,
+      stateRowId: options.projectionId,
       title: options.title,
       state: 'failed',
       label: 'Contents unavailable',
@@ -775,7 +775,7 @@ function projectContentsState(options: {
   }
 
   const projection = projectContentsReadResult({
-    ownerId: options.ownerId,
+    projectionId: options.projectionId,
     title: options.title,
     result: state.result,
     ...(state.nextCursor !== undefined ? { nextCursor: state.nextCursor } : {}),
@@ -807,7 +807,7 @@ function refreshingDetail(prefix: string, detail: string | undefined): string {
 }
 
 function projectContentsReadResult(options: {
-  readonly ownerId: BrowserTreeNodeId
+  readonly projectionId: BrowserTreeNodeId
   readonly title: string
   readonly result: ContentsReadResult
   readonly nextCursor?: string
@@ -816,7 +816,7 @@ function projectContentsReadResult(options: {
   if (options.result.state !== 'ready') {
     return stateProjection({
       kind: options.result.state === 'readFailed' ? 'failed' : 'unsupported',
-      ownerId: options.ownerId,
+      stateRowId: options.projectionId,
       title: options.title,
       state: options.result.state === 'readFailed' ? 'failed' : 'unsupported',
       label: 'Contents unavailable',
@@ -825,7 +825,7 @@ function projectContentsReadResult(options: {
   }
 
   return projectContentsResult({
-    ownerId: options.ownerId,
+    projectionId: options.projectionId,
     title: options.title,
     result: options.result.result,
     ...(options.nextCursor !== undefined ? { nextCursor: options.nextCursor } : {}),
@@ -834,7 +834,7 @@ function projectContentsReadResult(options: {
 }
 
 function projectContentsResult(options: {
-  readonly ownerId: BrowserTreeNodeId
+  readonly projectionId: BrowserTreeNodeId
   readonly title: string
   readonly result: ContentsResult
   readonly nextCursor?: string
@@ -850,7 +850,7 @@ function projectContentsResult(options: {
       kind: contentsProjectionKind(result),
       title: options.title,
       detail: contentsDetailWithContinuation(result, hasMore, options.accumulatedRows),
-      rows: [loadMoreRow(options.ownerId, result, nextCursor)]
+      rows: [loadMoreRow(options.projectionId, result, nextCursor)]
     })
   }
 
@@ -861,7 +861,7 @@ function projectContentsResult(options: {
       detail: contentsDetail(result, options.accumulatedRows),
       rows: [
         stateRow({
-          ownerId: options.ownerId,
+          rowId: options.projectionId,
           state: contentsStateRowState(result, rows.length),
           label: contentsStateLabel(result, rows.length),
           detail: contentsDetail(result, options.accumulatedRows)
@@ -871,7 +871,7 @@ function projectContentsResult(options: {
   }
 
   const contentRows =
-    nextCursor !== undefined ? [...rows, loadMoreRow(options.ownerId, result, nextCursor)] : rows
+    nextCursor !== undefined ? [...rows, loadMoreRow(options.projectionId, result, nextCursor)] : rows
 
   return contentProjection(indexedContentsSurface, {
     kind: contentsProjectionKind(result),
@@ -892,7 +892,7 @@ function projectFileContents(options: {
 
   return stateProjection({
     kind: 'ready',
-    ownerId: options.selectedNodeId,
+    stateRowId: options.selectedNodeId,
     title,
     state: 'file',
     label: 'File selected',
@@ -1202,20 +1202,20 @@ function indexingDetail(result: ContentsResult): string {
 }
 
 function loadMoreRow(
-  ownerId: BrowserTreeNodeId,
+  selectedNodeId: BrowserTreeNodeId,
   result: ContentsResult,
   nextCursor: string
 ): ContentRow {
   const subject = contentsCountSubject(result, result.rows.length)
   return {
-    id: `contents-load-more:${ownerId}`,
+    id: `contents-load-more:${selectedNodeId}`,
     kind: 'more',
     label: `More ${subject} available`,
     detail: `Load more`,
     icon: 'more',
     action: {
       kind: 'loadContentsPage',
-      nodeId: ownerId,
+      nodeId: selectedNodeId,
       label: `Load more ${subject}`,
       cursor: nextCursor
     }
@@ -1252,7 +1252,7 @@ function contentMoreRow(
 function stateProjection(options: {
   readonly surface?: ContentSurface
   readonly kind: ContentProjectionKind
-  readonly ownerId: string
+  readonly stateRowId: string
   readonly title: string
   readonly state: Exclude<ContentRow['state'], undefined>
   readonly label: string
@@ -1265,7 +1265,7 @@ function stateProjection(options: {
     detail: options.detail,
     rows: [
       stateRow({
-        ownerId: options.ownerId,
+        rowId: options.stateRowId,
         state: options.state,
         label: options.label,
         detail: options.detail,
@@ -1276,14 +1276,14 @@ function stateProjection(options: {
 }
 
 function stateRow(options: {
-  readonly ownerId: string
+  readonly rowId: string
   readonly state: Exclude<ContentRow['state'], undefined>
   readonly label: string
   readonly detail: string
   readonly action?: ContentRowAction
 }): ContentRow {
   return {
-    id: `contents-state:${options.ownerId}:${options.state}`,
+    id: `contents-state:${options.rowId}:${options.state}`,
     kind: 'state',
     label: options.label,
     detail: options.detail,
