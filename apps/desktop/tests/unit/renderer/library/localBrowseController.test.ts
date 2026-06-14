@@ -183,6 +183,27 @@ describe('createLocalBrowseController', () => {
     await controller.requestNodeChildren(musicNodeId, projection)
     expect(itemRequests[2]?.itemFilter).toBe('audio')
   })
+
+  it('clears loaded item windows so removed sources do not remain active duplicates', async () => {
+    const controller = createLocalBrowseController(testLocalBrowseApi())
+    controller.start()
+
+    await controller.refreshEntryPoints()
+    const projection = projectTree({
+      sourceReadStates: new Map(),
+      directoryReadStates: new Map(),
+      localBrowseEntryPointsState: controller.entryPointsState.value,
+      localBrowseItemStates: controller.itemStates.value
+    })
+    const musicNodeId = requiredNodeIdByLabel(projection, 'Music')
+
+    await expect(controller.requestNodeChildren(musicNodeId, projection)).resolves.toBe(true)
+    expect(controller.itemStates.value.size).toBe(1)
+
+    controller.clearItemWindows()
+
+    expect(controller.itemStates.value.size).toBe(0)
+  })
 })
 
 function testLocalBrowseApi(

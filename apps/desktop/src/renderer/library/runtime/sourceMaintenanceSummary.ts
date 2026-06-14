@@ -22,24 +22,24 @@ export function sourceMaintenanceBacklog(input: {
   const maintenance = input.maintenance
   const integrity = input.integrity
   const hash =
-    maintenance?.remainingHashCandidates ??
-    integrity?.evidenceAndMaintenance.remainingHashCandidates ??
-    0
+    maintenance === undefined
+      ? (integrity?.evidenceAndMaintenance.remainingHashCandidates ?? 0)
+      : maintenance.remainingHashCandidates
   const probe =
-    maintenance?.remainingProbeCandidates ??
-    integrity?.evidenceAndMaintenance.remainingProbeCandidates ??
-    0
+    maintenance === undefined
+      ? (integrity?.evidenceAndMaintenance.remainingProbeCandidates ?? 0)
+      : maintenance.remainingProbeCandidates
   const promotion =
-    maintenance?.remainingPlayableMediaPromotionCandidates ??
-    integrity?.evidenceAndMaintenance.remainingPlayableMediaPromotionCandidates ??
-    0
+    maintenance === undefined
+      ? (integrity?.evidenceAndMaintenance.remainingPlayableMediaPromotionCandidates ?? 0)
+      : maintenance.remainingPlayableMediaPromotionCandidates
   const identity =
-    (maintenance?.remainingTrackIdentityCandidateProductionCandidates ??
-      integrity?.evidenceAndMaintenance.remainingTrackIdentityCandidateProductionCandidates ??
-      0) +
-    (maintenance?.remainingTrackIdentityDecisionProductionCandidates ??
-      integrity?.evidenceAndMaintenance.remainingTrackIdentityDecisionProductionCandidates ??
-      0)
+    maintenance === undefined
+      ? (integrity?.evidenceAndMaintenance.remainingTrackIdentityCandidateProductionCandidates ??
+          0) +
+        (integrity?.evidenceAndMaintenance.remainingTrackIdentityDecisionProductionCandidates ?? 0)
+      : maintenance.remainingTrackIdentityCandidateProductionCandidates +
+        maintenance.remainingTrackIdentityDecisionProductionCandidates
   const attachment =
     maintenance === undefined
       ? integrityAttachmentRemaining(integrity)

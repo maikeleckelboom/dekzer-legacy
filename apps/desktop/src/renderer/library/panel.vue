@@ -76,7 +76,9 @@ const buttonBaseClass =
   'inline-flex min-h-9 items-center justify-center gap-2 rounded-sm px-3 py-2 text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background) disabled:cursor-not-allowed disabled:opacity-60'
 
 const primaryButtonClass = `${buttonBaseClass} min-w-38.5 border border-(--color-accent) bg-(--color-accent) text-(--color-background) hover:brightness-110`
-const iconButtonClass = `${buttonBaseClass} h-9 w-9 min-w-0 border border-(--color-border) bg-(--color-background) p-0 text-(--color-text) hover:border-(--color-accent) hover:text-(--color-accent)`
+const toolbarControlClass =
+  'border border-(--color-border) bg-(--color-surface-strong) text-(--color-text) shadow-[inset_0_0_0_1px_var(--color-border)] hover:border-(--color-accent) hover:text-(--color-accent)'
+const iconButtonClass = `${buttonBaseClass} h-9 w-9 min-w-0 ${toolbarControlClass} p-0`
 
 const viewStateStore = createViewStateStore()
 const libraryBrowseProfile = createLibraryBrowseProfileController()
@@ -1213,6 +1215,7 @@ function requestAddSourceNodeChildren(nodeId: BrowserTreeNodeId): Promise<boolea
 function clearBrowserView(): void {
   selectedLibraryNodeId.value = undefined
   contentsRead.clear()
+  localBrowse.clearItemWindows()
   expandedLibraryNodeIds.value = new Set()
   pendingLibraryRestoreIds.value = new Set()
   pendingSourceRegistration.value = undefined
@@ -1347,7 +1350,7 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
             ref="searchInputRef"
             v-model="librarySearch.searchText.value"
             type="search"
-            class="h-9 w-44 rounded-sm border border-(--color-border) bg-(--color-background) px-3 py-2 text-sm font-semibold text-(--color-text) outline-none transition placeholder:text-(--color-text-muted) hover:border-(--color-accent) focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background)"
+            :class="`${toolbarControlClass} h-9 w-44 rounded-sm px-3 py-2 text-sm font-semibold outline-none transition placeholder:text-(--color-text-muted) focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background)`"
             :aria-label="toolbarModel.search.label"
             :placeholder="toolbarModel.search.placeholder"
             @keydown.escape.stop.prevent="handleSearchEscape"

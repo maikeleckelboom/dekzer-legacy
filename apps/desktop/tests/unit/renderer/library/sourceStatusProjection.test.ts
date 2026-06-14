@@ -207,7 +207,9 @@ describe('source status projection', () => {
     })
 
     expect(view.badge).toBe('Maintenance needed')
-    expect(view.detail).toContain('Preparing source. Pending work: hash 3. 3 items total.')
+    expect(view.detail).toContain(
+      'Pending work: hash 3. Run maintenance processes a bounded batch.'
+    )
     expect(view.actions).toEqual([
       expect.objectContaining({ kind: 'scanSource', label: 'Rescan source', enabled: true }),
       expect.objectContaining({ kind: 'runMaintenance', label: 'Run maintenance', enabled: true }),
@@ -258,7 +260,7 @@ describe('source status projection', () => {
     })
 
     expect(view.detail).toContain(
-      'Preparing source. Pending work: hash 2, probe 1, promotion 4, identity 8, attachment 13. 28 items total.'
+      'Pending work: hash 2, probe 1, promotion 4, identity 8, attachment 13. Run maintenance processes a bounded batch.'
     )
     expect(view.detail).not.toContain('maintenance items pending')
   })
@@ -266,6 +268,13 @@ describe('source status projection', () => {
   it('clears maintenance backlog from source status when fresh maintenance has no remaining work', () => {
     const view = registeredView({
       sourceIntegrity: integrity({
+        evidenceAndMaintenance: {
+          remainingHashCandidates: 9,
+          remainingProbeCandidates: 8,
+          remainingPlayableMediaPromotionCandidates: 7,
+          remainingTrackIdentityCandidateProductionCandidates: 6,
+          remainingTrackIdentityDecisionProductionCandidates: 5
+        },
         attachmentIntegrity: {
           currentLinksCount: 0,
           staleLinksCount: 2,
@@ -280,6 +289,71 @@ describe('source status projection', () => {
 
     expect(view.badge).toBe('Ready')
     expect(view.detail).toBe('Source status is current.')
+  })
+
+  it('uses run-result maintenance counts after completed maintenance still has bounded work', () => {
+    const view = registeredView({
+      maintenanceRunState: 'completed',
+      sourceMaintenance: maintenance({
+        remainingHashCandidates: 3131,
+        remainingProbeCandidates: 2322,
+        attachmentLinks: {
+          currentLinksCount: 0,
+          staleLinksCount: 4000,
+          sourceFilesWithCurrentBlake3ObservationsCount: 0,
+          sourceFilesWithAttachmentLinksCount: 0,
+          sourceFilesMissingAttachmentLinksCount: 1457,
+          unmaterializedBlake3ObservationsCount: 0
+        },
+        lastRun: maintenanceLastRun({
+          remainingHashCandidates: 3131,
+          remainingProbeCandidates: 2322,
+          remainingPlayableMediaPromotionCandidates: 0,
+          remainingTrackIdentityCandidateProductionCandidates: 0,
+          remainingTrackIdentityDecisionProductionCandidates: 0
+        })
+      })
+    })
+
+    expect(view.badge).toBe('Maintenance needed')
+    expect(view.detail).toContain(
+      'Maintenance completed; pending work remains: hash 3131, probe 2322, attachment 5457. Run maintenance processes a bounded batch.'
+    )
+  })
+
+  it('run-result maintenance snapshot with zero remaining work clears maintenance needed', () => {
+    const view = registeredView({
+      maintenanceRunState: 'completed',
+      sourceIntegrity: integrity({ coverage: 'complete' }),
+      sourceMaintenance: maintenance({
+        lastRun: maintenanceLastRun()
+      })
+    })
+
+    expect(view.badge).toBe('Ready')
+    expect(view.detail).toBe('Source status is current.')
+  })
+
+  it('keeps running, failed, and unavailable maintenance states distinct', () => {
+    const running = registeredView({
+      maintenanceRunState: 'running',
+      sourceMaintenance: maintenance({ remainingHashCandidates: 4 })
+    })
+    expect(running.badge).toBe('Maintenance running')
+    expect(running.detail).toContain('Maintenance running for this source.')
+
+    const failed = registeredView({
+      maintenanceRunState: 'failed',
+      sourceMaintenance: maintenance({ status: 'failed' })
+    })
+    expect(failed.badge).toBe('Maintenance unavailable')
+    expect(failed.detail).toContain('Maintenance status could not be read.')
+
+    const unavailable = registeredView({
+      sourceMaintenance: maintenance({ status: 'unavailable' })
+    })
+    expect(unavailable.badge).toBe('Maintenance unavailable')
+    expect(unavailable.detail).toContain('Maintenance is unavailable for this source.')
   })
 
   it('missing, unavailable, and blocked sources project compact badges', () => {
@@ -572,6 +646,7 @@ function integrity(
   options: {
     readonly availability?: ReadSourceIntegrityReply['sourceAvailability']['state']
     readonly coverage?: ReadSourceIntegrityReply['coverageIntegrity']['state']
+    readonly evidenceAndMaintenance?: ReadSourceIntegrityReply['evidenceAndMaintenance']
     readonly attachmentIntegrity?: ReadSourceIntegrityReply['attachmentIntegrity']
   } = {}
 ): ReadSourceIntegrityReply {
@@ -591,7 +666,7 @@ function integrity(
       blockedDirectoriesCount: options.availability === 'blocked' ? 1 : 0,
       failedDirectoriesCount: 0
     },
-    evidenceAndMaintenance: {
+    evidenceAndMaintenance: options.evidenceAndMaintenance ?? {
       remainingHashCandidates: 0,
       remainingProbeCandidates: 0,
       remainingPlayableMediaPromotionCandidates: 0,
@@ -613,6 +688,81 @@ function maintenance(
   return {
     sourceId: '7',
     status: 'idle',
+    remainingHashCandidates: 0,
+    remainingProbeCandidates: 0,
+    remainingPlayableMediaPromotionCandidates: 0,
+    remainingTrackIdentityCandidateProductionCandidates: 0,
+    remainingTrackIdentityDecisionProductionCandidates: 0,
+    ...overrides
+  }
+}
+
+function maintenanceLastRun(
+  overrides: Partial<NonNullable<ReadSourceMaintenanceReply['lastRun']>> = {}
+): NonNullable<ReadSourceMaintenanceReply['lastRun']> {
+  return {
+    status: 'completed',
+    hash: {
+      effectiveLimit: 1,
+      hashedCount: 1,
+      skippedCount: 0,
+      failedCount: 0,
+      remainingCandidates: 0
+    },
+    attachmentMaterialization: {
+      effectiveLimit: 1,
+      attachmentsCreated: 0,
+      attachmentsRefreshed: 0,
+      linksCreated: 0,
+      linksReplaced: 0,
+      linksRefreshed: 0,
+      skippedStaleObservations: 0,
+      skippedNoBlake3: 0,
+      skippedNoObservations: 0,
+      remainingCandidates: 0
+    },
+    probe: {
+      effectiveLimit: 1,
+      probedCount: 1,
+      skippedCount: 0,
+      failedCount: 0,
+      remainingCandidates: 0
+    },
+    playableMediaPromotion: {
+      effectiveLimit: 0,
+      promotedCount: 0,
+      refreshedCount: 0,
+      skippedUnusableSource: 0,
+      skippedUnsupportedMediaKind: 0,
+      skippedNoObservations: 0,
+      skippedStaleObservations: 0,
+      skippedNoBlake3: 0,
+      skippedNoProbeObservations: 0,
+      skippedMissingAttachmentLink: 0,
+      skippedStaleAttachmentLink: 0,
+      remainingCandidates: 0
+    },
+    trackIdentityCandidates: {
+      effectiveLimit: 0,
+      candidatesCreated: 0,
+      candidatesRefreshed: 0,
+      membersCreated: 0,
+      membersRefreshed: 0,
+      evidenceCreated: 0,
+      evidenceRefreshed: 0,
+      candidatesMarkedStale: 0,
+      skippedStalePlayableMedia: 0,
+      remainingCandidates: 0
+    },
+    trackIdentityDecisions: {
+      effectiveLimit: 0,
+      decisionsCreated: 0,
+      decisionEvidenceCreated: 0,
+      skippedStaleCandidates: 0,
+      skippedExistingCurrentDecisions: 0,
+      skippedUserBlockedCandidates: 0,
+      remainingCandidates: 0
+    },
     remainingHashCandidates: 0,
     remainingProbeCandidates: 0,
     remainingPlayableMediaPromotionCandidates: 0,

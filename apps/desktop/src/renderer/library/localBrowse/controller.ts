@@ -30,6 +30,7 @@ export type LocalBrowseReadApi = Pick<RendererApi['library'], 'localBrowse'>
 export type LocalBrowseController = {
   readonly entryPointsState: Ref<LocalBrowseEntryPointsState>
   readonly itemStates: Ref<ReadonlyMap<string, LocalBrowseItemState>>
+  readonly clearItemWindows: () => void
   readonly refreshEntryPoints: () => Promise<boolean>
   readonly refreshBrowserWindows: (
     expandedNodeIds: ReadonlySet<BrowserTreeNodeId>,
@@ -81,6 +82,11 @@ export function createLocalBrowseController(
 
   function stop(): void {
     started = false
+  }
+
+  function clearItemWindows(): void {
+    itemReadSequence += 1
+    itemStates.value = new Map()
   }
 
   async function refreshEntryPoints(): Promise<boolean> {
@@ -497,6 +503,7 @@ export function createLocalBrowseController(
   return {
     entryPointsState,
     itemStates,
+    clearItemWindows,
     refreshEntryPoints,
     refreshBrowserWindows,
     requestNodeChildren,

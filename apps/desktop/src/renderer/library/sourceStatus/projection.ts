@@ -347,7 +347,7 @@ function registeredBadge(input: StatusViewInput): StatusBadge {
 
 function compactDetail(input: StatusViewInput, prefix: string | undefined): string {
   const parts = [prefix].filter((part): part is string => part !== undefined)
-  const maintenanceDetail = maintenanceSummary(input.sourceMaintenance, input.sourceIntegrity)
+  const maintenanceDetail = maintenanceSummary(input)
   const healthDetail = healthSummary(input.sourceIntegrity, input.sourceLifecycle)
 
   if (input.sourceMaintenance?.lastRun?.status === 'failed') {
@@ -356,7 +356,7 @@ function compactDetail(input: StatusViewInput, prefix: string | undefined): stri
     input.maintenanceRunState === 'running' ||
     input.sourceMaintenance?.status === 'running'
   ) {
-    parts.push('Maintenance is running for this source.')
+    parts.push('Maintenance running for this source.')
   } else if (input.sourceMaintenance?.status === 'unavailable') {
     parts.push('Maintenance is unavailable for this source.')
   } else if (input.sourceMaintenance?.status === 'blocked') {
@@ -382,28 +382,28 @@ function compactDetail(input: StatusViewInput, prefix: string | undefined): stri
   return input.sourceReadiness?.detail ?? 'Source status is current.'
 }
 
-function maintenanceSummary(
-  maintenance: ReadSourceMaintenanceReply | undefined,
-  integrity: ReadSourceIntegrityReply | undefined
-): string | undefined {
+function maintenanceSummary(input: StatusViewInput): string | undefined {
+  const maintenance = input.sourceMaintenance
   const backlog = sourceMaintenanceBacklog({
     ...(maintenance === undefined ? {} : { maintenance }),
-    ...(integrity === undefined ? {} : { integrity })
+    ...(input.sourceIntegrity === undefined ? {} : { integrity: input.sourceIntegrity })
   })
   if (backlog.total > 0) {
     const categories = backlog.categories
       .map((category) => `${category.label} ${category.count}`)
       .join(', ')
+    const prefix =
+      input.maintenanceRunState === 'completed' ||
+      input.sourceMaintenance?.lastRun?.status === 'completed'
+        ? 'Maintenance completed; pending work remains'
+        : 'Pending work'
+    const batchDetail = 'Run maintenance processes a bounded batch.'
 
     if (categories.length > 0) {
-      return `Preparing source. Pending work: ${categories}. ${backlog.total} ${
-        backlog.total === 1 ? 'item' : 'items'
-      } total.`
+      return `${prefix}: ${categories}. ${batchDetail}`
     }
 
-    return `Preparing source. Analysis and identity work is pending. ${backlog.total} ${
-      backlog.total === 1 ? 'item' : 'items'
-    } total.`
+    return `${prefix}: analysis and identity work. ${batchDetail}`
   }
 
   return undefined
