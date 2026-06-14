@@ -100,7 +100,7 @@ export function createLocalBrowseController(
   let activeWarmReads = 0
   let staleIgnoredWarmReads = 0
   const queuedWarmReadKeys = new Set<string>()
-  const activeWarmReadKeys = new Set<string>()
+  const activeWarmReadsByKey = new Map<string, LocalBrowseActiveWarmRead>()
   const warmReadQueue: LocalBrowseBranchWarmupTask[] = []
 
   function start(): void {
@@ -326,6 +326,20 @@ export function createLocalBrowseController(
     options: { readonly parentNodeId?: BrowserTreeNodeId } = {}
   ): Promise<boolean> {
     const requestKey = localBrowseWindowKey(target)
+    const warmRead = activeWarmReadFor(requestKey)
+
+    if (warmRead !== undefined) {
+      return adoptWarmItemsRead(warmRead, target, options)
+    }
+
+    return readItemsExplicit(target, requestKey, options)
+  }
+
+  async function readItemsExplicit(
+    target: LocalBrowseDirectoryTarget,
+    requestKey: string,
+    options: { readonly parentNodeId?: BrowserTreeNodeId } = {}
+  ): Promise<boolean> {
     const currentState = itemStates.value.get(requestKey)
 
     if (
@@ -395,19 +409,7 @@ export function createLocalBrowseController(
       }
 
       const window = loadedWindowFromResult(result, target)
-      setItemState(requestKey, {
-        kind: 'loaded',
-        window
-      })
-      if (options.parentNodeId !== undefined) {
-        scheduleBranchWarmupFromWindow({
-          anchorNodeId: options.parentNodeId,
-          parentNodeId: options.parentNodeId,
-          parentTarget: target,
-          window,
-          remainingDepth: branchWarmupDepth
-        })
-      }
+      commitItemWindow(target, requestKey, window, options)
       return true
     } catch {
       if (!isCurrentItemRead(requestKey, sequence)) {
@@ -428,6 +430,25 @@ export function createLocalBrowseController(
       }
       return true
     }
+  }
+
+  async function adoptWarmItemsRead(
+    warmRead: LocalBrowseActiveWarmRead,
+    target: LocalBrowseDirectoryTarget,
+    options: { readonly parentNodeId?: BrowserTreeNodeId } = {}
+  ): Promise<boolean> {
+    const outcome = await warmRead.promise
+
+    if (outcome.kind === 'committed') {
+      return true
+    }
+
+    if (isLoadedItemWindowForTarget(target)) {
+      return true
+    }
+
+    const requestKey = localBrowseWindowKey(target)
+    return readItemsExplicit(target, requestKey, options)
   }
 
   async function readMore(target: LocalBrowseMoreTarget): Promise<boolean> {
@@ -504,6 +525,49 @@ export function createLocalBrowseController(
     const nextStates = new Map(itemStates.value)
     nextStates.set(key, state)
     itemStates.value = nextStates
+  }
+
+  function activeWarmReadFor(requestKey: string): LocalBrowseActiveWarmRead | undefined {
+    return activeWarmReadsByKey.get(requestKey)
+  }
+
+  function commitItemWindow(
+    target: LocalBrowseDirectoryTarget,
+    requestKey: string,
+    window: LoadedLocalBrowseItems,
+    options: {
+      readonly parentNodeId?: BrowserTreeNodeId
+      readonly remainingDepth?: number
+    } = {}
+  ): void {
+    setItemState(requestKey, {
+      kind: 'loaded',
+      window
+    })
+
+    if (options.parentNodeId === undefined) {
+      return
+    }
+
+    scheduleBranchWarmupFromWindow({
+      anchorNodeId: options.parentNodeId,
+      parentNodeId: options.parentNodeId,
+      parentTarget: target,
+      window,
+      remainingDepth: options.remainingDepth ?? branchWarmupDepth
+    })
+  }
+
+  function isLoadedItemWindowForTarget(target: LocalBrowseDirectoryTarget): boolean {
+    const state = itemStates.value.get(localBrowseWindowKey(target))
+
+    return (
+      state?.kind === 'loaded' &&
+      state.window.addSourceView === target.addSourceView &&
+      state.window.identity.entryPointKind === target.entryPointKind &&
+      state.window.identity.resolvedRootPath === target.resolvedRootPath &&
+      state.window.identity.resolvedParentPath === target.resolvedParentPath
+    )
   }
 
   function setWindowMoreState(
@@ -626,7 +690,7 @@ export function createLocalBrowseController(
   function enqueueBranchWarmup(task: Omit<LocalBrowseBranchWarmupTask, 'requestKey'>): void {
     const requestKey = localBrowseWindowKey(task.target)
 
-    if (queuedWarmReadKeys.has(requestKey) || activeWarmReadKeys.has(requestKey)) {
+    if (queuedWarmReadKeys.has(requestKey) || activeWarmReadsByKey.has(requestKey)) {
       return
     }
 
@@ -660,18 +724,21 @@ export function createLocalBrowseController(
       }
 
       activeWarmReads += 1
-      activeWarmReadKeys.add(task.requestKey)
-      void runBranchWarmupTask(task).finally(() => {
+      const promise = runBranchWarmupTask(task)
+      activeWarmReadsByKey.set(task.requestKey, { task, promise })
+      void promise.finally(() => {
         activeWarmReads -= 1
-        activeWarmReadKeys.delete(task.requestKey)
+        activeWarmReadsByKey.delete(task.requestKey)
         drainBranchWarmupQueue()
       })
     }
   }
 
-  async function runBranchWarmupTask(task: LocalBrowseBranchWarmupTask): Promise<void> {
+  async function runBranchWarmupTask(
+    task: LocalBrowseBranchWarmupTask
+  ): Promise<LocalBrowseWarmReadOutcome> {
     if (!canStartWarmRead(task)) {
-      return
+      return { kind: 'stale' }
     }
 
     try {
@@ -679,37 +746,30 @@ export function createLocalBrowseController(
 
       if (!canCommitWarmRead(task)) {
         noteStaleWarmRead(task)
-        return
+        return { kind: 'stale' }
       }
 
       if (result.state !== 'read') {
-        return
+        return { kind: 'notRead' }
       }
 
       if (!isExpectedWindow(result, task.target, 0)) {
-        return
+        return { kind: 'unexpectedWindow' }
       }
 
       if (!canCommitWarmRead(task)) {
         noteStaleWarmRead(task)
-        return
+        return { kind: 'stale' }
       }
 
       const window = loadedWindowFromResult(result, task.target)
-      setItemState(task.requestKey, {
-        kind: 'loaded',
-        window
-      })
-
-      scheduleBranchWarmupFromWindow({
-        anchorNodeId: task.anchorNodeId,
+      commitItemWindow(task.target, task.requestKey, window, {
         parentNodeId: task.nodeId,
-        parentTarget: task.target,
-        window,
         remainingDepth: task.remainingDepth - 1
       })
+      return { kind: 'committed' }
     } catch {
-      return
+      return { kind: 'requestFailed' }
     }
   }
 
@@ -725,11 +785,28 @@ export function createLocalBrowseController(
   }
 
   function canCommitWarmRead(task: LocalBrowseBranchWarmupTask): boolean {
-    return canStartWarmRead(task)
+    return (
+      started &&
+      task.generation === warmupGeneration &&
+      task.target.addSourceView === addSourceView.value &&
+      shouldContinueBranchWarmup(task.anchorNodeId) &&
+      isWarmParentCurrent(task) &&
+      canCommitWarmWindow(task.requestKey)
+    )
   }
 
   function canWarmWindow(requestKey: string): boolean {
     return itemStates.value.get(requestKey) === undefined
+  }
+
+  function canCommitWarmWindow(requestKey: string): boolean {
+    const state = itemStates.value.get(requestKey)
+
+    return (
+      state === undefined ||
+      ((state.kind === 'loading' || state.kind === 'refreshing') &&
+        state.requestKey === requestKey)
+    )
   }
 
   function isWarmParentCurrent(task: LocalBrowseBranchWarmupTask): boolean {
@@ -939,6 +1016,18 @@ type LocalBrowseBranchWarmupTask = {
   readonly target: LocalBrowseDirectoryTarget
   readonly remainingDepth: number
   readonly requestKey: string
+}
+
+type LocalBrowseWarmReadOutcome =
+  | { readonly kind: 'committed' }
+  | { readonly kind: 'stale' }
+  | { readonly kind: 'notRead' }
+  | { readonly kind: 'unexpectedWindow' }
+  | { readonly kind: 'requestFailed' }
+
+type LocalBrowseActiveWarmRead = {
+  readonly task: LocalBrowseBranchWarmupTask
+  readonly promise: Promise<LocalBrowseWarmReadOutcome>
 }
 
 function isWarmableLocalBrowseItem(item: LocalBrowseItem): boolean {

@@ -344,6 +344,156 @@ describe('createLocalBrowseController', () => {
     })
   })
 
+  it('coalesces explicit child folder opens with active warm reads', async () => {
+    const pendingWarmRead =
+      deferred<Awaited<ReturnType<LocalBrowseReadApi['localBrowse']['readItems']>>>()
+    const itemRequests: ReadLocalBrowseItemsRequest[] = []
+    let warmRequest: ReadLocalBrowseItemsRequest | undefined
+    const controller = createLocalBrowseController(
+      testLocalBrowseApi({
+        readItems: async (request) => {
+          itemRequests.push(structuredClone(request))
+
+          if (request.resolvedParentPath.endsWith('Albums')) {
+            warmRequest = structuredClone(request)
+            return pendingWarmRead.promise
+          }
+
+          return localBrowseItemsResult(request, [directoryItem()])
+        }
+      }),
+      { warmup: { enabled: true } }
+    )
+    controller.start()
+
+    await controller.refreshEntryPoints()
+    let projection = projectTree({
+      sourceReadStates: new Map(),
+      directoryReadStates: new Map(),
+      localBrowseEntryPointsState: controller.entryPointsState.value,
+      localBrowseItemStates: controller.itemStates.value
+    })
+    const musicNodeId = requiredNodeIdByLabel(projection, 'Music')
+
+    await expect(controller.requestNodeChildren(musicNodeId, projection)).resolves.toBe(true)
+    projection = projectTree({
+      sourceReadStates: new Map(),
+      directoryReadStates: new Map(),
+      localBrowseEntryPointsState: controller.entryPointsState.value,
+      localBrowseItemStates: controller.itemStates.value
+    })
+    const albumsNodeId = requiredNodeIdByLabel(projection, 'Albums')
+    const albumsKey = localBrowseWindowKey({
+      addSourceView: 'preview',
+      entryPointKind: 'music',
+      resolvedRootPath: 'C:\\Users\\Maikel\\Music',
+      resolvedParentPath: 'C:\\Users\\Maikel\\Music\\Albums',
+      label: 'Albums'
+    })
+
+    const explicitRead = controller.requestNodeChildren(albumsNodeId, projection)
+    await waitForMicrotasks()
+
+    expect(itemRequests.map((request) => request.resolvedParentPath)).toEqual([
+      'C:\\Users\\Maikel\\Music',
+      'C:\\Users\\Maikel\\Music\\Albums'
+    ])
+    expect(controller.itemStates.value.get(albumsKey)).toBeUndefined()
+    const duringProjection = projectTree({
+      sourceReadStates: new Map(),
+      directoryReadStates: new Map(),
+      localBrowseEntryPointsState: controller.entryPointsState.value,
+      localBrowseItemStates: controller.itemStates.value
+    })
+    expect(requiredNodeByLabel(duringProjection, 'Albums').children.kind).toBe('deferred')
+
+    if (warmRequest === undefined) {
+      throw new Error('Expected active warm read request.')
+    }
+    pendingWarmRead.resolve(
+      localBrowseItemsResult(warmRequest, [
+        fileItem('track.flac', 'C:\\Users\\Maikel\\Music\\Albums\\track.flac')
+      ])
+    )
+    await expect(explicitRead).resolves.toBe(true)
+
+    expect(itemRequests.map((request) => request.resolvedParentPath)).toEqual([
+      'C:\\Users\\Maikel\\Music',
+      'C:\\Users\\Maikel\\Music\\Albums'
+    ])
+    expect(controller.itemStates.value.get(albumsKey)).toMatchObject({
+      kind: 'loaded',
+      window: {
+        addSourceView: 'preview',
+        items: [{ displayName: 'track.flac' }]
+      }
+    })
+  })
+
+  it('falls back to explicit local browse read when an adopted warm read fails', async () => {
+    const pendingWarmRead =
+      deferred<Awaited<ReturnType<LocalBrowseReadApi['localBrowse']['readItems']>>>()
+    const itemRequests: ReadLocalBrowseItemsRequest[] = []
+    let albumsReadCount = 0
+    const controller = createLocalBrowseController(
+      testLocalBrowseApi({
+        readItems: async (request) => {
+          itemRequests.push(structuredClone(request))
+
+          if (!request.resolvedParentPath.endsWith('Albums')) {
+            return localBrowseItemsResult(request, [directoryItem()])
+          }
+
+          albumsReadCount += 1
+          return albumsReadCount === 1
+            ? pendingWarmRead.promise
+            : localBrowseItemsResult(request, [
+                fileItem('track.flac', 'C:\\Users\\Maikel\\Music\\Albums\\track.flac')
+              ])
+        }
+      }),
+      { warmup: { enabled: true } }
+    )
+    controller.start()
+
+    await controller.refreshEntryPoints()
+    let projection = projectTree({
+      sourceReadStates: new Map(),
+      directoryReadStates: new Map(),
+      localBrowseEntryPointsState: controller.entryPointsState.value,
+      localBrowseItemStates: controller.itemStates.value
+    })
+    const musicNodeId = requiredNodeIdByLabel(projection, 'Music')
+
+    await expect(controller.requestNodeChildren(musicNodeId, projection)).resolves.toBe(true)
+    projection = projectTree({
+      sourceReadStates: new Map(),
+      directoryReadStates: new Map(),
+      localBrowseEntryPointsState: controller.entryPointsState.value,
+      localBrowseItemStates: controller.itemStates.value
+    })
+    const albumsNodeId = requiredNodeIdByLabel(projection, 'Albums')
+    const explicitRead = controller.requestNodeChildren(albumsNodeId, projection)
+    await waitForMicrotasks()
+
+    expect(itemRequests.map((request) => request.resolvedParentPath)).toEqual([
+      'C:\\Users\\Maikel\\Music',
+      'C:\\Users\\Maikel\\Music\\Albums'
+    ])
+
+    pendingWarmRead.resolve({
+      state: 'readFailed',
+      error: { code: 'readFailed', message: 'Warm read failed.' }
+    })
+    await expect(explicitRead).resolves.toBe(true)
+
+    expect(itemRequests.map((request) => request.resolvedParentPath)).toEqual([
+      'C:\\Users\\Maikel\\Music',
+      'C:\\Users\\Maikel\\Music\\Albums',
+      'C:\\Users\\Maikel\\Music\\Albums'
+    ])
+  })
+
   it('does not warm terminal file rows', async () => {
     const itemRequests: ReadLocalBrowseItemsRequest[] = []
     const controller = createLocalBrowseController(
@@ -577,12 +727,19 @@ function projectTree(state: BrowserState): BrowserProjection {
 }
 
 function requiredNodeIdByLabel(projection: BrowserProjection, label: string): string {
+  return requiredNodeByLabel(projection, label).id
+}
+
+function requiredNodeByLabel(
+  projection: BrowserProjection,
+  label: string
+): BrowserProjection['nodes'][number] {
   const nodes = [...projection.nodes]
 
   while (nodes.length > 0) {
     const node = nodes.shift()
     if (node?.label === label) {
-      return node.id
+      return node
     }
     if (node?.children.kind === 'loaded') {
       nodes.push(...node.children.nodes)

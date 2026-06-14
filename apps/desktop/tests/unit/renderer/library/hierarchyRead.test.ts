@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { ref } from 'vue'
 
 import {
   createLibraryHierarchyReadController,
@@ -13,6 +14,7 @@ import type {
   ReadResult
 } from '../../../../src/shared/library/hierarchy/read'
 import type { NavigationReadRowsResult } from '../../../../src/shared/library/navigation/read'
+import type { LibraryBrowseProfile } from '../../../../src/renderer/library/libraryBrowseProfile/types'
 
 describe('createLibraryHierarchyReadController', () => {
   it('refreshes navigation, reads the first source, and loads directory children', async () => {
@@ -175,46 +177,125 @@ describe('createLibraryHierarchyReadController', () => {
     expect(warmedParentIds).not.toContain('1001')
   })
 
-  it('does not let a late warm read overwrite an explicit directory read', async () => {
+  it('coalesces explicit child directory opens with active warm reads', async () => {
     const warmRead = deferred<ReadResult>()
-    const explicitRead = deferred<ReadResult>()
-    let directoryReadCount = 0
+    const readRequests: ReadRequest[] = []
     const controller = createLibraryHierarchyReadController(
       testLibraryApi({
         readRows: async () => navigationSourceReadRowsResult(),
         readChildren: async (request) => {
+          readRequests.push(structuredClone(request))
+
           if (request.parentDirectoryId === undefined) {
             return hierarchyReadResultWithRows([directoryNode('12', 'Album')])
           }
 
-          directoryReadCount += 1
-          return directoryReadCount === 1 ? warmRead.promise : explicitRead.promise
+          return warmRead.promise
         }
       }),
       { warmup: { enabled: true } }
     )
 
     await expect(controller.refresh()).resolves.toBe(true)
+
     const explicitPromise = controller.requestDirectoryChildren('source-directory:12')
     await waitForMicrotasks()
 
-    explicitRead.resolve(
-      hierarchyReadResultWithRows([directoryNode('20', 'Explicit Child', '12')], {
+    expect(readRequests.map((request) => request.parentDirectoryId ?? 'root')).toEqual([
+      'root',
+      '12'
+    ])
+    expect(controller.directoryReadStates.value.get('12')?.kind).toBe('unloaded')
+    expect(firstProjectedDirectoryStateKind(treeNodes(controller), 'source-directory:12')).toBe(
+      'deferred'
+    )
+
+    warmRead.resolve(
+      hierarchyReadResultWithRows([terminalDirectoryNode('20', 'Warm Child', '12')], {
         parentDirectoryId: '12'
       })
     )
     await expect(explicitPromise).resolves.toBe(true)
 
-    warmRead.resolve(
-      hierarchyReadResultWithRows([directoryNode('99', 'Stale Child', '12')], {
-        parentDirectoryId: '12'
-      })
-    )
-    await waitForMicrotasks()
-
+    expect(readRequests.map((request) => request.parentDirectoryId ?? 'root')).toEqual([
+      'root',
+      '12'
+    ])
     expect(firstLoadedChildIds(treeNodes(controller), 'source-directory:12')).toEqual([
       'source-directory:20'
     ])
+  })
+
+  it('does not commit stale active warm reads after the browse profile changes', async () => {
+    const warmRead = deferred<ReadResult>()
+    const profile = ref<LibraryBrowseProfile>('audio')
+    const controller = createLibraryHierarchyReadController(
+      testLibraryApi({
+        readRows: async () => navigationSourceReadRowsResult(),
+        readChildren: async (request) =>
+          request.parentDirectoryId === undefined
+            ? hierarchyReadResultWithRows([directoryNode('12', 'Album')])
+            : warmRead.promise
+      }),
+      { profile, warmup: { enabled: true } }
+    )
+
+    await expect(controller.refresh()).resolves.toBe(true)
+
+    profile.value = 'allFiles'
+    warmRead.resolve(loadedDirectoryReadResult('12'))
+    await waitForMicrotasks()
+
+    expect(controller.directoryReadStates.value.get('12')?.kind).toBe('unloaded')
+    expect(firstProjectedDirectoryStateKind(treeNodes(controller), 'source-directory:12')).toBe(
+      'deferred'
+    )
+  })
+
+  it('falls back to explicit directory read when an adopted warm read is not ready', async () => {
+    const warmRead = deferred<ReadResult>()
+    const readRequests: ReadRequest[] = []
+    let directoryReadCount = 0
+    const controller = createLibraryHierarchyReadController(
+      testLibraryApi({
+        readRows: async () => navigationSourceReadRowsResult(),
+        readChildren: async (request) => {
+          readRequests.push(structuredClone(request))
+
+          if (request.parentDirectoryId === undefined) {
+            return hierarchyReadResultWithRows([directoryNode('12', 'Album')])
+          }
+
+          directoryReadCount += 1
+          return directoryReadCount === 1
+            ? warmRead.promise
+            : hierarchyReadResultWithRows([terminalDirectoryNode('20', 'Recovered Child', '12')], {
+                parentDirectoryId: '12'
+              })
+        }
+      }),
+      { warmup: { enabled: true } }
+    )
+
+    await expect(controller.refresh()).resolves.toBe(true)
+
+    const explicitPromise = controller.requestDirectoryChildren('source-directory:12')
+    await waitForMicrotasks()
+
+    expect(readRequests.map((request) => request.parentDirectoryId ?? 'root')).toEqual([
+      'root',
+      '12'
+    ])
+
+    warmRead.resolve(hierarchyReadError('readFailed', 'readFailed', 'Warm read failed.'))
+    await expect(explicitPromise).resolves.toBe(true)
+
+    expect(readRequests.map((request) => request.parentDirectoryId ?? 'root')).toEqual([
+      'root',
+      '12',
+      '12'
+    ])
+    expect(controller.directoryReadStates.value.get('12')).toMatchObject({ kind: 'loaded' })
   })
 
   it('loads source and directory continuation windows and retries failed directory continuations', async () => {
@@ -1271,6 +1352,21 @@ function directoryNode(
     directoryScanState: 'scanning',
     navigableChildScopeState: 'hasNavigableChildScopes',
     updatedAtMs: 100
+  }
+}
+
+function terminalDirectoryNode(
+  directoryId: string,
+  label: string,
+  parentDirectoryId?: string,
+  sourceId = '7'
+): Extract<ChildRow, { kind: 'directory' }> {
+  return {
+    ...directoryNode(directoryId, label, parentDirectoryId, sourceId),
+    hasChildDirectories: false,
+    directoryPlayableMediaState: { kind: 'noPlayableMediaDescendants' },
+    directoryScanState: 'complete',
+    navigableChildScopeState: 'noNavigableChildScopes'
   }
 }
 

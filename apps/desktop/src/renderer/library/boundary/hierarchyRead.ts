@@ -128,7 +128,7 @@ export function createLibraryHierarchyReadController(
   let activeWarmReads = 0
   let staleIgnoredWarmReads = 0
   const queuedWarmReadKeys = new Set<string>()
-  const activeWarmReadKeys = new Set<string>()
+  const activeWarmReadsByKey = new Map<string, LibraryActiveWarmRead>()
   const warmReadQueue: LibraryBranchWarmupTask[] = []
 
   const currentRoot = computed(() => {
@@ -539,6 +539,20 @@ export function createLibraryHierarchyReadController(
       target.directoryId,
       profile.value
     )
+    const warmRead = activeWarmReadFor(requestKey)
+
+    if (warmRead !== undefined) {
+      return adoptWarmDirectoryRead(warmRead, target, options)
+    }
+
+    return readDirectoryWindowExplicit(target, requestKey, options)
+  }
+
+  async function readDirectoryWindowExplicit(
+    target: DirectoryTarget,
+    requestKey: string,
+    options: { readonly parentNodeId?: BrowserTreeNodeId } = {}
+  ): Promise<boolean> {
     const currentState = resolveDirectoryState(target.directoryId)
 
     if (currentState?.kind === 'loading' && currentState.requestKey === requestKey) {
@@ -613,28 +627,7 @@ export function createLibraryHierarchyReadController(
         return true
       }
 
-      setDirectoryReadState(
-        target.directoryId,
-        {
-          kind: 'loaded',
-          children: loadedChildrenFromWindow(result.window, directoryLoadedTarget(target))
-        },
-        result.window
-      )
-      if (options.parentNodeId !== undefined) {
-        scheduleBranchWarmupFromWindow({
-          anchorNodeId: options.parentNodeId,
-          parent: {
-            kind: 'directory',
-            nodeId: options.parentNodeId,
-            directoryId: target.directoryId,
-            entryPoint: target.entryPoint
-          },
-          target: directoryLoadedTarget(target),
-          window: result.window,
-          remainingDepth: branchWarmupDepth
-        })
-      }
+      commitDirectoryWindow(target, result.window, options)
       return true
     } catch {
       if (isCurrentDirectoryLoading(target.directoryId, requestKey, sequence)) {
@@ -659,6 +652,29 @@ export function createLibraryHierarchyReadController(
         hierarchyReadIsLoading.value = false
       }
     }
+  }
+
+  async function adoptWarmDirectoryRead(
+    warmRead: LibraryActiveWarmRead,
+    target: DirectoryTarget,
+    options: { readonly parentNodeId?: BrowserTreeNodeId } = {}
+  ): Promise<boolean> {
+    const outcome = await warmRead.promise
+
+    if (outcome.kind === 'committed') {
+      return true
+    }
+
+    if (isLoadedDirectoryWindowForTarget(target)) {
+      return true
+    }
+
+    const requestKey = createDirectoryRequestKey(
+      target.entryPoint,
+      target.directoryId,
+      profile.value
+    )
+    return readDirectoryWindowExplicit(target, requestKey, options)
   }
 
   async function readMore(target: MoreTarget): Promise<boolean> {
@@ -959,6 +975,55 @@ export function createLibraryHierarchyReadController(
     return directoryReadStates.value.get(directoryId)
   }
 
+  function activeWarmReadFor(requestKey: string): LibraryActiveWarmRead | undefined {
+    return activeWarmReadsByKey.get(requestKey)
+  }
+
+  function commitDirectoryWindow(
+    target: DirectoryTarget,
+    window: ChildWindow,
+    options: {
+      readonly parentNodeId?: BrowserTreeNodeId
+      readonly remainingDepth?: number
+    } = {}
+  ): void {
+    setDirectoryReadState(
+      target.directoryId,
+      {
+        kind: 'loaded',
+        children: loadedChildrenFromWindow(window, directoryLoadedTarget(target))
+      },
+      window
+    )
+
+    if (options.parentNodeId === undefined) {
+      return
+    }
+
+    scheduleBranchWarmupFromWindow({
+      anchorNodeId: options.parentNodeId,
+      parent: {
+        kind: 'directory',
+        nodeId: options.parentNodeId,
+        directoryId: target.directoryId,
+        entryPoint: target.entryPoint
+      },
+      target: directoryLoadedTarget(target),
+      window,
+      remainingDepth: options.remainingDepth ?? branchWarmupDepth
+    })
+  }
+
+  function isLoadedDirectoryWindowForTarget(target: DirectoryTarget): boolean {
+    const state = resolveDirectoryState(target.directoryId)
+
+    return (
+      state?.kind === 'loaded' &&
+      sameEntryPoint(state.children.entryPoint, target.entryPoint) &&
+      (state.children.parentDirectoryId ?? undefined) === target.directoryId
+    )
+  }
+
   function scheduleBranchWarmupFromWindow(options: {
     readonly anchorNodeId: BrowserTreeNodeId
     readonly parent: LibraryBranchWarmupParent
@@ -1036,7 +1101,7 @@ export function createLibraryHierarchyReadController(
       task.profile
     )
 
-    if (queuedWarmReadKeys.has(requestKey) || activeWarmReadKeys.has(requestKey)) {
+    if (queuedWarmReadKeys.has(requestKey) || activeWarmReadsByKey.has(requestKey)) {
       return
     }
 
@@ -1070,18 +1135,21 @@ export function createLibraryHierarchyReadController(
       }
 
       activeWarmReads += 1
-      activeWarmReadKeys.add(task.requestKey)
-      void runBranchWarmupTask(task).finally(() => {
+      const promise = runBranchWarmupTask(task)
+      activeWarmReadsByKey.set(task.requestKey, { task, promise })
+      void promise.finally(() => {
         activeWarmReads -= 1
-        activeWarmReadKeys.delete(task.requestKey)
+        activeWarmReadsByKey.delete(task.requestKey)
         drainBranchWarmupQueue()
       })
     }
   }
 
-  async function runBranchWarmupTask(task: LibraryBranchWarmupTask): Promise<void> {
+  async function runBranchWarmupTask(
+    task: LibraryBranchWarmupTask
+  ): Promise<LibraryWarmReadOutcome> {
     if (!canStartWarmRead(task)) {
-      return
+      return { kind: 'stale' }
     }
 
     try {
@@ -1091,45 +1159,29 @@ export function createLibraryHierarchyReadController(
 
       if (!canCommitWarmRead(task)) {
         noteStaleWarmRead(task)
-        return
+        return { kind: 'stale' }
       }
 
       if (result.state !== 'ready') {
-        return
+        return { kind: 'notReady' }
       }
 
       if (!isExpectedWindow(result.window, 0, task.target.directoryId, task.target.entryPoint)) {
-        return
+        return { kind: 'unexpectedWindow' }
       }
 
       if (!canCommitWarmRead(task)) {
         noteStaleWarmRead(task)
-        return
+        return { kind: 'stale' }
       }
 
-      setDirectoryReadState(
-        task.target.directoryId,
-        {
-          kind: 'loaded',
-          children: loadedChildrenFromWindow(result.window, directoryLoadedTarget(task.target))
-        },
-        result.window
-      )
-
-      scheduleBranchWarmupFromWindow({
-        anchorNodeId: task.anchorNodeId,
-        parent: {
-          kind: 'directory',
-          nodeId: task.target.nodeId,
-          directoryId: task.target.directoryId,
-          entryPoint: task.target.entryPoint
-        },
-        target: directoryLoadedTarget(task.target),
-        window: result.window,
+      commitDirectoryWindow(task.target, result.window, {
+        parentNodeId: task.target.nodeId,
         remainingDepth: task.remainingDepth - 1
       })
+      return { kind: 'committed' }
     } catch {
-      return
+      return { kind: 'requestFailed' }
     }
   }
 
@@ -1144,12 +1196,29 @@ export function createLibraryHierarchyReadController(
   }
 
   function canCommitWarmRead(task: LibraryBranchWarmupTask): boolean {
-    return canStartWarmRead(task)
+    return (
+      task.generation === warmupGeneration &&
+      task.profile === profile.value &&
+      shouldContinueBranchWarmup(task.anchorNodeId) &&
+      isWarmParentCurrent(task) &&
+      canCommitWarmDirectory(task)
+    )
   }
 
   function canWarmDirectory(directoryId: string): boolean {
     const state = directoryReadStates.value.get(directoryId)
     return state === undefined || state.kind === 'unloaded'
+  }
+
+  function canCommitWarmDirectory(task: LibraryBranchWarmupTask): boolean {
+    const state = directoryReadStates.value.get(task.target.directoryId)
+
+    return (
+      state === undefined ||
+      state.kind === 'unloaded' ||
+      ((state.kind === 'loading' || state.kind === 'refreshing') &&
+        state.requestKey === task.requestKey)
+    )
   }
 
   function isWarmParentCurrent(task: LibraryBranchWarmupTask): boolean {
@@ -1262,6 +1331,18 @@ type LibraryBranchWarmupTask = {
   readonly target: WarmableDirectoryTarget
   readonly remainingDepth: number
   readonly requestKey: string
+}
+
+type LibraryWarmReadOutcome =
+  | { readonly kind: 'committed' }
+  | { readonly kind: 'stale' }
+  | { readonly kind: 'notReady' }
+  | { readonly kind: 'unexpectedWindow' }
+  | { readonly kind: 'requestFailed' }
+
+type LibraryActiveWarmRead = {
+  readonly task: LibraryBranchWarmupTask
+  readonly promise: Promise<LibraryWarmReadOutcome>
 }
 
 function acceptedNavigationResult(
