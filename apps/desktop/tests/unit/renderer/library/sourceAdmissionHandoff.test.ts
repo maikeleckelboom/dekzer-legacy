@@ -79,7 +79,7 @@ describe('source admission handoff projection', () => {
         [
           '7',
           sourceActivity({
-            preparationActivity: {
+            preparation: {
               state: 'running'
             }
           })
@@ -135,20 +135,20 @@ function sourceBinding(sourceId: string, label: string): RowBinding {
 
 function sourceActivity(
   overrides: {
-    readonly preparationActivity?: Partial<ReadSourceActivityReply['preparationActivity']>
+    readonly preparation?: Partial<ReadSourceActivityReply['preparation']>
   } = {}
 ): ReadSourceActivityReply {
   const base: ReadSourceActivityReply = {
     sourceId: '7',
-    admissionState: 'active',
-    browseReadiness: {
+    admission: 'active',
+    browse: {
       state: 'ready'
     },
-    scanActivity: {
+    scan: {
       state: 'completed',
       counters: {}
     },
-    preparationActivity: {
+    preparation: {
       state: 'complete',
       backlog: {
         hash: 0,
@@ -164,15 +164,15 @@ function sourceActivity(
 
   return {
     ...base,
-    preparationActivity:
-      overrides.preparationActivity === undefined
-        ? base.preparationActivity
+    preparation:
+      overrides.preparation === undefined
+        ? base.preparation
         : {
-            ...base.preparationActivity,
-            ...overrides.preparationActivity,
+            ...base.preparation,
+            ...overrides.preparation,
             backlog: {
-              ...base.preparationActivity.backlog,
-              ...(overrides.preparationActivity.backlog ?? {})
+              ...base.preparation.backlog,
+              ...(overrides.preparation.backlog ?? {})
             }
           }
   }

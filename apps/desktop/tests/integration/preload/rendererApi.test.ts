@@ -176,17 +176,17 @@ describe('preload renderer API', () => {
       state: 'ready',
       activity: {
         sourceId: '7',
-        admissionState: 'active',
-        browseReadiness: {
+        admission: 'active',
+        browse: {
           state: 'ready',
           detail: 'Source is ready to browse.'
         },
-        scanActivity: {
+        scan: {
           state: 'completed',
           counters: {},
           detail: 'Scan completed.'
         },
-        preparationActivity: {
+        preparation: {
           state: 'complete',
           backlog: {
             hash: 0,

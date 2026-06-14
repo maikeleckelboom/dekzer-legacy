@@ -19,17 +19,17 @@ export function projectSourceActivity(input: {
     return undefined
   }
 
-  const scanActivity = scanActivityFromProgress(input.scanProgress) ?? activity.scanActivity
-  const preparationActivity =
+  const scan = scanFromProgress(input.scanProgress) ?? activity.scan
+  const preparation =
     input.maintenanceRunState === 'completed' &&
-    activity.preparationActivity.lastRunStatus !== undefined
-      ? { ...activity.preparationActivity, provenance: 'runResult' as const }
-      : activity.preparationActivity
+    activity.preparation.lastRunStatus !== undefined
+      ? { ...activity.preparation, provenance: 'runResult' as const }
+      : activity.preparation
 
   return {
     ...activity,
-    scanActivity,
-    preparationActivity
+    scan,
+    preparation
   }
 }
 
@@ -61,9 +61,9 @@ export function projectSourceActivityBySourceId(input: {
 }
 
 export function sourceActivityBacklogCategories(
-  activity: Pick<ReadSourceActivityReply, 'preparationActivity'>
+  activity: Pick<ReadSourceActivityReply, 'preparation'>
 ): readonly SourceActivityBacklogCategory[] {
-  const backlog = activity.preparationActivity.backlog
+  const backlog = activity.preparation.backlog
   const categories = [
     { label: 'hash', count: backlog.hash },
     { label: 'probe', count: backlog.probe },
@@ -76,16 +76,16 @@ export function sourceActivityBacklogCategories(
 }
 
 export function sourceActivityBacklogTotal(
-  activity: Pick<ReadSourceActivityReply, 'preparationActivity'>
+  activity: Pick<ReadSourceActivityReply, 'preparation'>
 ): number {
-  const backlog = activity.preparationActivity.backlog
+  const backlog = activity.preparation.backlog
   return backlog.hash + backlog.probe + backlog.attachment + backlog.promotion + backlog.identity
 }
 
 export function sourceActivityPreparationSummary(
-  activity: Pick<ReadSourceActivityReply, 'preparationActivity'>
+  activity: Pick<ReadSourceActivityReply, 'preparation'>
 ): string | undefined {
-  const preparation = activity.preparationActivity
+  const preparation = activity.preparation
   const categories = sourceActivityBacklogCategories(activity)
   const categoryDetail = categories
     .map((category) => `${category.label} ${category.count}`)
@@ -112,9 +112,9 @@ export function sourceActivityPreparationSummary(
 }
 
 export function sourceActivityScanSummary(
-  activity: Pick<ReadSourceActivityReply, 'scanActivity'>
+  activity: Pick<ReadSourceActivityReply, 'scan'>
 ): string | undefined {
-  const scan = activity.scanActivity
+  const scan = activity.scan
 
   switch (scan.state) {
     case 'running':
@@ -132,9 +132,9 @@ export function sourceActivityScanSummary(
   }
 }
 
-function scanActivityFromProgress(
+function scanFromProgress(
   progress: ScanProgressState | undefined
-): ReadSourceActivityReply['scanActivity'] | undefined {
+): ReadSourceActivityReply['scan'] | undefined {
   if (progress === undefined || progress.kind === 'idle') {
     return undefined
   }
@@ -185,7 +185,7 @@ function scanActivityFromProgress(
 }
 
 function scanRunningDetail(
-  counters: ReadSourceActivityReply['scanActivity']['counters']
+  counters: ReadSourceActivityReply['scan']['counters']
 ): string {
   const parts: string[] = []
 

@@ -133,19 +133,19 @@ export type StatusViewInput = {
 export type SourceStatusDiagnosticTrace = {
   readonly sourceId?: string
   readonly sourcePath?: string
-  readonly admissionState?:
-    | ReadSourceActivityReply['admissionState']
+  readonly admission?:
+    | ReadSourceActivityReply['admission']
     | 'active'
     | 'restorable'
     | 'notAdmitted'
-  readonly browseReadiness?: ReadSourceActivityReply['browseReadiness']
-  readonly scanActivity?: ReadSourceActivityReply['scanActivity']
-  readonly preparationActivity?: ReadSourceActivityReply['preparationActivity']
+  readonly browse?: ReadSourceActivityReply['browse']
+  readonly scan?: ReadSourceActivityReply['scan']
+  readonly preparation?: ReadSourceActivityReply['preparation']
   readonly duplicateStatus?: 'active' | 'restorable' | 'none'
   readonly maintenanceSnapshotSource?: ReturnType<typeof sourceMaintenanceBacklog>['source']
   readonly backlogCounts?: SourceMaintenanceBacklog['categories']
   readonly backlogTotal?: number
-  readonly provenance?: ReadSourceActivityReply['preparationActivity']['provenance']
+  readonly provenance?: ReadSourceActivityReply['preparation']['provenance']
   readonly lastRunStatus?: SourceMaintenanceBacklog['lastRunStatus']
 }
 
@@ -393,17 +393,17 @@ function registeredActivityBadge(input: StatusViewInput): StatusBadge | undefine
     return undefined
   }
 
-  if (activity.scanActivity.state === 'running') {
+  if (activity.scan.state === 'running') {
     return 'Scanning source'
   }
-  if (activity.scanActivity.state === 'failed' || activity.scanActivity.state === 'blocked') {
+  if (activity.scan.state === 'failed' || activity.scan.state === 'blocked') {
     return 'Blocked'
   }
-  if (activity.scanActivity.state === 'cancelled') {
+  if (activity.scan.state === 'cancelled') {
     return 'Needs scan'
   }
 
-  switch (activity.browseReadiness.state) {
+  switch (activity.browse.state) {
     case 'missing':
       return 'Missing'
     case 'blocked':
@@ -418,7 +418,7 @@ function registeredActivityBadge(input: StatusViewInput): StatusBadge | undefine
       break
   }
 
-  switch (activity.preparationActivity.state) {
+  switch (activity.preparation.state) {
     case 'running':
       return 'Preparing source'
     case 'completedWithRemainingWork':
@@ -432,7 +432,7 @@ function registeredActivityBadge(input: StatusViewInput): StatusBadge | undefine
       break
   }
 
-  switch (activity.browseReadiness.state) {
+  switch (activity.browse.state) {
     case 'needsScan':
       return 'Needs scan'
     case 'empty':
@@ -513,10 +513,10 @@ function sourceActivityDetail(input: StatusViewInput): string | undefined {
   }
 
   if (
-    activity.scanActivity.state === 'running' ||
-    activity.scanActivity.state === 'failed' ||
-    activity.scanActivity.state === 'blocked' ||
-    activity.scanActivity.state === 'cancelled'
+    activity.scan.state === 'running' ||
+    activity.scan.state === 'failed' ||
+    activity.scan.state === 'blocked' ||
+    activity.scan.state === 'cancelled'
   ) {
     return sourceActivityScanSummary(activity)
   }
@@ -526,7 +526,7 @@ function sourceActivityDetail(input: StatusViewInput): string | undefined {
     return preparation
   }
 
-  return activity.browseReadiness.detail
+  return activity.browse.detail
 }
 
 function maintenanceBacklogPrefix(backlog: SourceMaintenanceBacklog): string {
@@ -719,8 +719,8 @@ export function sourceStatusDiagnosticTrace(input: StatusViewInput): SourceStatu
     activity === undefined ? undefined : sourceActivityBacklogCategories(activity)
   const activityBacklogTotal =
     activity === undefined ? undefined : sourceActivityBacklogTotal(activity)
-  const admissionState =
-    activity?.admissionState ??
+  const admission =
+    activity?.admission ??
     (duplicateStatus === 'active'
       ? 'active'
       : duplicateStatus === 'restorable'
@@ -729,30 +729,30 @@ export function sourceStatusDiagnosticTrace(input: StatusViewInput): SourceStatu
           ? undefined
           : 'notAdmitted')
   const provenance =
-    activity?.preparationActivity.provenance ?? diagnosticProvenanceFromBacklog(backlog.source)
+    activity?.preparation.provenance ?? diagnosticProvenanceFromBacklog(backlog.source)
 
   return {
     ...(sourceId === undefined ? {} : { sourceId }),
     ...(input.sourcePath === undefined ? {} : { sourcePath: input.sourcePath }),
-    ...(admissionState === undefined ? {} : { admissionState }),
-    ...(activity === undefined ? {} : { browseReadiness: activity.browseReadiness }),
-    ...(activity === undefined ? {} : { scanActivity: activity.scanActivity }),
-    ...(activity === undefined ? {} : { preparationActivity: activity.preparationActivity }),
+    ...(admission === undefined ? {} : { admission }),
+    ...(activity === undefined ? {} : { browse: activity.browse }),
+    ...(activity === undefined ? {} : { scan: activity.scan }),
+    ...(activity === undefined ? {} : { preparation: activity.preparation }),
     ...(duplicateStatus === undefined ? {} : { duplicateStatus }),
     maintenanceSnapshotSource: backlog.source,
     backlogCounts: activityBacklogCounts ?? backlog.categories,
     backlogTotal: activityBacklogTotal ?? backlog.total,
     provenance,
-    ...(activity?.preparationActivity.lastRunStatus === undefined &&
+    ...(activity?.preparation.lastRunStatus === undefined &&
     backlog.lastRunStatus === undefined
       ? {}
-      : { lastRunStatus: activity?.preparationActivity.lastRunStatus ?? backlog.lastRunStatus })
+      : { lastRunStatus: activity?.preparation.lastRunStatus ?? backlog.lastRunStatus })
   }
 }
 
 function diagnosticProvenanceFromBacklog(
   source: SourceMaintenanceBacklog['source']
-): ReadSourceActivityReply['preparationActivity']['provenance'] {
+): ReadSourceActivityReply['preparation']['provenance'] {
   switch (source) {
     case 'maintenance':
       return 'maintenanceSnapshot'

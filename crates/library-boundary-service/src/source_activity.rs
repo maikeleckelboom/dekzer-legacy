@@ -7,52 +7,46 @@ pub(crate) fn map_read_source_activity_reply(
     source_integrity: store::StoreSourceIntegrity,
     maintenance: SourceMaintenanceSnapshot,
 ) -> protocol::ReadSourceActivityReply {
-    let admission_state = admission_state(source_integrity.lifecycle.as_ref());
-    let browse_readiness = browse_readiness(&source_integrity);
-    let scan_activity = scan_activity(source_integrity.lifecycle.as_ref());
-    let preparation_activity = preparation_activity(&maintenance);
+    let admission = admission(source_integrity.lifecycle.as_ref());
+    let browse = browse(&source_integrity);
+    let scan = scan(source_integrity.lifecycle.as_ref());
+    let preparation = preparation(&maintenance);
 
     protocol::ReadSourceActivityReply {
         source_id: source_integrity.source_id,
-        admission_state,
-        browse_readiness,
-        scan_activity,
-        preparation_activity,
+        admission,
+        browse,
+        scan,
+        preparation,
     }
 }
 
-fn admission_state(
-    lifecycle: Option<&store::StoreSourceLifecycle>,
-) -> protocol::SourceActivityAdmissionState {
+fn admission(lifecycle: Option<&store::StoreSourceLifecycle>) -> protocol::SourceAdmissionState {
     match lifecycle {
-        Some(lifecycle) if lifecycle.is_user_visible => {
-            protocol::SourceActivityAdmissionState::Active
-        }
-        Some(_) => protocol::SourceActivityAdmissionState::Restorable,
-        None => protocol::SourceActivityAdmissionState::NotAdmitted,
+        Some(lifecycle) if lifecycle.is_user_visible => protocol::SourceAdmissionState::Active,
+        Some(_) => protocol::SourceAdmissionState::Restorable,
+        None => protocol::SourceAdmissionState::NotAdmitted,
     }
 }
 
-fn browse_readiness(
-    source_integrity: &store::StoreSourceIntegrity,
-) -> protocol::SourceBrowseReadiness {
+fn browse(source_integrity: &store::StoreSourceIntegrity) -> protocol::SourceBrowseReadiness {
     let Some(lifecycle) = source_integrity.lifecycle.as_ref() else {
         return readiness(
-            protocol::SourceBrowseReadinessState::Unavailable,
+            protocol::SourceBrowseState::Unavailable,
             "Source is not admitted.",
         );
     };
 
     if !lifecycle.is_user_visible {
         return readiness(
-            protocol::SourceBrowseReadinessState::Unavailable,
+            protocol::SourceBrowseState::Unavailable,
             "Source is restorable but not active.",
         );
     }
 
     if lifecycle.source_class != "internal" && lifecycle.mount_status != "mounted" {
         return readiness(
-            protocol::SourceBrowseReadinessState::Unavailable,
+            protocol::SourceBrowseState::Unavailable,
             "Source mount is unavailable.",
         );
     }
@@ -60,16 +54,16 @@ fn browse_readiness(
     match lifecycle.access_state.as_str() {
         "missing" => {
             return readiness(
-                protocol::SourceBrowseReadinessState::Missing,
+                protocol::SourceBrowseState::Missing,
                 "Source root is missing.",
             );
         }
         "blocked" => {
             return readiness(
                 if lifecycle.access_issue_kind.as_deref() == Some("unavailable_mount") {
-                    protocol::SourceBrowseReadinessState::Unavailable
+                    protocol::SourceBrowseState::Unavailable
                 } else {
-                    protocol::SourceBrowseReadinessState::Blocked
+                    protocol::SourceBrowseState::Blocked
                 },
                 "Source root is blocked.",
             );
@@ -80,59 +74,56 @@ fn browse_readiness(
     match lifecycle.scan_phase.as_str() {
         "idle" if lifecycle.last_successful_scan_at.is_none() => {
             return readiness(
-                protocol::SourceBrowseReadinessState::NeedsScan,
+                protocol::SourceBrowseState::NeedsScan,
                 "Source has not completed a scan.",
             );
         }
         "scanning" => {
             return readiness(
-                protocol::SourceBrowseReadinessState::Indexing,
+                protocol::SourceBrowseState::Indexing,
                 "Source scan is running.",
             );
         }
         "blocked" => {
             return readiness(
                 if lifecycle.scan_issue_kind.as_deref() == Some("unavailable_mount") {
-                    protocol::SourceBrowseReadinessState::Unavailable
+                    protocol::SourceBrowseState::Unavailable
                 } else {
-                    protocol::SourceBrowseReadinessState::Blocked
+                    protocol::SourceBrowseState::Blocked
                 },
                 "Source scan is blocked.",
             );
         }
         "failed" => {
-            return readiness(
-                protocol::SourceBrowseReadinessState::Blocked,
-                "Source scan failed.",
-            );
+            return readiness(protocol::SourceBrowseState::Blocked, "Source scan failed.");
         }
         _ => {}
     }
 
     match source_integrity.coverage.state {
         store::StoreSourceIntegrityCoverageState::SourceUnavailable => readiness(
-            protocol::SourceBrowseReadinessState::Unavailable,
+            protocol::SourceBrowseState::Unavailable,
             "Source is unavailable.",
         ),
         store::StoreSourceIntegrityCoverageState::LocationMissing => readiness(
-            protocol::SourceBrowseReadinessState::Missing,
+            protocol::SourceBrowseState::Missing,
             "Source location is missing.",
         ),
         store::StoreSourceIntegrityCoverageState::Blocked
         | store::StoreSourceIntegrityCoverageState::Failed => readiness(
-            protocol::SourceBrowseReadinessState::Blocked,
+            protocol::SourceBrowseState::Blocked,
             "Source coverage is blocked.",
         ),
         store::StoreSourceIntegrityCoverageState::Scanning => readiness(
-            protocol::SourceBrowseReadinessState::Indexing,
+            protocol::SourceBrowseState::Indexing,
             "Source coverage is still indexing.",
         ),
         store::StoreSourceIntegrityCoverageState::Pending => readiness(
-            protocol::SourceBrowseReadinessState::NeedsScan,
+            protocol::SourceBrowseState::NeedsScan,
             "Source coverage is pending scan.",
         ),
         store::StoreSourceIntegrityCoverageState::Incomplete => readiness(
-            protocol::SourceBrowseReadinessState::NeedsScan,
+            protocol::SourceBrowseState::NeedsScan,
             "Source coverage is incomplete.",
         ),
         store::StoreSourceIntegrityCoverageState::Complete => {
@@ -143,12 +134,12 @@ fn browse_readiness(
                 .unwrap_or(false)
             {
                 readiness(
-                    protocol::SourceBrowseReadinessState::Empty,
+                    protocol::SourceBrowseState::Empty,
                     "Source is indexed but no media candidates are present.",
                 )
             } else {
                 readiness(
-                    protocol::SourceBrowseReadinessState::Ready,
+                    protocol::SourceBrowseState::Ready,
                     "Source is ready to browse.",
                 )
             }
@@ -156,21 +147,18 @@ fn browse_readiness(
     }
 }
 
-fn readiness(
-    state: protocol::SourceBrowseReadinessState,
-    detail: &str,
-) -> protocol::SourceBrowseReadiness {
+fn readiness(state: protocol::SourceBrowseState, detail: &str) -> protocol::SourceBrowseReadiness {
     protocol::SourceBrowseReadiness {
         state,
         detail: Some(detail.to_string()),
     }
 }
 
-fn scan_activity(lifecycle: Option<&store::StoreSourceLifecycle>) -> protocol::SourceScanActivity {
+fn scan(lifecycle: Option<&store::StoreSourceLifecycle>) -> protocol::SourceScanProgress {
     let Some(lifecycle) = lifecycle else {
-        return protocol::SourceScanActivity {
-            state: protocol::SourceScanActivityState::Blocked,
-            counters: protocol::SourceScanActivityCounters::default(),
+        return protocol::SourceScanProgress {
+            state: protocol::SourceScanState::Blocked,
+            counters: protocol::SourceScanCounters::default(),
             detail: Some("Source is not admitted.".to_string()),
             scan_run_id: None,
             last_started_at_ms: None,
@@ -179,47 +167,45 @@ fn scan_activity(lifecycle: Option<&store::StoreSourceLifecycle>) -> protocol::S
     };
 
     let state = match lifecycle.scan_phase.as_str() {
-        "scanning" => protocol::SourceScanActivityState::Running,
-        "complete" => protocol::SourceScanActivityState::Completed,
-        "failed" => protocol::SourceScanActivityState::Failed,
-        "blocked" => protocol::SourceScanActivityState::Blocked,
-        "partial" => protocol::SourceScanActivityState::Failed,
-        _ => protocol::SourceScanActivityState::Idle,
+        "scanning" => protocol::SourceScanState::Running,
+        "complete" => protocol::SourceScanState::Completed,
+        "failed" => protocol::SourceScanState::Failed,
+        "blocked" => protocol::SourceScanState::Blocked,
+        "partial" => protocol::SourceScanState::Failed,
+        _ => protocol::SourceScanState::Idle,
     };
 
-    protocol::SourceScanActivity {
+    protocol::SourceScanProgress {
         state,
-        counters: protocol::SourceScanActivityCounters::default(),
-        detail: scan_activity_detail(state, lifecycle).map(str::to_string),
+        counters: protocol::SourceScanCounters::default(),
+        detail: scan_detail(state, lifecycle).map(str::to_string),
         scan_run_id: None,
         last_started_at_ms: lifecycle.last_scan_started_at,
         last_finished_at_ms: lifecycle.last_scan_finished_at,
     }
 }
 
-fn scan_activity_detail(
-    state: protocol::SourceScanActivityState,
+fn scan_detail(
+    state: protocol::SourceScanState,
     lifecycle: &store::StoreSourceLifecycle,
 ) -> Option<&'static str> {
     match state {
-        protocol::SourceScanActivityState::Idle
+        protocol::SourceScanState::Idle
             if lifecycle.last_successful_scan_at.is_none()
                 && lifecycle.last_scan_started_at.is_none() =>
         {
             Some("Scan has not started.")
         }
-        protocol::SourceScanActivityState::Idle => Some("Scan is idle."),
-        protocol::SourceScanActivityState::Running => Some("Scan is running."),
-        protocol::SourceScanActivityState::Completed => Some("Scan completed."),
-        protocol::SourceScanActivityState::Failed => Some("Scan failed or ended partially."),
-        protocol::SourceScanActivityState::Blocked => Some("Scan is blocked."),
-        protocol::SourceScanActivityState::Cancelled => Some("Scan was cancelled."),
+        protocol::SourceScanState::Idle => Some("Scan is idle."),
+        protocol::SourceScanState::Running => Some("Scan is running."),
+        protocol::SourceScanState::Completed => Some("Scan completed."),
+        protocol::SourceScanState::Failed => Some("Scan failed or ended partially."),
+        protocol::SourceScanState::Blocked => Some("Scan is blocked."),
+        protocol::SourceScanState::Cancelled => Some("Scan was cancelled."),
     }
 }
 
-fn preparation_activity(
-    maintenance: &SourceMaintenanceSnapshot,
-) -> protocol::SourcePreparationActivity {
+fn preparation(maintenance: &SourceMaintenanceSnapshot) -> protocol::SourcePreparation {
     let backlog = preparation_backlog(maintenance);
     let remaining = preparation_backlog_total(backlog);
     let last_run_status = maintenance.last_run.as_ref().map(|run| run.status);
@@ -229,29 +215,29 @@ fn preparation_activity(
         .map(last_run_preparation_processed_counts);
     let state = match maintenance.status {
         protocol::SourceMaintenanceSnapshotStatus::Running => {
-            protocol::SourcePreparationActivityState::Running
+            protocol::SourcePreparationState::Running
         }
         protocol::SourceMaintenanceSnapshotStatus::Unavailable
         | protocol::SourceMaintenanceSnapshotStatus::Blocked => {
-            protocol::SourcePreparationActivityState::Unavailable
+            protocol::SourcePreparationState::Unavailable
         }
         protocol::SourceMaintenanceSnapshotStatus::Failed => {
-            protocol::SourcePreparationActivityState::Failed
+            protocol::SourcePreparationState::Failed
         }
         protocol::SourceMaintenanceSnapshotStatus::Idle
             if remaining > 0 && maintenance.last_run.is_some() =>
         {
-            protocol::SourcePreparationActivityState::CompletedWithRemainingWork
+            protocol::SourcePreparationState::CompletedWithRemainingWork
         }
         protocol::SourceMaintenanceSnapshotStatus::Idle if remaining > 0 => {
-            protocol::SourcePreparationActivityState::Idle
+            protocol::SourcePreparationState::Idle
         }
         protocol::SourceMaintenanceSnapshotStatus::Idle => {
-            protocol::SourcePreparationActivityState::Complete
+            protocol::SourcePreparationState::Complete
         }
     };
 
-    protocol::SourcePreparationActivity {
+    protocol::SourcePreparation {
         state,
         backlog,
         provenance: protocol::SourcePreparationProvenance::MaintenanceSnapshot,
@@ -264,13 +250,13 @@ fn preparation_activity(
 
 fn preparation_backlog(
     maintenance: &SourceMaintenanceSnapshot,
-) -> protocol::SourcePreparationBacklogCounts {
+) -> protocol::SourcePreparationBacklog {
     let attachment = maintenance
         .attachment_links
         .as_ref()
         .map(|links| links.stale_links_count + links.source_files_missing_attachment_links_count)
         .unwrap_or(0);
-    protocol::SourcePreparationBacklogCounts {
+    protocol::SourcePreparationBacklog {
         hash: maintenance.remaining_hash_candidates,
         probe: maintenance.remaining_probe_candidates,
         attachment,
@@ -280,14 +266,14 @@ fn preparation_backlog(
     }
 }
 
-fn preparation_backlog_total(backlog: protocol::SourcePreparationBacklogCounts) -> usize {
+fn preparation_backlog_total(backlog: protocol::SourcePreparationBacklog) -> usize {
     backlog.hash + backlog.probe + backlog.attachment + backlog.promotion + backlog.identity
 }
 
 fn last_run_preparation_processed_counts(
     last_run: &protocol::SourceMaintenanceLastRunSummary,
-) -> protocol::SourcePreparationProcessedCounts {
-    protocol::SourcePreparationProcessedCounts {
+) -> protocol::SourcePreparationProcessed {
+    protocol::SourcePreparationProcessed {
         hash: last_run.hash.hashed_count + last_run.hash.skipped_count + last_run.hash.failed_count,
         probe: last_run.probe.probed_count
             + last_run.probe.skipped_count
@@ -318,30 +304,18 @@ mod tests {
             source_integrity(lifecycle("scanning"), coverage_complete_with_media()),
             maintenance_snapshot(),
         );
-        assert_eq!(
-            running.scan_activity.state,
-            protocol::SourceScanActivityState::Running
-        );
-        assert_eq!(
-            running.browse_readiness.state,
-            protocol::SourceBrowseReadinessState::Indexing
-        );
+        assert_eq!(running.scan.state, protocol::SourceScanState::Running);
+        assert_eq!(running.browse.state, protocol::SourceBrowseState::Indexing);
 
         let failed = map_read_source_activity_reply(
             source_integrity(lifecycle("failed"), coverage_complete_with_media()),
             maintenance_snapshot(),
         );
-        assert_eq!(
-            failed.scan_activity.state,
-            protocol::SourceScanActivityState::Failed
-        );
-        assert_eq!(
-            failed.browse_readiness.state,
-            protocol::SourceBrowseReadinessState::Blocked
-        );
+        assert_eq!(failed.scan.state, protocol::SourceScanState::Failed);
+        assert_eq!(failed.browse.state, protocol::SourceBrowseState::Blocked);
 
         let json = serde_json::to_value(running).expect("serialize activity");
-        assert!(json.pointer("/scanActivity/percentage").is_none());
+        assert!(json.pointer("/scan/percentage").is_none());
     }
 
     #[test]
@@ -356,16 +330,16 @@ mod tests {
         );
 
         assert_eq!(
-            activity.preparation_activity.state,
-            protocol::SourcePreparationActivityState::CompletedWithRemainingWork
+            activity.preparation.state,
+            protocol::SourcePreparationState::CompletedWithRemainingWork
         );
-        assert_eq!(activity.preparation_activity.backlog.hash, 2);
+        assert_eq!(activity.preparation.backlog.hash, 2);
         assert_eq!(
-            activity.preparation_activity.provenance,
+            activity.preparation.provenance,
             protocol::SourcePreparationProvenance::MaintenanceSnapshot
         );
         assert_eq!(
-            activity.preparation_activity.last_run_status,
+            activity.preparation.last_run_status,
             Some(protocol::SourceMaintenanceRunStatus::Completed)
         );
     }
@@ -381,21 +355,18 @@ mod tests {
         );
 
         assert_eq!(
-            activity.preparation_activity.state,
-            protocol::SourcePreparationActivityState::Complete
+            activity.preparation.state,
+            protocol::SourcePreparationState::Complete
         );
     }
 
     #[test]
-    fn admission_state_distinguishes_active_restorable_and_not_admitted() {
+    fn admission_distinguishes_active_restorable_and_not_admitted() {
         let active = map_read_source_activity_reply(
             source_integrity(lifecycle("complete"), coverage_complete_with_media()),
             maintenance_snapshot(),
         );
-        assert_eq!(
-            active.admission_state,
-            protocol::SourceActivityAdmissionState::Active
-        );
+        assert_eq!(active.admission, protocol::SourceAdmissionState::Active);
 
         let mut restorable_lifecycle = lifecycle("complete");
         restorable_lifecycle.is_user_visible = false;
@@ -404,8 +375,8 @@ mod tests {
             maintenance_snapshot(),
         );
         assert_eq!(
-            restorable.admission_state,
-            protocol::SourceActivityAdmissionState::Restorable
+            restorable.admission,
+            protocol::SourceAdmissionState::Restorable
         );
 
         let not_admitted = map_read_source_activity_reply(
@@ -428,8 +399,8 @@ mod tests {
             maintenance_snapshot(),
         );
         assert_eq!(
-            not_admitted.admission_state,
-            protocol::SourceActivityAdmissionState::NotAdmitted
+            not_admitted.admission,
+            protocol::SourceAdmissionState::NotAdmitted
         );
     }
 

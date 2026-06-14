@@ -413,7 +413,7 @@ describe('source status projection', () => {
   it('maps running source activity to scanning copy without percentages', () => {
     const view = registeredView({
       sourceActivity: sourceActivity({
-        scanActivity: {
+        scan: {
           state: 'running',
           counters: {
             directoriesVisited: 3,
@@ -438,7 +438,7 @@ describe('source status projection', () => {
         detail: 'The source hierarchy is ready.'
       },
       sourceActivity: sourceActivity({
-        preparationActivity: {
+        preparation: {
           state: 'idle',
           backlog: {
             hash: 2,
@@ -460,7 +460,7 @@ describe('source status projection', () => {
   it('keeps completed maintenance with remaining activity distinct from complete preparation', () => {
     const view = registeredView({
       sourceActivity: sourceActivity({
-        preparationActivity: {
+        preparation: {
           state: 'completedWithRemainingWork',
           provenance: 'runResult',
           lastRunStatus: 'completed',
@@ -482,7 +482,7 @@ describe('source status projection', () => {
   it('source activity complete clears preparation warning state', () => {
     const view = registeredView({
       sourceActivity: sourceActivity({
-        preparationActivity: {
+        preparation: {
           state: 'complete'
         }
       })
@@ -574,7 +574,7 @@ describe('source status projection', () => {
     expect(trace).toEqual({
       sourceId: '7',
       sourcePath: 'C:/Music/Removed',
-      admissionState: 'restorable',
+      admission: 'restorable',
       duplicateStatus: 'restorable',
       maintenanceSnapshotSource: 'runResult',
       backlogCounts: [{ label: 'hash', count: 2 }],
@@ -594,19 +594,19 @@ describe('source status projection', () => {
       },
       sourcePath: 'C:/Music',
       sourceActivity: sourceActivity({
-        admissionState: 'active',
-        browseReadiness: {
+        admission: 'active',
+        browse: {
           state: 'ready',
           detail: 'Source is ready to browse.'
         },
-        scanActivity: {
+        scan: {
           state: 'running',
           counters: {
             filesDiscovered: 9
           },
           scanRunId: 'scan-1'
         },
-        preparationActivity: {
+        preparation: {
           state: 'completedWithRemainingWork',
           provenance: 'runResult',
           lastRunStatus: 'completed',
@@ -631,10 +631,10 @@ describe('source status projection', () => {
     expect(trace).toMatchObject({
       sourceId: '7',
       sourcePath: 'C:/Music',
-      admissionState: 'active',
-      browseReadiness: { state: 'ready' },
-      scanActivity: { state: 'running', counters: { filesDiscovered: 9 } },
-      preparationActivity: {
+      admission: 'active',
+      browse: { state: 'ready' },
+      scan: { state: 'running', counters: { filesDiscovered: 9 } },
+      preparation: {
         state: 'completedWithRemainingWork',
         provenance: 'runResult',
         lastRunStatus: 'completed'
@@ -937,25 +937,25 @@ function lifecycle(overrides: Partial<SourceLifecycleRecord> = {}): SourceLifecy
 
 function sourceActivity(
   overrides: {
-    readonly admissionState?: ReadSourceActivityReply['admissionState']
-    readonly browseReadiness?: Partial<ReadSourceActivityReply['browseReadiness']>
-    readonly scanActivity?: Partial<ReadSourceActivityReply['scanActivity']>
-    readonly preparationActivity?: Partial<ReadSourceActivityReply['preparationActivity']>
+    readonly admission?: ReadSourceActivityReply['admission']
+    readonly browse?: Partial<ReadSourceActivityReply['browse']>
+    readonly scan?: Partial<ReadSourceActivityReply['scan']>
+    readonly preparation?: Partial<ReadSourceActivityReply['preparation']>
   } = {}
 ): ReadSourceActivityReply {
   const base: ReadSourceActivityReply = {
     sourceId: '7',
-    admissionState: 'active',
-    browseReadiness: {
+    admission: 'active',
+    browse: {
       state: 'ready',
       detail: 'Source is ready to browse.'
     },
-    scanActivity: {
+    scan: {
       state: 'completed',
       counters: {},
       detail: 'Scan completed.'
     },
-    preparationActivity: {
+    preparation: {
       state: 'complete',
       backlog: {
         hash: 0,
@@ -969,42 +969,42 @@ function sourceActivity(
     }
   }
 
-  const preparationActivity =
-    overrides.preparationActivity === undefined
-      ? base.preparationActivity
+  const preparation =
+    overrides.preparation === undefined
+      ? base.preparation
       : {
-          ...base.preparationActivity,
-          ...overrides.preparationActivity,
+          ...base.preparation,
+          ...overrides.preparation,
           backlog: {
-            ...base.preparationActivity.backlog,
-            ...(overrides.preparationActivity.backlog ?? {})
+            ...base.preparation.backlog,
+            ...(overrides.preparation.backlog ?? {})
           }
         }
 
   return {
     ...base,
-    ...(overrides.admissionState === undefined
+    ...(overrides.admission === undefined
       ? {}
-      : { admissionState: overrides.admissionState }),
-    browseReadiness:
-      overrides.browseReadiness === undefined
-        ? base.browseReadiness
+      : { admission: overrides.admission }),
+    browse:
+      overrides.browse === undefined
+        ? base.browse
         : {
-            ...base.browseReadiness,
-            ...overrides.browseReadiness
+            ...base.browse,
+            ...overrides.browse
           },
-    scanActivity:
-      overrides.scanActivity === undefined
-        ? base.scanActivity
+    scan:
+      overrides.scan === undefined
+        ? base.scan
         : {
-            ...base.scanActivity,
-            ...overrides.scanActivity,
+            ...base.scan,
+            ...overrides.scan,
             counters: {
-              ...base.scanActivity.counters,
-              ...(overrides.scanActivity.counters ?? {})
+              ...base.scan.counters,
+              ...(overrides.scan.counters ?? {})
             }
           },
-    preparationActivity
+    preparation
   }
 }
 

@@ -30,10 +30,10 @@ pub struct ReadSourceActivityReply {
     #[schemars(with = "String")]
     #[ts(as = "String")]
     pub source_id: i64,
-    pub admission_state: SourceActivityAdmissionState,
-    pub browse_readiness: SourceBrowseReadiness,
-    pub scan_activity: SourceScanActivity,
-    pub preparation_activity: SourcePreparationActivity,
+    pub admission: SourceAdmissionState,
+    pub browse: SourceBrowseReadiness,
+    pub scan: SourceScanProgress,
+    pub preparation: SourcePreparation,
 }
 
 #[derive(
@@ -50,7 +50,7 @@ pub struct ReadSourceActivityReply {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub enum SourceActivityAdmissionState {
+pub enum SourceAdmissionState {
     Active,
     Restorable,
     NotAdmitted,
@@ -69,7 +69,7 @@ pub enum SourceActivityAdmissionState {
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
 pub struct SourceBrowseReadiness {
-    pub state: SourceBrowseReadinessState,
+    pub state: SourceBrowseState,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub detail: Option<String>,
@@ -89,7 +89,7 @@ pub struct SourceBrowseReadiness {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub enum SourceBrowseReadinessState {
+pub enum SourceBrowseState {
     NeedsScan,
     Indexing,
     Ready,
@@ -111,9 +111,9 @@ pub enum SourceBrowseReadinessState {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct SourceScanActivity {
-    pub state: SourceScanActivityState,
-    pub counters: SourceScanActivityCounters,
+pub struct SourceScanProgress {
+    pub state: SourceScanState,
+    pub counters: SourceScanCounters,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub detail: Option<String>,
@@ -144,7 +144,7 @@ pub struct SourceScanActivity {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub enum SourceScanActivityState {
+pub enum SourceScanState {
     Idle,
     Running,
     Completed,
@@ -167,7 +167,7 @@ pub enum SourceScanActivityState {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct SourceScanActivityCounters {
+pub struct SourceScanCounters {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub directories_visited: Option<usize>,
@@ -190,9 +190,9 @@ pub struct SourceScanActivityCounters {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct SourcePreparationActivity {
-    pub state: SourcePreparationActivityState,
-    pub backlog: SourcePreparationBacklogCounts,
+pub struct SourcePreparation {
+    pub state: SourcePreparationState,
+    pub backlog: SourcePreparationBacklog,
     pub provenance: SourcePreparationProvenance,
     pub bounded_batch: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -200,7 +200,7 @@ pub struct SourcePreparationActivity {
     pub last_run_status: Option<SourceMaintenanceRunStatus>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
-    pub last_run_processed: Option<SourcePreparationProcessedCounts>,
+    pub last_run_processed: Option<SourcePreparationProcessed>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub source_failure: Option<SourceMaintenanceSourceFailure>,
@@ -220,7 +220,7 @@ pub struct SourcePreparationActivity {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub enum SourcePreparationActivityState {
+pub enum SourcePreparationState {
     Idle,
     Running,
     CompletedWithRemainingWork,
@@ -264,7 +264,7 @@ pub enum SourcePreparationProvenance {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct SourcePreparationBacklogCounts {
+pub struct SourcePreparationBacklog {
     pub hash: usize,
     pub probe: usize,
     pub attachment: usize,
@@ -286,7 +286,7 @@ pub struct SourcePreparationBacklogCounts {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct SourcePreparationProcessedCounts {
+pub struct SourcePreparationProcessed {
     pub hash: usize,
     pub probe: usize,
     pub attachment: usize,
@@ -297,10 +297,9 @@ pub struct SourcePreparationProcessedCounts {
 #[cfg(test)]
 mod tests {
     use super::{
-        ReadSourceActivityReply, SourceActivityAdmissionState, SourceBrowseReadiness,
-        SourceBrowseReadinessState, SourcePreparationActivity, SourcePreparationActivityState,
-        SourcePreparationBacklogCounts, SourcePreparationProvenance, SourceScanActivity,
-        SourceScanActivityCounters, SourceScanActivityState,
+        ReadSourceActivityReply, SourceAdmissionState, SourceBrowseReadiness, SourceBrowseState,
+        SourcePreparation, SourcePreparationBacklog, SourcePreparationProvenance,
+        SourcePreparationState, SourceScanCounters, SourceScanProgress, SourceScanState,
     };
     use serde_json::json;
 
@@ -308,25 +307,25 @@ mod tests {
     fn source_activity_contract_does_not_serialize_fake_percentage() {
         let reply = ReadSourceActivityReply {
             source_id: 7,
-            admission_state: SourceActivityAdmissionState::Active,
-            browse_readiness: SourceBrowseReadiness {
-                state: SourceBrowseReadinessState::Indexing,
+            admission: SourceAdmissionState::Active,
+            browse: SourceBrowseReadiness {
+                state: SourceBrowseState::Indexing,
                 detail: Some("Scan is running.".to_string()),
             },
-            scan_activity: SourceScanActivity {
-                state: SourceScanActivityState::Running,
-                counters: SourceScanActivityCounters {
+            scan: SourceScanProgress {
+                state: SourceScanState::Running,
+                counters: SourceScanCounters {
                     files_discovered: Some(5),
-                    ..SourceScanActivityCounters::default()
+                    ..SourceScanCounters::default()
                 },
                 detail: None,
                 scan_run_id: None,
                 last_started_at_ms: Some(100),
                 last_finished_at_ms: None,
             },
-            preparation_activity: SourcePreparationActivity {
-                state: SourcePreparationActivityState::Idle,
-                backlog: SourcePreparationBacklogCounts::default(),
+            preparation: SourcePreparation {
+                state: SourcePreparationState::Idle,
+                backlog: SourcePreparationBacklog::default(),
                 provenance: SourcePreparationProvenance::MaintenanceSnapshot,
                 bounded_batch: true,
                 last_run_status: None,
@@ -337,12 +336,9 @@ mod tests {
 
         let json = serde_json::to_value(reply).expect("serialize source activity");
         assert_eq!(json["sourceId"], json!("7"));
-        assert_eq!(
-            json["scanActivity"]["counters"]["filesDiscovered"],
-            json!(5)
-        );
-        assert!(json.pointer("/scanActivity/percentage").is_none());
-        assert!(json.pointer("/preparationActivity/percentage").is_none());
+        assert_eq!(json["scan"]["counters"]["filesDiscovered"], json!(5));
+        assert!(json.pointer("/scan/percentage").is_none());
+        assert!(json.pointer("/preparation/percentage").is_none());
     }
 
     #[test]

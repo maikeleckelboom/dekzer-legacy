@@ -25,7 +25,7 @@ describe('source activity projection', () => {
       }
     })
 
-    expect(projected?.scanActivity).toMatchObject({
+    expect(projected?.scan).toMatchObject({
       state: 'running',
       counters: {
         directoriesVisited: 3,
@@ -75,13 +75,13 @@ describe('source activity projection', () => {
       scanProgress
     })
 
-    expect(projected?.scanActivity.state).toBe(expected.state)
+    expect(projected?.scan.state).toBe(expected.state)
     expect(sourceActivityScanSummary(projected!)).toBe(expected.detail)
   })
 
   it('preserves preparation category counts and bounded-batch copy', () => {
     const activity = sourceActivity({
-      preparationActivity: {
+      preparation: {
         state: 'idle',
         backlog: {
           hash: 1,
@@ -110,7 +110,7 @@ describe('source activity projection', () => {
     expect(
       sourceActivityPreparationSummary(
         sourceActivity({
-          preparationActivity: {
+          preparation: {
             state: 'completedWithRemainingWork',
             backlog: {
               hash: 7,
@@ -129,7 +129,7 @@ describe('source activity projection', () => {
     expect(
       sourceActivityPreparationSummary(
         sourceActivity({
-          preparationActivity: {
+          preparation: {
             state: 'complete'
           }
         })
@@ -140,7 +140,7 @@ describe('source activity projection', () => {
   it('preserves run-result provenance when maintenance just completed', () => {
     const projected = projectSourceActivity({
       activity: sourceActivity({
-        preparationActivity: {
+        preparation: {
           state: 'completedWithRemainingWork',
           lastRunStatus: 'completed'
         }
@@ -148,27 +148,27 @@ describe('source activity projection', () => {
       maintenanceRunState: 'completed'
     })
 
-    expect(projected?.preparationActivity.provenance).toBe('runResult')
+    expect(projected?.preparation.provenance).toBe('runResult')
   })
 })
 
 function sourceActivity(
   overrides: {
-    readonly preparationActivity?: Partial<ReadSourceActivityReply['preparationActivity']>
+    readonly preparation?: Partial<ReadSourceActivityReply['preparation']>
   } = {}
 ): ReadSourceActivityReply {
   const base: ReadSourceActivityReply = {
     sourceId: '7',
-    admissionState: 'active',
-    browseReadiness: {
+    admission: 'active',
+    browse: {
       state: 'ready',
       detail: 'Source is ready to browse.'
     },
-    scanActivity: {
+    scan: {
       state: 'idle',
       counters: {}
     },
-    preparationActivity: {
+    preparation: {
       state: 'complete',
       backlog: {
         hash: 0,
@@ -184,15 +184,15 @@ function sourceActivity(
 
   return {
     ...base,
-    preparationActivity:
-      overrides.preparationActivity === undefined
-        ? base.preparationActivity
+    preparation:
+      overrides.preparation === undefined
+        ? base.preparation
         : {
-            ...base.preparationActivity,
-            ...overrides.preparationActivity,
+            ...base.preparation,
+            ...overrides.preparation,
             backlog: {
-              ...base.preparationActivity.backlog,
-              ...(overrides.preparationActivity.backlog ?? {})
+              ...base.preparation.backlog,
+              ...(overrides.preparation.backlog ?? {})
             }
           }
   }

@@ -284,7 +284,7 @@ describe('Library home projection', () => {
         [
           '7',
           sourceActivity({
-            preparationActivity: {
+            preparation: {
               state: 'idle',
               backlog: {
                 hash: 2,
@@ -516,21 +516,21 @@ function maintenance(
 
 function sourceActivity(
   overrides: {
-    readonly preparationActivity?: Partial<ReadSourceActivityReply['preparationActivity']>
+    readonly preparation?: Partial<ReadSourceActivityReply['preparation']>
   } = {}
 ): ReadSourceActivityReply {
   const base: ReadSourceActivityReply = {
     sourceId: '7',
-    admissionState: 'active',
-    browseReadiness: {
+    admission: 'active',
+    browse: {
       state: 'ready',
       detail: 'Source is ready to browse.'
     },
-    scanActivity: {
+    scan: {
       state: 'completed',
       counters: {}
     },
-    preparationActivity: {
+    preparation: {
       state: 'complete',
       backlog: {
         hash: 0,
@@ -546,15 +546,15 @@ function sourceActivity(
 
   return {
     ...base,
-    preparationActivity:
-      overrides.preparationActivity === undefined
-        ? base.preparationActivity
+    preparation:
+      overrides.preparation === undefined
+        ? base.preparation
         : {
-            ...base.preparationActivity,
-            ...overrides.preparationActivity,
+            ...base.preparation,
+            ...overrides.preparation,
             backlog: {
-              ...base.preparationActivity.backlog,
-              ...(overrides.preparationActivity.backlog ?? {})
+              ...base.preparation.backlog,
+              ...(overrides.preparation.backlog ?? {})
             }
           }
   }

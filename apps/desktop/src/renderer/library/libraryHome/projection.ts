@@ -297,27 +297,27 @@ function projectLibraryHomeSourceActivity(input: {
     return undefined
   }
 
-  switch (activity.browseReadiness.state) {
+  switch (activity.browse.state) {
     case 'missing':
       return {
         productState: 'missing',
         badge: 'Missing',
         tone: 'danger',
-        detail: activity.browseReadiness.detail ?? 'This source is missing.'
+        detail: activity.browse.detail ?? 'This source is missing.'
       }
     case 'blocked':
       return {
         productState: 'blocked',
         badge: 'Blocked',
         tone: 'danger',
-        detail: activity.browseReadiness.detail ?? 'This source is blocked.'
+        detail: activity.browse.detail ?? 'This source is blocked.'
       }
     case 'unavailable':
       return {
         productState: 'unavailable',
         badge: 'Offline/unavailable',
         tone: 'danger',
-        detail: activity.browseReadiness.detail ?? 'This source is offline or unavailable.'
+        detail: activity.browse.detail ?? 'This source is offline or unavailable.'
       }
     case 'indexing':
       return {
@@ -332,7 +332,7 @@ function projectLibraryHomeSourceActivity(input: {
       break
   }
 
-  if (activity.scanActivity.state === 'running') {
+  if (activity.scan.state === 'running') {
     return {
       productState: 'indexing',
       badge: 'Scanning source',
@@ -340,7 +340,7 @@ function projectLibraryHomeSourceActivity(input: {
       detail: sourceActivityScanSummary(activity) ?? 'Scanning source.'
     }
   }
-  if (activity.scanActivity.state === 'failed' || activity.scanActivity.state === 'blocked') {
+  if (activity.scan.state === 'failed' || activity.scan.state === 'blocked') {
     return {
       productState: 'blocked',
       badge: 'Blocked',
@@ -348,7 +348,7 @@ function projectLibraryHomeSourceActivity(input: {
       detail: sourceActivityScanSummary(activity) ?? 'Scan is blocked.'
     }
   }
-  if (activity.scanActivity.state === 'cancelled') {
+  if (activity.scan.state === 'cancelled') {
     return {
       productState: 'needsScan',
       badge: 'Needs scan',
@@ -357,7 +357,7 @@ function projectLibraryHomeSourceActivity(input: {
     }
   }
 
-  switch (activity.preparationActivity.state) {
+  switch (activity.preparation.state) {
     case 'running':
       return {
         productState: 'maintenanceNeeded',
@@ -405,13 +405,13 @@ function projectLibraryHomeSourceActivity(input: {
       break
   }
 
-  switch (activity.browseReadiness.state) {
+  switch (activity.browse.state) {
     case 'needsScan':
       return {
         productState: 'needsScan',
         badge: 'Needs scan',
         tone: 'warning',
-        detail: activity.browseReadiness.detail ?? 'Scan source to index your music.'
+        detail: activity.browse.detail ?? 'Scan source to index your music.'
       }
     case 'empty':
       return {

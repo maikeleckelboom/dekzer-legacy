@@ -688,19 +688,19 @@ async function validatesSourceActivityReadRequestAndReply(): Promise<void> {
         type: 'sourceActivity',
         payload: {
           sourceId: '7',
-          admissionState: 'active',
-          browseReadiness: {
+          admission: 'active',
+          browse: {
             state: 'ready',
             detail: 'Source is ready to browse.'
           },
-          scanActivity: {
+          scan: {
             state: 'completed',
             counters: {},
             detail: 'Scan completed.',
             lastStartedAtMs: 10,
             lastFinishedAtMs: 20
           },
-          preparationActivity: {
+          preparation: {
             state: 'completedWithRemainingWork',
             backlog: {
               hash: 2,
@@ -739,9 +739,9 @@ async function validatesSourceActivityReadRequestAndReply(): Promise<void> {
     } satisfies CommandRequest,
     'readSourceActivity sends the generated snapshot command'
   )
-  equal(reply.admissionState, 'active', 'readSourceActivity unwraps admission state')
+  equal(reply.admission, 'active', 'readSourceActivity unwraps admission state')
   equal(
-    reply.preparationActivity.provenance,
+    reply.preparation.provenance,
     'maintenanceSnapshot',
     'readSourceActivity preserves preparation provenance'
   )

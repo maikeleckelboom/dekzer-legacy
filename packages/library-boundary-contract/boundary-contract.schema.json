@@ -3137,17 +3137,17 @@
     "ReadSourceActivityReply": {
       "type": "object",
       "properties": {
-        "admissionState": {
-          "$ref": "#/$defs/SourceActivityAdmissionState"
+        "admission": {
+          "$ref": "#/$defs/SourceAdmissionState"
         },
-        "browseReadiness": {
+        "browse": {
           "$ref": "#/$defs/SourceBrowseReadiness"
         },
-        "preparationActivity": {
-          "$ref": "#/$defs/SourcePreparationActivity"
+        "preparation": {
+          "$ref": "#/$defs/SourcePreparation"
         },
-        "scanActivity": {
-          "$ref": "#/$defs/SourceScanActivity"
+        "scan": {
+          "$ref": "#/$defs/SourceScanProgress"
         },
         "sourceId": {
           "type": "string"
@@ -3155,10 +3155,10 @@
       },
       "required": [
         "sourceId",
-        "admissionState",
-        "browseReadiness",
-        "scanActivity",
-        "preparationActivity"
+        "admission",
+        "browse",
+        "scan",
+        "preparation"
       ]
     },
     "ReadSourceActivityRequest": {
@@ -4832,7 +4832,7 @@
         "unknown"
       ]
     },
-    "SourceActivityAdmissionState": {
+    "SourceAdmissionState": {
       "type": "string",
       "enum": [
         "active",
@@ -4897,14 +4897,14 @@
           ]
         },
         "state": {
-          "$ref": "#/$defs/SourceBrowseReadinessState"
+          "$ref": "#/$defs/SourceBrowseState"
         }
       },
       "required": [
         "state"
       ]
     },
-    "SourceBrowseReadinessState": {
+    "SourceBrowseState": {
       "type": "string",
       "enum": [
         "needsScan",
@@ -6220,11 +6220,11 @@
         "ejectPending"
       ]
     },
-    "SourcePreparationActivity": {
+    "SourcePreparation": {
       "type": "object",
       "properties": {
         "backlog": {
-          "$ref": "#/$defs/SourcePreparationBacklogCounts"
+          "$ref": "#/$defs/SourcePreparationBacklog"
         },
         "boundedBatch": {
           "type": "boolean"
@@ -6232,7 +6232,7 @@
         "lastRunProcessed": {
           "anyOf": [
             {
-              "$ref": "#/$defs/SourcePreparationProcessedCounts"
+              "$ref": "#/$defs/SourcePreparationProcessed"
             },
             {
               "type": "null"
@@ -6263,7 +6263,7 @@
           ]
         },
         "state": {
-          "$ref": "#/$defs/SourcePreparationActivityState"
+          "$ref": "#/$defs/SourcePreparationState"
         }
       },
       "required": [
@@ -6273,18 +6273,7 @@
         "boundedBatch"
       ]
     },
-    "SourcePreparationActivityState": {
-      "type": "string",
-      "enum": [
-        "idle",
-        "running",
-        "completedWithRemainingWork",
-        "complete",
-        "failed",
-        "unavailable"
-      ]
-    },
-    "SourcePreparationBacklogCounts": {
+    "SourcePreparationBacklog": {
       "type": "object",
       "properties": {
         "attachment": {
@@ -6321,7 +6310,7 @@
         "identity"
       ]
     },
-    "SourcePreparationProcessedCounts": {
+    "SourcePreparationProcessed": {
       "type": "object",
       "properties": {
         "attachment": {
@@ -6364,6 +6353,17 @@
         "maintenanceSnapshot",
         "runResult",
         "integrityFallback",
+        "unavailable"
+      ]
+    },
+    "SourcePreparationState": {
+      "type": "string",
+      "enum": [
+        "idle",
+        "running",
+        "completedWithRemainingWork",
+        "complete",
+        "failed",
         "unavailable"
       ]
     },
@@ -6449,48 +6449,7 @@
         "unknownRoot"
       ]
     },
-    "SourceScanActivity": {
-      "type": "object",
-      "properties": {
-        "counters": {
-          "$ref": "#/$defs/SourceScanActivityCounters"
-        },
-        "detail": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "lastFinishedAtMs": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "int64"
-        },
-        "lastStartedAtMs": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "int64"
-        },
-        "scanRunId": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "state": {
-          "$ref": "#/$defs/SourceScanActivityState"
-        }
-      },
-      "required": [
-        "state",
-        "counters"
-      ]
-    },
-    "SourceScanActivityCounters": {
+    "SourceScanCounters": {
       "type": "object",
       "properties": {
         "directoriesVisited": {
@@ -6534,17 +6493,6 @@
           "minimum": 0
         }
       }
-    },
-    "SourceScanActivityState": {
-      "type": "string",
-      "enum": [
-        "idle",
-        "running",
-        "completed",
-        "failed",
-        "blocked",
-        "cancelled"
-      ]
     },
     "SourceScanEvent": {
       "type": "object",
@@ -6635,6 +6583,58 @@
         "partial",
         "blocked",
         "failed"
+      ]
+    },
+    "SourceScanProgress": {
+      "type": "object",
+      "properties": {
+        "counters": {
+          "$ref": "#/$defs/SourceScanCounters"
+        },
+        "detail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lastFinishedAtMs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
+        },
+        "lastStartedAtMs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
+        },
+        "scanRunId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "state": {
+          "$ref": "#/$defs/SourceScanState"
+        }
+      },
+      "required": [
+        "state",
+        "counters"
+      ]
+    },
+    "SourceScanState": {
+      "type": "string",
+      "enum": [
+        "idle",
+        "running",
+        "completed",
+        "failed",
+        "blocked",
+        "cancelled"
       ]
     },
     "StartRootScanReply": {

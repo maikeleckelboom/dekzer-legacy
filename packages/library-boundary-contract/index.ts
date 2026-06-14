@@ -264,7 +264,7 @@ export type ReadSourceIntegrityReply = { sourceId: string, sourceAvailability: S
 
 export type ReadSourceMaintenanceReply = { sourceId: string, status: SourceMaintenanceSnapshotStatus, remainingHashCandidates: number, remainingProbeCandidates: number, remainingPlayableMediaPromotionCandidates: number, remainingTrackIdentityCandidateProductionCandidates: number, remainingTrackIdentityDecisionProductionCandidates: number, attachmentLinks?: SourceMaintenanceAttachmentLinkSummary, sourceFailure?: SourceMaintenanceSourceFailure, lastRun?: SourceMaintenanceLastRunSummary, };
 
-export type ReadSourceActivityReply = { sourceId: string, admissionState: SourceActivityAdmissionState, browseReadiness: SourceBrowseReadiness, scanActivity: SourceScanActivity, preparationActivity: SourcePreparationActivity, };
+export type ReadSourceActivityReply = { sourceId: string, admission: SourceAdmissionState, browse: SourceBrowseReadiness, scan: SourceScanProgress, preparation: SourcePreparation, };
 
 export type ReadSourceFileAttachmentReply = { status: AttachmentIdentityReadStatus, attachmentLink?: SourceFileAttachmentLink, };
 
@@ -350,27 +350,27 @@ export type SourceIntegrityRuntimeMaintenance = { state: SourceIntegrityRuntimeM
 
 export type SourceIntegrityRuntimeMaintenanceState = "idle" | "running";
 
-export type SourceActivityAdmissionState = "active" | "restorable" | "notAdmitted";
+export type SourceAdmissionState = "active" | "restorable" | "notAdmitted";
 
-export type SourceBrowseReadiness = { state: SourceBrowseReadinessState, detail?: string, };
+export type SourceBrowseReadiness = { state: SourceBrowseState, detail?: string, };
 
-export type SourceBrowseReadinessState = "needsScan" | "indexing" | "ready" | "empty" | "missing" | "blocked" | "unavailable";
+export type SourceBrowseState = "needsScan" | "indexing" | "ready" | "empty" | "missing" | "blocked" | "unavailable";
 
-export type SourceScanActivity = { state: SourceScanActivityState, counters: SourceScanActivityCounters, detail?: string, scanRunId?: string | null, lastStartedAtMs?: number, lastFinishedAtMs?: number, };
+export type SourceScanProgress = { state: SourceScanState, counters: SourceScanCounters, detail?: string, scanRunId?: string | null, lastStartedAtMs?: number, lastFinishedAtMs?: number, };
 
-export type SourceScanActivityState = "idle" | "running" | "completed" | "failed" | "blocked" | "cancelled";
+export type SourceScanState = "idle" | "running" | "completed" | "failed" | "blocked" | "cancelled";
 
-export type SourceScanActivityCounters = { directoriesVisited?: number, filesVisited?: number, filesDiscovered?: number, mediaCandidates?: number, queuedWorkItems?: number, };
+export type SourceScanCounters = { directoriesVisited?: number, filesVisited?: number, filesDiscovered?: number, mediaCandidates?: number, queuedWorkItems?: number, };
 
-export type SourcePreparationActivity = { state: SourcePreparationActivityState, backlog: SourcePreparationBacklogCounts, provenance: SourcePreparationProvenance, boundedBatch: boolean, lastRunStatus?: SourceMaintenanceRunStatus, lastRunProcessed?: SourcePreparationProcessedCounts, sourceFailure?: SourceMaintenanceSourceFailure, };
+export type SourcePreparation = { state: SourcePreparationState, backlog: SourcePreparationBacklog, provenance: SourcePreparationProvenance, boundedBatch: boolean, lastRunStatus?: SourceMaintenanceRunStatus, lastRunProcessed?: SourcePreparationProcessed, sourceFailure?: SourceMaintenanceSourceFailure, };
 
-export type SourcePreparationActivityState = "idle" | "running" | "completedWithRemainingWork" | "complete" | "failed" | "unavailable";
+export type SourcePreparationState = "idle" | "running" | "completedWithRemainingWork" | "complete" | "failed" | "unavailable";
 
 export type SourcePreparationProvenance = "maintenanceSnapshot" | "runResult" | "integrityFallback" | "unavailable";
 
-export type SourcePreparationBacklogCounts = { hash: number, probe: number, attachment: number, promotion: number, identity: number, };
+export type SourcePreparationBacklog = { hash: number, probe: number, attachment: number, promotion: number, identity: number, };
 
-export type SourcePreparationProcessedCounts = { hash: number, probe: number, attachment: number, promotion: number, identity: number, };
+export type SourcePreparationProcessed = { hash: number, probe: number, attachment: number, promotion: number, identity: number, };
 
 export type AttachmentIdentityReadStatus = "ok" | "notFound" | "invalidRequest" | "readFailed";
 

@@ -147,19 +147,19 @@ function readinessDetail(input: {
   const activity = input.sourceActivity
   if (activity !== undefined) {
     if (
-      activity.scanActivity.state === 'running' ||
-      activity.browseReadiness.state === 'indexing'
+      activity.scan.state === 'running' ||
+      activity.browse.state === 'indexing'
     ) {
       return sourceActivityScanSummary(activity) ?? 'Scanning source.'
     }
 
-    if (activity.preparationActivity.state === 'running') {
+    if (activity.preparation.state === 'running') {
       return sourceActivityPreparationSummary(activity) ?? 'Preparing source.'
     }
 
     if (
-      activity.preparationActivity.state === 'completedWithRemainingWork' ||
-      (activity.preparationActivity.state === 'idle' && sourceActivityBacklogTotal(activity) > 0)
+      activity.preparation.state === 'completedWithRemainingWork' ||
+      (activity.preparation.state === 'idle' && sourceActivityBacklogTotal(activity) > 0)
     ) {
       return (
         sourceActivityPreparationSummary(activity) ??
@@ -167,8 +167,8 @@ function readinessDetail(input: {
       )
     }
 
-    if (activity.preparationActivity.state === 'complete') {
-      return activity.browseReadiness.state === 'ready' ? 'Ready.' : 'Preparation complete.'
+    if (activity.preparation.state === 'complete') {
+      return activity.browse.state === 'ready' ? 'Ready.' : 'Preparation complete.'
     }
   }
 
