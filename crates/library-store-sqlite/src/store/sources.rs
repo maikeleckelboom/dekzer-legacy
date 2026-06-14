@@ -124,6 +124,19 @@ pub enum LocalRootAvailability {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LocalRootAdmission {
+    pub root_id: i64,
+    pub admitted_root_path: PathBuf,
+    pub visibility: LocalRootAdmissionVisibility,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LocalRootAdmissionVisibility {
+    Active,
+    Restorable,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RootNavigationWindowEstablishment {
     pub root_id: i64,
     pub state: RootNavigationWindowEstablishmentState,
@@ -144,6 +157,11 @@ pub enum RootNavigationWindowEstablishmentState {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReadLocalRootsResult {
     pub roots: Vec<LocalRoot>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReadLocalRootAdmissionsResult {
+    pub roots: Vec<LocalRootAdmission>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -323,6 +341,32 @@ impl SqliteDurableStore {
             })?
             .collect::<Result<Vec<_>, _>>()?;
         Ok(ReadLocalRootsResult { roots })
+    }
+
+    pub fn read_local_root_admissions(&self) -> LibrarySqliteResult<ReadLocalRootAdmissionsResult> {
+        let connection = open_connection(&self.path)?;
+        let mut statement = connection.prepare(
+            "SELECT sl.source_id, sl.absolute_path, s.is_user_visible
+             FROM source_locators sl
+             JOIN sources s ON s.source_id = sl.source_id
+             WHERE sl.locator_kind = 'absolute_path'
+             ORDER BY sl.source_id ASC",
+        )?;
+        let roots = statement
+            .query_map([], |row| {
+                let is_user_visible = row.get::<_, i64>(2)? != 0;
+                Ok(LocalRootAdmission {
+                    root_id: row.get(0)?,
+                    admitted_root_path: PathBuf::from(row.get::<_, String>(1)?),
+                    visibility: if is_user_visible {
+                        LocalRootAdmissionVisibility::Active
+                    } else {
+                        LocalRootAdmissionVisibility::Restorable
+                    },
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(ReadLocalRootAdmissionsResult { roots })
     }
 
     pub fn unregister_local_root(

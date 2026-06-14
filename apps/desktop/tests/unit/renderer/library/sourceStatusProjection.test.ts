@@ -5,6 +5,7 @@ import type { StatusContext } from '../../../../src/renderer/library/sourceStatu
 import { projectStatusContext } from '../../../../src/renderer/library/sourceStatus/context'
 import {
   projectStatusView,
+  sourceStatusDiagnosticTrace,
   type StatusViewInput
 } from '../../../../src/renderer/library/sourceStatus/projection'
 import type { BrowserProjection } from '../../../../src/renderer/library/tree/projection'
@@ -176,6 +177,40 @@ describe('source status projection', () => {
     expect(view.actions.some((action) => action.kind === 'addLocalPath')).toBe(false)
   })
 
+  it('restorable local browse row offers restore instead of active duplicate actions', () => {
+    const projection = localBrowseProjection(
+      {
+        kind: 'localBrowseItem',
+        item: {
+          ...localItem([admission('selectedDirectory', 'C:/Music/Removed')], 'directory'),
+          status: 'restorableSource',
+          matchedSourceId: '7'
+        },
+        target: {
+          addSourceView: 'preview',
+          entryPointKind: 'music',
+          resolvedRootPath: 'C:/Music',
+          resolvedParentPath: 'C:/Music/Removed',
+          label: 'Removed'
+        }
+      },
+      'Removed'
+    )
+    const view = statusView(
+      projectStatusContext({ projection, selectedNodeId: 'selected', selectedTitle: 'Removed' })
+    )
+
+    expect(view.badge).toBe('Restore source')
+    expect(view.actions).toEqual([
+      expect.objectContaining({
+        kind: 'addLocalPath',
+        label: 'Restore source',
+        resolvedPath: 'C:/Music/Removed'
+      })
+    ])
+    expect(view.actions.some((action) => action.kind === 'showSource')).toBe(false)
+  })
+
   it('does not offer broad system root admission from a loose media file', () => {
     const projection = localBrowseProjection(
       {
@@ -206,9 +241,9 @@ describe('source status projection', () => {
       sourceMaintenance: maintenance({ remainingHashCandidates: 3 })
     })
 
-    expect(view.badge).toBe('Maintenance needed')
+    expect(view.badge).toBe('Preparation pending')
     expect(view.detail).toContain(
-      'Pending work: hash 3. Run maintenance processes a bounded batch.'
+      'Preparation pending: hash 3. Run maintenance processes a bounded batch.'
     )
     expect(view.actions).toEqual([
       expect.objectContaining({ kind: 'scanSource', label: 'Rescan source', enabled: true }),
@@ -260,9 +295,49 @@ describe('source status projection', () => {
     })
 
     expect(view.detail).toContain(
-      'Pending work: hash 2, probe 1, promotion 4, identity 8, attachment 13. Run maintenance processes a bounded batch.'
+      'Preparation pending: hash 2, probe 1, promotion 4, identity 8, attachment 13. Run maintenance processes a bounded batch.'
     )
     expect(view.detail).not.toContain('maintenance items pending')
+  })
+
+  it('uses integrity fallback only when no maintenance snapshot exists', () => {
+    const fallback = registeredView({
+      sourceIntegrity: integrity({
+        evidenceAndMaintenance: {
+          remainingHashCandidates: 0,
+          remainingProbeCandidates: 8,
+          remainingPlayableMediaPromotionCandidates: 0,
+          remainingTrackIdentityCandidateProductionCandidates: 0,
+          remainingTrackIdentityDecisionProductionCandidates: 0
+        }
+      })
+    })
+
+    expect(fallback.badge).toBe('Preparation pending')
+    expect(fallback.detail).toContain(
+      'Preparation pending from integrity fallback: probe 8. Run maintenance processes a bounded batch.'
+    )
+
+    const freshMaintenance = registeredView({
+      sourceIntegrity: integrity({
+        evidenceAndMaintenance: {
+          remainingHashCandidates: 0,
+          remainingProbeCandidates: 8,
+          remainingPlayableMediaPromotionCandidates: 0,
+          remainingTrackIdentityCandidateProductionCandidates: 0,
+          remainingTrackIdentityDecisionProductionCandidates: 0
+        }
+      }),
+      sourceMaintenance: maintenance({
+        remainingHashCandidates: 1
+      })
+    })
+
+    expect(freshMaintenance.badge).toBe('Preparation pending')
+    expect(freshMaintenance.detail).toContain(
+      'Preparation pending: hash 1. Run maintenance processes a bounded batch.'
+    )
+    expect(freshMaintenance.detail).not.toContain('integrity fallback')
   })
 
   it('clears maintenance backlog from source status when fresh maintenance has no remaining work', () => {
@@ -315,7 +390,7 @@ describe('source status projection', () => {
       })
     })
 
-    expect(view.badge).toBe('Maintenance needed')
+    expect(view.badge).toBe('Preparation pending')
     expect(view.detail).toContain(
       'Maintenance completed; pending work remains: hash 3131, probe 2322, attachment 5457. Run maintenance processes a bounded batch.'
     )
@@ -377,6 +452,50 @@ describe('source status projection', () => {
     })
     expect(unavailable.badge).toBe('Maintenance unavailable')
     expect(unavailable.detail).toContain('Maintenance is unavailable for this source.')
+  })
+
+  it('builds development diagnostic trace data from admission and maintenance truth', () => {
+    const context: StatusContext = {
+      kind: 'localBrowse',
+      title: 'Removed',
+      itemRole: 'folder',
+      localState: 'restorable',
+      detail: 'C:/Music/Removed',
+      matchedSourceId: '7',
+      admission: {
+        resolvedPath: 'C:/Music/Removed',
+        label: 'Restore source'
+      }
+    }
+    const trace = sourceStatusDiagnosticTrace({
+      context,
+      sourcePath: 'C:/Music/Removed',
+      sourceMaintenance: maintenance({
+        remainingHashCandidates: 2,
+        lastRun: maintenanceLastRun({
+          status: 'completed',
+          remainingHashCandidates: 2
+        })
+      }),
+      maintenanceRunState: 'completed',
+      canAddLocalPath: true,
+      scanStatus: 'idle',
+      removeSourceStatus: 'idle',
+      refreshStatus: 'idle',
+      canScan: true,
+      canRemove: true,
+      canRunMaintenance: true
+    })
+
+    expect(trace).toEqual({
+      sourceId: '7',
+      sourcePath: 'C:/Music/Removed',
+      duplicateStatus: 'restorable',
+      maintenanceSnapshotSource: 'runResult',
+      backlogCounts: [{ label: 'hash', count: 2 }],
+      backlogTotal: 2,
+      lastRunStatus: 'completed'
+    })
   })
 
   it('missing, unavailable, and blocked sources project compact badges', () => {

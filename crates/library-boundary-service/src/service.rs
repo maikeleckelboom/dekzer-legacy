@@ -8,8 +8,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use library_boundary_protocol as protocol;
 use library_store_sqlite::{
-    LibraryStoreContext, LocalRootAvailability, ReadLocalRootsResult, RegisterLocalRootInput,
-    RegisterLocalRootResult, RootNavigationWindowEstablishment,
+    LibraryStoreContext, LocalRootAdmissionVisibility, LocalRootAvailability, ReadLocalRootsResult,
+    RegisterLocalRootInput, RegisterLocalRootResult, RootNavigationWindowEstablishment,
     RootNavigationWindowEstablishmentState, RootScanObservation,
     SourceFileBlake3HashAdmissionScope, SourceRegistrationRootClass, SqliteDurableStore,
     UnregisterLocalRootInput,
@@ -20,7 +20,10 @@ use crate::local_browse_entry_points::{
     LocalBrowseEntryPointResolver, ResolvedLocalBrowseEntryPoint, normalize_local_browse_path_key,
     production_local_browse_entry_point_resolver,
 };
-use crate::local_browse_items::{LocalBrowseItemReader, production_local_browse_item_reader};
+use crate::local_browse_items::{
+    LocalBrowseItemReader, LocalBrowseSourceAdmission, LocalBrowseSourceAdmissionStatus,
+    production_local_browse_item_reader,
+};
 use crate::search_filter_protocol::{map_search_filter_read_reply, store_search_filter_request};
 use crate::session_events::{LibraryBoundaryEventStream, ScanEventInput};
 use crate::snapshot_read_protocol::{
@@ -420,19 +423,7 @@ impl LibraryBoundaryService {
         &self,
         _request: protocol::ReadLocalBrowseEntryPointsRequest,
     ) -> protocol::ProtocolResult<protocol::ReadLocalBrowseEntryPointsReply> {
-        let admitted_source_ids_by_path_key = self
-            .durable_store
-            .read_local_roots()
-            .map_err(map_store_error)?
-            .roots
-            .into_iter()
-            .map(|root| {
-                (
-                    normalize_local_browse_path_key(&root.admitted_root_path),
-                    root.root_id,
-                )
-            })
-            .collect::<HashMap<_, _>>();
+        let source_admissions_by_path_key = self.local_browse_source_admissions_by_path_key()?;
 
         let resolution = self
             .local_browse_entry_point_resolver
@@ -443,7 +434,7 @@ impl LibraryBoundaryService {
 
         Ok(map_local_browse_entry_points_reply(
             resolution,
-            &admitted_source_ids_by_path_key,
+            &source_admissions_by_path_key,
         ))
     }
 
@@ -451,19 +442,7 @@ impl LibraryBoundaryService {
         &self,
         request: protocol::ReadLocalBrowseItemsRequest,
     ) -> protocol::ProtocolResult<protocol::ReadLocalBrowseItemsReply> {
-        let admitted_source_ids_by_path_key = self
-            .durable_store
-            .read_local_roots()
-            .map_err(map_store_error)?
-            .roots
-            .into_iter()
-            .map(|root| {
-                (
-                    normalize_local_browse_path_key(&root.admitted_root_path),
-                    root.root_id,
-                )
-            })
-            .collect::<HashMap<_, _>>();
+        let source_admissions_by_path_key = self.local_browse_source_admissions_by_path_key()?;
 
         let resolution = self
             .local_browse_entry_point_resolver
@@ -479,7 +458,36 @@ impl LibraryBoundaryService {
         }
 
         self.local_browse_item_reader
-            .read_items(request, &admitted_source_ids_by_path_key)
+            .read_items(request, &source_admissions_by_path_key)
+    }
+
+    fn local_browse_source_admissions_by_path_key(
+        &self,
+    ) -> protocol::ProtocolResult<HashMap<String, LocalBrowseSourceAdmission>> {
+        Ok(self
+            .durable_store
+            .read_local_root_admissions()
+            .map_err(map_store_error)?
+            .roots
+            .into_iter()
+            .map(|root| {
+                let status = match root.visibility {
+                    LocalRootAdmissionVisibility::Active => {
+                        LocalBrowseSourceAdmissionStatus::Active
+                    }
+                    LocalRootAdmissionVisibility::Restorable => {
+                        LocalBrowseSourceAdmissionStatus::Restorable
+                    }
+                };
+                (
+                    normalize_local_browse_path_key(&root.admitted_root_path),
+                    LocalBrowseSourceAdmission {
+                        source_id: root.root_id,
+                        status,
+                    },
+                )
+            })
+            .collect())
     }
 
     pub fn read_navigation_rows(
@@ -984,12 +992,12 @@ fn library_tree_row_policy_filter(
 
 fn map_local_browse_entry_points_reply(
     resolution: LocalBrowseEntryPointResolution,
-    admitted_source_ids_by_path_key: &HashMap<String, i64>,
+    source_admissions_by_path_key: &HashMap<String, LocalBrowseSourceAdmission>,
 ) -> protocol::ReadLocalBrowseEntryPointsReply {
     let entries = resolution
         .entries
         .into_iter()
-        .map(|entry| map_local_browse_entry_point(entry, admitted_source_ids_by_path_key))
+        .map(|entry| map_local_browse_entry_point(entry, source_admissions_by_path_key))
         .collect::<Vec<_>>();
     let status = local_browse_entry_points_read_status(&entries, resolution.failure.as_ref());
     protocol::ReadLocalBrowseEntryPointsReply {
@@ -1024,18 +1032,24 @@ fn local_browse_entry_points_read_status(
 
 fn map_local_browse_entry_point(
     entry: ResolvedLocalBrowseEntryPoint,
-    admitted_source_ids_by_path_key: &HashMap<String, i64>,
+    source_admissions_by_path_key: &HashMap<String, LocalBrowseSourceAdmission>,
 ) -> protocol::LocalBrowseEntryPoint {
-    let matched_source_id = entry
+    let matched_admission = entry
         .resolved_path
         .as_deref()
         .map(normalize_local_browse_path_key)
-        .and_then(|key| admitted_source_ids_by_path_key.get(&key).copied());
-    let status = if matched_source_id.is_some() {
-        protocol::LocalBrowseEntryPointStatus::DuplicateOfAdmittedSource
-    } else {
-        entry.status
-    };
+        .and_then(|key| source_admissions_by_path_key.get(&key).copied());
+    let matched_source_id = matched_admission.map(|admission| admission.source_id);
+    let status = matched_admission
+        .map(|admission| match admission.status {
+            LocalBrowseSourceAdmissionStatus::Active => {
+                protocol::LocalBrowseEntryPointStatus::DuplicateOfAdmittedSource
+            }
+            LocalBrowseSourceAdmissionStatus::Restorable => {
+                protocol::LocalBrowseEntryPointStatus::RestorableSource
+            }
+        })
+        .unwrap_or(entry.status);
     let available_operations = local_browse_entry_point_available_operations(
         entry.entry_point_kind,
         status,
@@ -1067,6 +1081,7 @@ fn local_browse_entry_point_available_operations(
         status,
         protocol::LocalBrowseEntryPointStatus::Available
             | protocol::LocalBrowseEntryPointStatus::DuplicateOfAdmittedSource
+            | protocol::LocalBrowseEntryPointStatus::RestorableSource
     ) {
         return Vec::new();
     }
@@ -1076,7 +1091,7 @@ fn local_browse_entry_point_available_operations(
         protocol::LocalBrowseOperation::ChooseDescendant,
     ];
 
-    if status != protocol::LocalBrowseEntryPointStatus::Available
+    if status == protocol::LocalBrowseEntryPointStatus::DuplicateOfAdmittedSource
         || kind == protocol::LocalBrowseEntryPointKind::SystemDriveRoot
     {
         return operations;

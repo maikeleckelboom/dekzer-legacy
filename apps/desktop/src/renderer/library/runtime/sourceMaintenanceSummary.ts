@@ -4,13 +4,22 @@ import type {
 } from '@dekzer/library-boundary-contract'
 
 export type SourceMaintenanceBacklog = {
+  readonly source: SourceMaintenanceBacklogSource
   readonly total: number
   readonly categories: readonly { readonly label: string; readonly count: number }[]
+  readonly lastRunStatus?: NonNullable<ReadSourceMaintenanceReply['lastRun']>['status']
 }
+
+export type SourceMaintenanceBacklogSource =
+  | 'maintenance'
+  | 'integrityFallback'
+  | 'runResult'
+  | 'unavailable'
 
 export function hasSourceMaintenanceBacklog(input: {
   readonly maintenance?: ReadSourceMaintenanceReply
   readonly integrity?: ReadSourceIntegrityReply
+  readonly runState?: 'idle' | 'running' | 'completed' | 'failed'
 }): boolean {
   return sourceMaintenanceBacklog(input).total > 0
 }
@@ -18,9 +27,11 @@ export function hasSourceMaintenanceBacklog(input: {
 export function sourceMaintenanceBacklog(input: {
   readonly maintenance?: ReadSourceMaintenanceReply
   readonly integrity?: ReadSourceIntegrityReply
+  readonly runState?: 'idle' | 'running' | 'completed' | 'failed'
 }): SourceMaintenanceBacklog {
   const maintenance = input.maintenance
   const integrity = input.integrity
+  const source = maintenanceSource(input)
   const hash =
     maintenance === undefined
       ? (integrity?.evidenceAndMaintenance.remainingHashCandidates ?? 0)
@@ -54,9 +65,29 @@ export function sourceMaintenanceBacklog(input: {
   ].filter((category) => category.count > 0)
 
   return {
+    source,
     total: hash + probe + promotion + identity + attachment,
-    categories
+    categories,
+    ...(maintenance?.lastRun?.status === undefined
+      ? {}
+      : { lastRunStatus: maintenance.lastRun.status })
   }
+}
+
+function maintenanceSource(input: {
+  readonly maintenance?: ReadSourceMaintenanceReply
+  readonly integrity?: ReadSourceIntegrityReply
+  readonly runState?: 'idle' | 'running' | 'completed' | 'failed'
+}): SourceMaintenanceBacklogSource {
+  if (input.maintenance !== undefined) {
+    return input.runState === 'completed' ? 'runResult' : 'maintenance'
+  }
+
+  if (input.integrity !== undefined) {
+    return 'integrityFallback'
+  }
+
+  return 'unavailable'
 }
 
 function maintenanceAttachmentRemaining(maintenance: ReadSourceMaintenanceReply): number {

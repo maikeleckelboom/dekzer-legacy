@@ -704,6 +704,10 @@ function formatEntryPointDetail(entry: LocalBrowseEntryPoint): string {
     return 'Already added as a music source.'
   }
 
+  if (entry.status === 'restorableSource') {
+    return 'Source was removed. Restore it to use this folder again.'
+  }
+
   if (entry.failure !== null) {
     return entry.failure.detail
   }
@@ -725,6 +729,10 @@ function formatEntryPointDetail(entry: LocalBrowseEntryPoint): string {
 function formatItemDetail(item: LocalBrowseItem): string {
   if (item.status === 'duplicateOfAdmittedSource') {
     return 'Already added as a music source.'
+  }
+
+  if (item.status === 'restorableSource') {
+    return 'Source was removed. Restore it to use this folder again.'
   }
 
   if (item.failure !== null) {
@@ -827,6 +835,8 @@ function entryPointStatusLabel(status: LocalBrowseEntryPointStatus): string {
       return 'Local browse unsupported.'
     case 'duplicateOfAdmittedSource':
       return 'Already added as a library source.'
+    case 'restorableSource':
+      return 'Source was removed. Restore it to use this folder again.'
   }
 }
 
@@ -844,6 +854,8 @@ function itemStatusLabel(status: LocalBrowseItemStatus): string {
       return 'Local browse unsupported.'
     case 'duplicateOfAdmittedSource':
       return 'Already added as a music source.'
+    case 'restorableSource':
+      return 'Source was removed. Restore it to use this folder again.'
     case 'rejected':
       return 'Protected location.'
     case 'unknown':

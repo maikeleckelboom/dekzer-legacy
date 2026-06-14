@@ -49,7 +49,7 @@ export type StatusContext =
 
 export type StatusAdmission = {
   readonly resolvedPath: string
-  readonly label: 'Add as music source' | 'Add parent as music source'
+  readonly label: 'Add as music source' | 'Add parent as music source' | 'Restore source'
 }
 
 export type LocalBrowseStatusState =
@@ -59,6 +59,7 @@ export type LocalBrowseStatusState =
   | 'protected'
   | 'resolutionFailed'
   | 'alreadyAdded'
+  | 'restorable'
 
 export type StatusContextInput = {
   readonly projection: BrowserProjection | undefined
@@ -190,7 +191,7 @@ function admissionField(
 ): {
   readonly admission?: StatusAdmission
 } {
-  if (localState !== 'eligible') {
+  if (localState !== 'eligible' && localState !== 'restorable') {
     return {}
   }
 
@@ -204,9 +205,11 @@ function admissionField(
     admission: {
       resolvedPath: operation.resolvedPath,
       label:
-        operation.requestKind === 'parentDirectory'
-          ? 'Add parent as music source'
-          : 'Add as music source'
+        localState === 'restorable'
+          ? 'Restore source'
+          : operation.requestKind === 'parentDirectory'
+            ? 'Add parent as music source'
+            : 'Add as music source'
     }
   }
 }
@@ -216,6 +219,10 @@ function localBrowseEntryState(
 ): LocalBrowseStatusState {
   if (entry.status === 'duplicateOfAdmittedSource') {
     return 'alreadyAdded'
+  }
+
+  if (entry.status === 'restorableSource') {
+    return 'restorable'
   }
 
   if (entry.status !== 'available' && entry.status !== 'resolving') {
@@ -236,6 +243,10 @@ function localBrowseItemState(
 ): LocalBrowseStatusState {
   if (item.status === 'duplicateOfAdmittedSource') {
     return 'alreadyAdded'
+  }
+
+  if (item.status === 'restorableSource') {
+    return 'restorable'
   }
 
   if (item.itemKind === 'rejectedRoot' || item.status === 'rejected') {

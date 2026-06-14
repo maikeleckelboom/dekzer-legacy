@@ -67,7 +67,7 @@ export type ReadLocalBrowseEntryPointsRequest = null;
 
 export type LocalBrowseEntryPointKind = "systemDriveRoot" | "localDataVolumeRoot" | "removableVolumeRoot" | "userHome" | "desktop" | "downloads" | "music";
 
-export type LocalBrowseEntryPointStatus = "resolving" | "available" | "unavailable" | "permissionBlocked" | "missing" | "unsupportedPlatform" | "duplicateOfAdmittedSource";
+export type LocalBrowseEntryPointStatus = "resolving" | "available" | "unavailable" | "permissionBlocked" | "missing" | "unsupportedPlatform" | "duplicateOfAdmittedSource" | "restorableSource";
 
 export type LocalBrowsePlatform = "windows" | "macos" | "linux" | "unsupported";
 
@@ -83,7 +83,7 @@ export type ReadLocalBrowseItemsRequest = { entryPointKind: LocalBrowseEntryPoin
 
 export type LocalBrowseItemKind = "directory" | "mediaFile" | "unsupportedFile" | "rejectedRoot" | "inaccessible" | "unknown";
 
-export type LocalBrowseItemStatus = "available" | "unavailable" | "permissionBlocked" | "missing" | "unsupportedPlatform" | "duplicateOfAdmittedSource" | "rejected" | "unknown";
+export type LocalBrowseItemStatus = "available" | "unavailable" | "permissionBlocked" | "missing" | "unsupportedPlatform" | "duplicateOfAdmittedSource" | "restorableSource" | "rejected" | "unknown";
 
 export type LocalBrowseItemMediaRelevance = "mediaRelevant" | "companionMetadata" | "unsupported" | "unknown";
 

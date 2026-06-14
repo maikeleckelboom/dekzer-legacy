@@ -19,7 +19,8 @@ import {
 } from '../libraryBrowseProfile/types'
 import {
   hasSourceMaintenanceBacklog,
-  sourceMaintenanceBacklog
+  sourceMaintenanceBacklog,
+  type SourceMaintenanceBacklog
 } from '../runtime/sourceMaintenanceSummary'
 
 export type StatusBadge =
@@ -30,10 +31,11 @@ export type StatusBadge =
   | 'No playable media in this view'
   | 'No files in this source inventory view'
   | 'Needs scan'
-  | 'Maintenance needed'
+  | 'Preparation pending'
   | 'Maintenance running'
   | 'Maintenance unavailable'
   | 'Ready to add'
+  | 'Restore source'
   | 'Choose a music folder'
   | 'Choose a specific folder'
   | 'Protected location'
@@ -46,7 +48,7 @@ export type StatusBadge =
 export type StatusAction =
   | {
       readonly kind: 'addLocalPath'
-      readonly label: 'Add as music source' | 'Add parent as music source'
+      readonly label: 'Add as music source' | 'Add parent as music source' | 'Restore source'
       readonly resolvedPath: string
       readonly enabled: boolean
       readonly reason?: string
@@ -111,6 +113,17 @@ export type StatusViewInput = {
   readonly canScan: boolean
   readonly canRemove: boolean
   readonly canRunMaintenance: boolean
+  readonly sourcePath?: string
+}
+
+export type SourceStatusDiagnosticTrace = {
+  readonly sourceId?: string
+  readonly sourcePath?: string
+  readonly duplicateStatus?: 'active' | 'restorable' | 'none'
+  readonly maintenanceSnapshotSource?: ReturnType<typeof sourceMaintenanceBacklog>['source']
+  readonly backlogCounts?: SourceMaintenanceBacklog['categories']
+  readonly backlogTotal?: number
+  readonly lastRunStatus?: SourceMaintenanceBacklog['lastRunStatus']
 }
 
 export function projectStatusView(input: StatusViewInput): StatusView {
@@ -320,10 +333,11 @@ function registeredBadge(input: StatusViewInput): StatusBadge {
   if (
     hasSourceMaintenanceBacklog({
       ...(input.sourceMaintenance === undefined ? {} : { maintenance: input.sourceMaintenance }),
-      ...(input.sourceIntegrity === undefined ? {} : { integrity: input.sourceIntegrity })
+      ...(input.sourceIntegrity === undefined ? {} : { integrity: input.sourceIntegrity }),
+      ...(input.maintenanceRunState === undefined ? {} : { runState: input.maintenanceRunState })
     })
   ) {
-    return 'Maintenance needed'
+    return 'Preparation pending'
   }
 
   if (sourceReadinessBadge !== undefined) {
@@ -386,17 +400,14 @@ function maintenanceSummary(input: StatusViewInput): string | undefined {
   const maintenance = input.sourceMaintenance
   const backlog = sourceMaintenanceBacklog({
     ...(maintenance === undefined ? {} : { maintenance }),
-    ...(input.sourceIntegrity === undefined ? {} : { integrity: input.sourceIntegrity })
+    ...(input.sourceIntegrity === undefined ? {} : { integrity: input.sourceIntegrity }),
+    ...(input.maintenanceRunState === undefined ? {} : { runState: input.maintenanceRunState })
   })
   if (backlog.total > 0) {
     const categories = backlog.categories
       .map((category) => `${category.label} ${category.count}`)
       .join(', ')
-    const prefix =
-      input.maintenanceRunState === 'completed' ||
-      input.sourceMaintenance?.lastRun?.status === 'completed'
-        ? 'Maintenance completed; pending work remains'
-        : 'Pending work'
+    const prefix = maintenanceBacklogPrefix(backlog)
     const batchDetail = 'Run maintenance processes a bounded batch.'
 
     if (categories.length > 0) {
@@ -407,6 +418,19 @@ function maintenanceSummary(input: StatusViewInput): string | undefined {
   }
 
   return undefined
+}
+
+function maintenanceBacklogPrefix(backlog: SourceMaintenanceBacklog): string {
+  switch (backlog.source) {
+    case 'runResult':
+      return 'Maintenance completed; pending work remains'
+    case 'integrityFallback':
+      return 'Preparation pending from integrity fallback'
+    case 'maintenance':
+      return 'Preparation pending'
+    case 'unavailable':
+      return 'Preparation status unavailable'
+  }
 }
 
 function healthSummary(
@@ -534,9 +558,10 @@ function toneForBadge(badge: StatusBadge): StatusView['tone'] {
     case 'Still indexing':
       return 'active'
     case 'Needs scan':
-    case 'Maintenance needed':
+    case 'Preparation pending':
     case 'Maintenance unavailable':
     case 'Ready to add':
+    case 'Restore source':
     case 'Choose a music folder':
     case 'Choose a specific folder':
     case 'Protected location':
@@ -555,6 +580,39 @@ function toneForBadge(badge: StatusBadge): StatusView['tone'] {
   }
 }
 
+export function sourceStatusDiagnosticTrace(input: StatusViewInput): SourceStatusDiagnosticTrace {
+  const backlog = sourceMaintenanceBacklog({
+    ...(input.sourceMaintenance === undefined ? {} : { maintenance: input.sourceMaintenance }),
+    ...(input.sourceIntegrity === undefined ? {} : { integrity: input.sourceIntegrity }),
+    ...(input.maintenanceRunState === undefined ? {} : { runState: input.maintenanceRunState })
+  })
+  const context = input.context
+  const sourceId =
+    'sourceId' in context
+      ? context.sourceId
+      : context.kind === 'localBrowse'
+        ? context.matchedSourceId
+        : undefined
+  const duplicateStatus =
+    context.kind === 'localBrowse'
+      ? context.localState === 'alreadyAdded'
+        ? 'active'
+        : context.localState === 'restorable'
+          ? 'restorable'
+          : 'none'
+      : undefined
+
+  return {
+    ...(sourceId === undefined ? {} : { sourceId }),
+    ...(input.sourcePath === undefined ? {} : { sourcePath: input.sourcePath }),
+    ...(duplicateStatus === undefined ? {} : { duplicateStatus }),
+    maintenanceSnapshotSource: backlog.source,
+    backlogCounts: backlog.categories,
+    backlogTotal: backlog.total,
+    ...(backlog.lastRunStatus === undefined ? {} : { lastRunStatus: backlog.lastRunStatus })
+  }
+}
+
 function localBrowseBadge(
   state: Extract<StatusContext, { readonly kind: 'localBrowse' }>['localState']
 ): StatusBadge | undefined {
@@ -565,6 +623,7 @@ function localBrowseTone(badge: StatusBadge | undefined): StatusView['tone'] {
   switch (badge) {
     case undefined:
     case 'Ready to add':
+    case 'Restore source':
     case 'Choose a music folder':
       return 'muted'
     case 'Already added':

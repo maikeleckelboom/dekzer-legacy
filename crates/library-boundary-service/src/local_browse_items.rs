@@ -12,11 +12,23 @@ use crate::local_browse_entry_points::{
 
 const LOCAL_BROWSE_ITEM_LIMIT_MAX: usize = 200;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct LocalBrowseSourceAdmission {
+    pub(crate) source_id: i64,
+    pub(crate) status: LocalBrowseSourceAdmissionStatus,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LocalBrowseSourceAdmissionStatus {
+    Active,
+    Restorable,
+}
+
 pub(crate) trait LocalBrowseItemReader: Send + Sync {
     fn read_items(
         &self,
         request: protocol::ReadLocalBrowseItemsRequest,
-        admitted_source_ids_by_path_key: &HashMap<String, i64>,
+        source_admissions_by_path_key: &HashMap<String, LocalBrowseSourceAdmission>,
     ) -> protocol::ProtocolResult<protocol::ReadLocalBrowseItemsReply>;
 }
 
@@ -30,13 +42,13 @@ impl LocalBrowseItemReader for PlatformLocalBrowseItemReader {
     fn read_items(
         &self,
         request: protocol::ReadLocalBrowseItemsRequest,
-        admitted_source_ids_by_path_key: &HashMap<String, i64>,
+        source_admissions_by_path_key: &HashMap<String, LocalBrowseSourceAdmission>,
     ) -> protocol::ProtocolResult<protocol::ReadLocalBrowseItemsReply> {
         validate_common_request(&request)?;
 
         #[cfg(not(windows))]
         {
-            let _ = admitted_source_ids_by_path_key;
+            let _ = source_admissions_by_path_key;
             Ok(failure_reply(
                 &request,
                 protocol::LocalBrowseItemsReadStatus::UnsupportedPlatform,
@@ -47,7 +59,7 @@ impl LocalBrowseItemReader for PlatformLocalBrowseItemReader {
 
         #[cfg(windows)]
         {
-            read_windows_items(request, admitted_source_ids_by_path_key)
+            read_windows_items(request, source_admissions_by_path_key)
         }
     }
 }
@@ -78,7 +90,7 @@ fn validate_common_request(
 #[cfg(windows)]
 fn read_windows_items(
     request: protocol::ReadLocalBrowseItemsRequest,
-    admitted_source_ids_by_path_key: &HashMap<String, i64>,
+    source_admissions_by_path_key: &HashMap<String, LocalBrowseSourceAdmission>,
 ) -> protocol::ProtocolResult<protocol::ReadLocalBrowseItemsReply> {
     let root_path = PathBuf::from(&request.resolved_root_path);
     let parent_path = PathBuf::from(&request.resolved_parent_path);
@@ -193,7 +205,7 @@ fn read_windows_items(
         .into_iter()
         .skip(request.offset)
         .take(request.limit)
-        .map(|key| item_for_key(&request, key, admitted_source_ids_by_path_key))
+        .map(|key| item_for_key(&request, key, source_admissions_by_path_key))
         .collect::<Vec<_>>();
 
     let status = if enumeration_failure || key_failure {
@@ -388,19 +400,24 @@ fn inaccessible_key(
 fn item_for_key(
     request: &protocol::ReadLocalBrowseItemsRequest,
     key: LocalBrowseItemKey,
-    admitted_source_ids_by_path_key: &HashMap<String, i64>,
+    source_admissions_by_path_key: &HashMap<String, LocalBrowseSourceAdmission>,
 ) -> protocol::LocalBrowseItem {
-    let matched_source_id = if key.item_kind == protocol::LocalBrowseItemKind::RejectedRoot {
+    let matched_admission = if key.item_kind == protocol::LocalBrowseItemKind::RejectedRoot {
         None
     } else {
-        admitted_source_ids_by_path_key.get(&key.path_key).copied()
+        source_admissions_by_path_key.get(&key.path_key).copied()
     };
-    let duplicate = matched_source_id.is_some();
-    let status = if duplicate {
-        protocol::LocalBrowseItemStatus::DuplicateOfAdmittedSource
-    } else {
-        key.status
-    };
+    let matched_source_id = matched_admission.map(|admission| admission.source_id);
+    let status = matched_admission
+        .map(|admission| match admission.status {
+            LocalBrowseSourceAdmissionStatus::Active => {
+                protocol::LocalBrowseItemStatus::DuplicateOfAdmittedSource
+            }
+            LocalBrowseSourceAdmissionStatus::Restorable => {
+                protocol::LocalBrowseItemStatus::RestorableSource
+            }
+        })
+        .unwrap_or(key.status);
     let available_operations = available_operations_for_item(request, &key, status);
 
     protocol::LocalBrowseItem {
@@ -445,6 +462,17 @@ fn available_operations_for_item(
         ) => vec![
             protocol::LocalBrowseOperation::BrowseChildren,
             protocol::LocalBrowseOperation::ChooseDescendant,
+        ],
+        (
+            protocol::LocalBrowseItemKind::Directory,
+            protocol::LocalBrowseItemStatus::RestorableSource,
+        ) => vec![
+            protocol::LocalBrowseOperation::BrowseChildren,
+            protocol::LocalBrowseOperation::ChooseDescendant,
+            protocol::LocalBrowseOperation::RequestSourceAdmission {
+                request_kind: protocol::LocalBrowseSourceAdmissionRequestKind::SelectedDirectory,
+                resolved_path: key.path.to_string_lossy().into_owned(),
+            },
         ],
         (protocol::LocalBrowseItemKind::MediaFile, protocol::LocalBrowseItemStatus::Available)
             if key.parent_admission_available =>

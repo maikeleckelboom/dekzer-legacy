@@ -204,6 +204,53 @@ describe('createLocalBrowseController', () => {
 
     expect(controller.itemStates.value.size).toBe(0)
   })
+
+  it('ignores stale in-flight item reads after item windows are cleared', async () => {
+    const pendingRead =
+      deferred<Awaited<ReturnType<LocalBrowseReadApi['localBrowse']['readItems']>>>()
+    const controller = createLocalBrowseController(
+      testLocalBrowseApi({
+        readItems: vi.fn(() => pendingRead.promise)
+      })
+    )
+    controller.start()
+
+    await controller.refreshEntryPoints()
+    const projection = projectTree({
+      sourceReadStates: new Map(),
+      directoryReadStates: new Map(),
+      localBrowseEntryPointsState: controller.entryPointsState.value,
+      localBrowseItemStates: controller.itemStates.value
+    })
+    const musicNodeId = requiredNodeIdByLabel(projection, 'Music')
+    const read = controller.requestNodeChildren(musicNodeId, projection)
+
+    expect(controller.itemStates.value.size).toBe(1)
+    controller.clearItemWindows()
+    pendingRead.resolve({
+      state: 'read',
+      status: 'complete',
+      windowIdentity: {
+        entryPointKind: 'music',
+        resolvedRootPath: 'C:\\Users\\Maikel\\Music',
+        resolvedParentPath: 'C:\\Users\\Maikel\\Music'
+      },
+      offset: 0,
+      limit: 50,
+      totalItems: 1,
+      items: [
+        {
+          ...directoryItem(),
+          status: 'duplicateOfAdmittedSource',
+          matchedSourceId: '7'
+        }
+      ],
+      failure: null
+    })
+
+    await expect(read).resolves.toBe(false)
+    expect(controller.itemStates.value.size).toBe(0)
+  })
 })
 
 function testLocalBrowseApi(
@@ -313,4 +360,16 @@ function requiredNodeIdByLabel(projection: BrowserProjection, label: string): st
   }
 
   throw new Error(`Expected node labelled ${label}.`)
+}
+
+function deferred<T>(): { readonly promise: Promise<T>; readonly resolve: (value: T) => void } {
+  let resolveDeferred: (value: T) => void = () => undefined
+  const promise = new Promise<T>((resolve) => {
+    resolveDeferred = resolve
+  })
+
+  return {
+    promise,
+    resolve: resolveDeferred
+  }
 }

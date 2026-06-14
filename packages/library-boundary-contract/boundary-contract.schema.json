@@ -2185,7 +2185,8 @@
         "permissionBlocked",
         "missing",
         "unsupportedPlatform",
-        "duplicateOfAdmittedSource"
+        "duplicateOfAdmittedSource",
+        "restorableSource"
       ]
     },
     "LocalBrowseEntryPointsReadStatus": {
@@ -2355,6 +2356,7 @@
         "missing",
         "unsupportedPlatform",
         "duplicateOfAdmittedSource",
+        "restorableSource",
         "rejected",
         "unknown"
       ]

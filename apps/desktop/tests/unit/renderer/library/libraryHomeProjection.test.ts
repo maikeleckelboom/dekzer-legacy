@@ -198,8 +198,8 @@ describe('Library home projection', () => {
     expect(projection.productState).toBe('maintenanceNeeded')
     expect(projection.rows).toEqual([
       expect.objectContaining({
-        label: 'Maintenance needed',
-        detail: 'Run maintenance to finish preparing music.'
+        label: 'Preparation pending',
+        detail: 'Preparation pending. Run maintenance processes a bounded batch.'
       })
     ])
   })

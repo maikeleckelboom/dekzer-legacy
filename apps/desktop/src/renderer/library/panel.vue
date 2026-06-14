@@ -55,7 +55,11 @@ import {
 import { projectLibraryToolbar } from './runtime/toolbarProjection'
 import { projectSourceReadinessByNodeId } from './runtime/sourceReadiness'
 import { projectStatusContext } from './sourceStatus/context'
-import { projectStatusView, type StatusAction } from './sourceStatus/projection'
+import {
+  projectStatusView,
+  sourceStatusDiagnosticTrace,
+  type StatusAction
+} from './sourceStatus/projection'
 import type { BrowserState, RowBinding } from './state'
 import { createViewStateStore } from './runtime/viewState'
 import { projectState } from './tree/projection'
@@ -332,6 +336,21 @@ const selectedStatusSourceId = computed(() => {
   return 'sourceId' in context ? context.sourceId : undefined
 })
 
+const selectedStatusSourcePath = computed(() => {
+  const context = sourceStatusContext.value
+  if (context.kind === 'localBrowse') {
+    return context.detail
+  }
+
+  const sourceId = selectedStatusSourceId.value
+  const rootsState = rootActions.localRootsReadState.value
+  if (sourceId === undefined || rootsState.kind !== 'ready') {
+    return undefined
+  }
+
+  return rootsState.roots.find((root) => root.rootId === sourceId)?.admittedRootPath
+})
+
 const sourceStatusSourceIds = computed(() => {
   const sourceIds = new Set(sourceLifecycleSourceIds.value)
   const selectedSourceId = selectedStatusSourceId.value
@@ -371,6 +390,9 @@ const sourceStatusView = computed(() => {
     ...(sourceMaintenance === undefined ? {} : { sourceMaintenance }),
     ...(maintenanceRunState === undefined ? {} : { maintenanceRunState }),
     ...(sourceReadiness === undefined ? {} : { sourceReadiness }),
+    ...(selectedStatusSourcePath.value === undefined
+      ? {}
+      : { sourcePath: selectedStatusSourcePath.value }),
     canAddLocalPath: rootLifecycle.canAddMusicFolder.value,
     scanStatus: rootActions.scanStatus.value,
     removeSourceStatus: rootActions.removeSourceStatus.value,
@@ -380,6 +402,50 @@ const sourceStatusView = computed(() => {
     canRunMaintenance: sourceId !== undefined
   })
 })
+
+watch(
+  [
+    sourceStatusContext,
+    selectedStatusSourcePath,
+    () => integrityRead.snapshotBySourceId.value,
+    () => maintenanceRead.snapshotBySourceId.value,
+    () => maintenanceRead.runStateBySourceId.value
+  ],
+  () => {
+    if (!import.meta.env.DEV) {
+      return
+    }
+
+    const context = sourceStatusContext.value
+    const sourceId = selectedStatusSourceId.value
+    const sourceIntegrity =
+      sourceId === undefined ? undefined : integrityRead.snapshotBySourceId.value.get(sourceId)
+    const sourceMaintenance =
+      sourceId === undefined ? undefined : maintenanceRead.snapshotBySourceId.value.get(sourceId)
+    const maintenanceRunState =
+      sourceId === undefined ? undefined : maintenanceRead.runStateBySourceId.value.get(sourceId)
+
+    console.debug(
+      '[dekzer:library:source-status]',
+      sourceStatusDiagnosticTrace({
+        context,
+        ...(sourceIntegrity === undefined ? {} : { sourceIntegrity }),
+        ...(sourceMaintenance === undefined ? {} : { sourceMaintenance }),
+        ...(maintenanceRunState === undefined ? {} : { maintenanceRunState }),
+        ...(selectedStatusSourcePath.value === undefined
+          ? {}
+          : { sourcePath: selectedStatusSourcePath.value }),
+        canAddLocalPath: rootLifecycle.canAddMusicFolder.value,
+        scanStatus: rootActions.scanStatus.value,
+        removeSourceStatus: rootActions.removeSourceStatus.value,
+        refreshStatus: rootLifecycle.refreshStatus.value,
+        canScan: sourceId !== undefined && rootLifecycle.canScanSourceRoot(sourceId),
+        canRemove: sourceId !== undefined && rootActions.canUnregisterLocalRootId(sourceId),
+        canRunMaintenance: sourceId !== undefined
+      })
+    )
+  }
+)
 
 const sourceAdmissionHandoffView = computed(() =>
   projectSourceAdmissionHandoff({

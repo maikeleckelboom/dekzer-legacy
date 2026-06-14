@@ -15,6 +15,7 @@ export type LocalBrowseEntryPointStatus =
   | 'missing'
   | 'unsupportedPlatform'
   | 'duplicateOfAdmittedSource'
+  | 'restorableSource'
 
 export type LocalBrowsePlatform = 'windows' | 'macos' | 'linux' | 'unsupported'
 

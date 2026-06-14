@@ -10,7 +10,7 @@ import {
   defaultLibraryBrowseProfile,
   type LibraryBrowseProfile
 } from '../libraryBrowseProfile/types'
-import { hasSourceMaintenanceBacklog } from '../runtime/sourceMaintenanceSummary'
+import { sourceMaintenanceBacklog } from '../runtime/sourceMaintenanceSummary'
 
 export type LibraryHomeProductState =
   | 'noSources'
@@ -54,7 +54,7 @@ export type LibrarySourceReadinessBadge =
   | 'Missing'
   | 'Blocked'
   | 'Offline/unavailable'
-  | 'Maintenance needed'
+  | 'Preparation pending'
   | 'No audio tracks in this view'
   | 'No playable media in this view'
   | 'No files in this source inventory view'
@@ -249,21 +249,35 @@ function projectLibraryHomeRootReadiness(input: {
     return summary
   }
 
-  if (
-    hasSourceMaintenanceBacklog({
-      ...(input.sourceMaintenance === undefined ? {} : { maintenance: input.sourceMaintenance }),
-      ...(input.sourceIntegrity === undefined ? {} : { integrity: input.sourceIntegrity })
-    })
-  ) {
+  const backlog = sourceMaintenanceBacklog({
+    ...(input.sourceMaintenance === undefined ? {} : { maintenance: input.sourceMaintenance }),
+    ...(input.sourceIntegrity === undefined ? {} : { integrity: input.sourceIntegrity })
+  })
+  if (backlog.total > 0) {
     return {
       productState: 'maintenanceNeeded',
-      badge: 'Maintenance needed',
+      badge: 'Preparation pending',
       tone: 'warning',
-      detail: 'Run maintenance to finish preparing music.'
+      detail: `${libraryHomeMaintenancePrefix(backlog.source)}. Run maintenance processes a bounded batch.`
     }
   }
 
   return summary
+}
+
+function libraryHomeMaintenancePrefix(
+  source: ReturnType<typeof sourceMaintenanceBacklog>['source']
+): string {
+  switch (source) {
+    case 'maintenance':
+      return 'Preparation pending'
+    case 'integrityFallback':
+      return 'Preparation pending from integrity fallback'
+    case 'runResult':
+      return 'Maintenance completed; pending work remains'
+    case 'unavailable':
+      return 'Preparation status unavailable'
+  }
 }
 
 export function libraryBrowseEmptyStateLabel(profile: LibraryBrowseProfile): string {
@@ -354,8 +368,8 @@ function dominantLibraryHomeState(
   if (summaries.some((summary) => summary.productState === 'maintenanceNeeded')) {
     return {
       productState: 'maintenanceNeeded',
-      title: 'Library needs maintenance',
-      detail: 'Run maintenance to finish preparing music.'
+      title: 'Library preparation pending',
+      detail: 'Run maintenance processes a bounded batch.'
     }
   }
 
@@ -428,7 +442,7 @@ function sourceSummaryDetail(summary: LibrarySourceReadinessProjection): string 
     case 'emptyCurrentView':
       return summary.detail
     case 'maintenanceNeeded':
-      return 'Run maintenance to finish preparing music.'
+      return summary.detail
     case 'noSources':
     case 'chooseSource':
       return summary.detail

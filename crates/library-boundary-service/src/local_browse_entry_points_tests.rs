@@ -196,6 +196,17 @@ fn expect_register_local_root_reply(
     }
 }
 
+fn expect_unregister_local_root_reply(
+    reply: protocol::CommandReply,
+) -> protocol::UnregisterLocalRootReply {
+    match reply {
+        protocol::CommandReply::LibraryRoots(protocol::LibraryRootReply::UnregisterLocalRoot(
+            reply,
+        )) => reply,
+        other => panic!("expected unregister local root reply, got {other:?}"),
+    }
+}
+
 fn expect_local_browse_entry_points_reply(
     reply: protocol::CommandReply,
 ) -> protocol::ReadLocalBrowseEntryPointsReply {
@@ -231,6 +242,15 @@ fn register_local_root(
         protocol::RegisterLocalRootReply::Registered(root) => root,
         other => panic!("expected registered local root reply, got {other:?}"),
     }
+}
+
+fn unregister_local_root(service: &LibraryBoundaryService, root_id: i64) {
+    let reply = expect_unregister_local_root_reply(expect_success(service.handle_command(
+        protocol::CommandRequest::LibraryRoots(protocol::LibraryRootCommand::UnregisterLocalRoot(
+            protocol::UnregisterLocalRootRequest { root_id },
+        )),
+    )));
+    assert!(reply.unregistered);
 }
 
 fn has_browse_children_operation(operations: &[protocol::LocalBrowseOperation]) -> bool {
@@ -449,6 +469,51 @@ fn local_browse_entry_points_exact_admitted_source_match_is_duplicate_entry() {
         application_table_row_counts(&context),
         before_counts,
         "duplicate entry point read must not mutate any durable application table"
+    );
+}
+
+#[test]
+fn local_browse_entry_points_removed_source_match_is_restorable_entry() {
+    let fixture_tempdir = TempDir::new().expect("create fixture paths");
+    let source_root = fixture_tempdir.path().join("Music");
+    std::fs::create_dir_all(&source_root).expect("create source root");
+
+    let (_tempdir, context, service) =
+        open_service_with_fake_local_browse_entries(fake_local_browse_resolution(vec![
+            fake_local_browse_entry(
+                protocol::LocalBrowseEntryPointKind::Music,
+                source_root.clone(),
+                "Music",
+                protocol::LocalBrowseEntryPointStatus::Available,
+            ),
+        ]));
+    let registered = register_local_root(&service, source_root.to_string_lossy().into_owned());
+    unregister_local_root(&service, registered.root_id);
+    let before_counts = application_table_row_counts(&context);
+
+    let reply = read_local_browse_entry_points(&service);
+
+    assert_eq!(reply.entries.len(), 1);
+    assert_eq!(
+        reply.entries[0].status,
+        protocol::LocalBrowseEntryPointStatus::RestorableSource
+    );
+    assert_eq!(reply.entries[0].matched_source_id, Some(registered.root_id));
+    assert!(has_source_admission_operation(
+        &reply.entries[0].available_operations
+    ));
+    assert_eq!(
+        application_table_row_counts(&context),
+        before_counts,
+        "restorable entry point read must not mutate any durable application table"
+    );
+
+    let restored = register_local_root(&service, source_root.to_string_lossy().into_owned());
+    assert_eq!(restored.root_id, registered.root_id);
+    let active_reply = read_local_browse_entry_points(&service);
+    assert_eq!(
+        active_reply.entries[0].status,
+        protocol::LocalBrowseEntryPointStatus::DuplicateOfAdmittedSource
     );
 }
 

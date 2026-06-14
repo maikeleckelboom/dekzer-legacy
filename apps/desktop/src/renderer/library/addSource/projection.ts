@@ -21,6 +21,7 @@ export type AddSourceProductState =
   | 'suggestionsReady'
   | 'selectedFolderPreview'
   | 'alreadyAdded'
+  | 'restoreSource'
   | 'protectedOrBlocked'
   | 'tooBroad'
   | 'notUseful'
@@ -65,7 +66,7 @@ export type AddSourceAction =
         LocalBrowseOperation,
         { readonly kind: 'requestSourceAdmission' }
       >['requestKind']
-      readonly label: 'Add as music source' | 'Add parent as music source'
+      readonly label: 'Add as music source' | 'Add parent as music source' | 'Restore source'
     }
 
 export type AddSourceRow = {
@@ -91,6 +92,7 @@ export type AddSourceProjection = {
 export type AddSourceStatusText = {
   readonly badge?:
     | 'Ready to add'
+    | 'Restore source'
     | 'Already added'
     | 'Choose a specific folder'
     | 'Protected location'
@@ -182,6 +184,7 @@ export function projectAddSourceStatusText(input: {
     | 'protected'
     | 'resolutionFailed'
     | 'alreadyAdded'
+    | 'restorable'
   readonly detail?: string
 }): AddSourceStatusText {
   switch (input.localState) {
@@ -189,6 +192,11 @@ export function projectAddSourceStatusText(input: {
       return {
         badge: 'Ready to add',
         detail: 'This folder can be added as a managed music source.'
+      }
+    case 'restorable':
+      return {
+        badge: 'Restore source',
+        detail: 'This source was removed. Restore it to manage this folder again.'
       }
     case 'broadRoot':
       return {
@@ -483,6 +491,10 @@ function folderSelectionState(options: {
     return 'alreadyAdded'
   }
 
+  if (options.localStatus === 'restorableSource') {
+    return 'restoreSource'
+  }
+
   if (options.localStatus === 'permissionBlocked' || options.localStatus === 'rejected') {
     return 'protectedOrBlocked'
   }
@@ -508,6 +520,8 @@ function folderSelectionDetail(
   switch (state) {
     case 'alreadyAdded':
       return 'Already added as a music source.'
+    case 'restoreSource':
+      return 'This source was removed. Restore it to manage this folder again.'
     case 'tooBroad':
       return 'Choose a specific folder inside this drive.'
     case 'protectedOrBlocked':
@@ -709,6 +723,10 @@ function localBrowseItemDetail(item: LocalBrowseItem): string {
     return 'Already added as a music source.'
   }
 
+  if (item.status === 'restorableSource') {
+    return 'Source was removed. Restore it to use this folder again.'
+  }
+
   if (item.failure !== null) {
     return item.failure.detail
   }
@@ -751,7 +769,11 @@ function localBrowseTerminalLabel(item: LocalBrowseItem): string {
 }
 
 function localBrowseItemIcon(item: LocalBrowseItem): AddSourceRowIcon {
-  if (item.status !== 'available' && item.status !== 'duplicateOfAdmittedSource') {
+  if (
+    item.status !== 'available' &&
+    item.status !== 'duplicateOfAdmittedSource' &&
+    item.status !== 'restorableSource'
+  ) {
     return 'warning'
   }
 

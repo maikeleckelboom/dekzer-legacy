@@ -96,6 +96,32 @@ describe('Add Source projection', () => {
     expect(projection.detail).toBe('Already added as a music source.')
   })
 
+  it('uses boundary restorable identity for removed source paths', () => {
+    const projection = projectAddSourceProjection({
+      selectedNodeId: 'selected',
+      projection: projectionForBinding({
+        kind: 'localBrowseItem',
+        item: {
+          ...localItem([admission('selectedDirectory', 'C:/Music/Removed')]),
+          status: 'restorableSource',
+          matchedSourceId: '7'
+        },
+        target: {
+          addSourceView: 'preview',
+          entryPointKind: 'music',
+          resolvedRootPath: 'C:/Music',
+          resolvedParentPath: 'C:/Music/Removed',
+          label: 'Removed'
+        }
+      })
+    })
+
+    expect(projection.productState).toBe('restoreSource')
+    expect(projection.detail).toBe(
+      'This source was removed. Restore it to manage this folder again.'
+    )
+  })
+
   it('asks for a specific folder inside broad roots', () => {
     const projection = projectAddSourceProjection({
       selectedNodeId: 'selected',

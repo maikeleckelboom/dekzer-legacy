@@ -29,6 +29,7 @@ export type LocalBrowseItemStatus =
   | 'missing'
   | 'unsupportedPlatform'
   | 'duplicateOfAdmittedSource'
+  | 'restorableSource'
   | 'rejected'
   | 'unknown'
 

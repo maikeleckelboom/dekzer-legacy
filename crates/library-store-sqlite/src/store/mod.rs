@@ -66,7 +66,8 @@ pub use source_file_media_probe::{
     effective_media_probe_batch_limit,
 };
 pub use sources::{
-    LocalRoot, LocalRootAvailability, ReadLocalRootsResult, RegisterLocalRootInput,
+    LocalRoot, LocalRootAdmission, LocalRootAdmissionVisibility, LocalRootAvailability,
+    ReadLocalRootAdmissionsResult, ReadLocalRootsResult, RegisterLocalRootInput,
     RegisterLocalRootResult, RootNavigationWindowEstablishment,
     RootNavigationWindowEstablishmentState, SourceRegistrationProposal,
     SourceRegistrationRejection, SourceRegistrationRootClass, UnregisterLocalRootInput,

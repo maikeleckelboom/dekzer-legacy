@@ -132,6 +132,35 @@ describe('local browse tree projection', () => {
     expect(findNodeDetail(projection, 'Music')).toBe('Already added as a music source.')
   })
 
+  it('projects removed entry points as restorable instead of active duplicates', () => {
+    const projection = projectTree(
+      browserState({
+        entries: [
+          musicEntryPoint({
+            status: 'restorableSource',
+            matchedSourceId: '7',
+            availableOperations: defaultMusicEntryOperations()
+          })
+        ]
+      })
+    )
+    const binding = [...projection.bindingsById.values()].find(
+      (candidate) => candidate.kind === 'localBrowseEntryPoint'
+    )
+
+    expect(binding).toMatchObject({
+      kind: 'localBrowseEntryPoint',
+      entry: {
+        status: 'restorableSource',
+        matchedSourceId: '7',
+        availableOperations: defaultMusicEntryOperations()
+      }
+    })
+    expect(findNodeDetail(projection, 'Music')).toBe(
+      'Source was removed. Restore it to use this folder again.'
+    )
+  })
+
   it('projects local browse child row kinds without source bindings', () => {
     const rootTarget = {
       addSourceView: 'preview' as const,

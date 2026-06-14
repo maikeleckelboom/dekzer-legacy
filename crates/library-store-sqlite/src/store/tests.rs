@@ -1,8 +1,9 @@
 use super::discovery::{RootScanHierarchyObservationReason, RootScanObservation};
 use super::{
     DurableStoreBootstrapStatus, DurableStoreSchemaCompatibilityState, LocalRoot,
-    RegisterLocalRootInput, RegisterLocalRootResult, RootNavigationWindowEstablishmentState,
-    SourceRegistrationRootClass, SqliteDurableStore,
+    LocalRootAdmissionVisibility, RegisterLocalRootInput, RegisterLocalRootResult,
+    RootNavigationWindowEstablishmentState, SourceRegistrationRootClass, SqliteDurableStore,
+    UnregisterLocalRootInput,
 };
 use crate::authority::ingest::{DiscoveredFileInput, DiscoveryBatch};
 use crate::authority::roots::{
@@ -1060,6 +1061,70 @@ fn register_local_root_initializes_lifecycle_side_rows() {
         SourceAccessState::Accessible.as_str()
     );
     assert_eq!(lifecycle.scan_phase, SourceScanPhase::Idle.as_str());
+}
+
+#[test]
+fn local_root_admissions_distinguish_active_and_restorable_paths() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let db_path = tempdir.path().join("library.sqlite3");
+    let source_root = tempdir.path().join("music-root");
+    fs::create_dir_all(&source_root).expect("create source root");
+    let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
+    let registered = expect_registered_root(
+        durable_store
+            .register_local_root(RegisterLocalRootInput {
+                requested_path: source_root.clone(),
+            })
+            .expect("register local root"),
+    );
+
+    let active = durable_store
+        .read_local_root_admissions()
+        .expect("read active local root admissions");
+    assert_eq!(active.roots.len(), 1);
+    assert_eq!(active.roots[0].root_id, registered.root_id);
+    assert_eq!(
+        active.roots[0].visibility,
+        LocalRootAdmissionVisibility::Active
+    );
+
+    durable_store
+        .unregister_local_root(UnregisterLocalRootInput {
+            root_id: registered.root_id,
+        })
+        .expect("unregister local root");
+    let visible_roots = durable_store
+        .read_local_roots()
+        .expect("read visible local roots");
+    assert!(
+        visible_roots.roots.is_empty(),
+        "hidden roots must not be visible active roots"
+    );
+    let restorable = durable_store
+        .read_local_root_admissions()
+        .expect("read restorable local root admissions");
+    assert_eq!(restorable.roots.len(), 1);
+    assert_eq!(restorable.roots[0].root_id, registered.root_id);
+    assert_eq!(
+        restorable.roots[0].visibility,
+        LocalRootAdmissionVisibility::Restorable
+    );
+
+    let restored = expect_registered_root(
+        durable_store
+            .register_local_root(RegisterLocalRootInput {
+                requested_path: source_root,
+            })
+            .expect("restore local root"),
+    );
+    assert_eq!(restored.root_id, registered.root_id);
+    let active_again = durable_store
+        .read_local_root_admissions()
+        .expect("read restored local root admissions");
+    assert_eq!(
+        active_again.roots[0].visibility,
+        LocalRootAdmissionVisibility::Active
+    );
 }
 
 #[test]

@@ -249,6 +249,7 @@ pub enum LocalBrowseEntryPointStatus {
     Missing,
     UnsupportedPlatform,
     DuplicateOfAdmittedSource,
+    RestorableSource,
 }
 
 #[derive(
@@ -552,6 +553,7 @@ pub enum LocalBrowseItemStatus {
     Missing,
     UnsupportedPlatform,
     DuplicateOfAdmittedSource,
+    RestorableSource,
     Rejected,
     Unknown,
 }

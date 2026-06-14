@@ -181,6 +181,17 @@ fn expect_register_local_root_reply(
     }
 }
 
+fn expect_unregister_local_root_reply(
+    reply: protocol::CommandReply,
+) -> protocol::UnregisterLocalRootReply {
+    match reply {
+        protocol::CommandReply::LibraryRoots(protocol::LibraryRootReply::UnregisterLocalRoot(
+            reply,
+        )) => reply,
+        other => panic!("expected unregister local root reply, got {other:?}"),
+    }
+}
+
 fn expect_local_browse_items_reply(
     reply: protocol::CommandReply,
 ) -> protocol::ReadLocalBrowseItemsReply {
@@ -248,6 +259,15 @@ fn register_local_root(
         protocol::RegisterLocalRootReply::Registered(root) => root,
         other => panic!("expected registered local root reply, got {other:?}"),
     }
+}
+
+fn unregister_local_root(service: &LibraryBoundaryService, root_id: i64) {
+    let reply = expect_unregister_local_root_reply(expect_success(service.handle_command(
+        protocol::CommandRequest::LibraryRoots(protocol::LibraryRootCommand::UnregisterLocalRoot(
+            protocol::UnregisterLocalRootRequest { root_id },
+        )),
+    )));
+    assert!(reply.unregistered);
 }
 
 fn item_names(reply: &protocol::ReadLocalBrowseItemsReply) -> Vec<String> {
@@ -627,6 +647,67 @@ fn exact_admitted_source_path_marks_duplicate_without_mutation() {
     assert!(!has_source_admission_operation(&item.available_operations));
     assert!(has_browse_children_operation(&item.available_operations));
     assert_eq!(application_table_row_counts(&context), before);
+}
+
+#[cfg(windows)]
+#[test]
+fn removed_admitted_source_path_marks_restorable_without_active_duplicate() {
+    let root = TempDir::new().expect("create local root");
+    let admitted = root.path().join("Admitted");
+    std::fs::create_dir(&admitted).expect("create admitted item");
+    let (_tempdir, context, service) = open_test_service_with_local_browse_root(
+        protocol::LocalBrowseEntryPointKind::Music,
+        root.path(),
+    );
+    let registered = register_local_root(&service, admitted.to_string_lossy().into_owned());
+    unregister_local_root(&service, registered.root_id);
+
+    let before = application_table_row_counts(&context);
+    let reply = read_local_browse_items(
+        &service,
+        protocol::LocalBrowseEntryPointKind::Music,
+        root.path(),
+        root.path(),
+        0,
+        20,
+    );
+    let item = reply
+        .items
+        .iter()
+        .find(|item| item.display_name == "Admitted")
+        .expect("admitted item");
+
+    assert_eq!(
+        item.status,
+        protocol::LocalBrowseItemStatus::RestorableSource
+    );
+    assert_eq!(item.matched_source_id, Some(registered.root_id));
+    assert!(has_source_admission_operation(&item.available_operations));
+    assert!(has_browse_children_operation(&item.available_operations));
+    assert_eq!(application_table_row_counts(&context), before);
+
+    let restored = register_local_root(&service, admitted.to_string_lossy().into_owned());
+    assert_eq!(restored.root_id, registered.root_id);
+    let active_reply = read_local_browse_items(
+        &service,
+        protocol::LocalBrowseEntryPointKind::Music,
+        root.path(),
+        root.path(),
+        0,
+        20,
+    );
+    let active_item = active_reply
+        .items
+        .iter()
+        .find(|item| item.display_name == "Admitted")
+        .expect("restored item");
+    assert_eq!(
+        active_item.status,
+        protocol::LocalBrowseItemStatus::DuplicateOfAdmittedSource
+    );
+    assert!(!has_source_admission_operation(
+        &active_item.available_operations
+    ));
 }
 
 #[cfg(windows)]
