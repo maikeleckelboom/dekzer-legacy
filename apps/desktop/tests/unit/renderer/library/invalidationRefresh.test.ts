@@ -626,9 +626,15 @@ describe('panel runtime wiring', () => {
 
     expect(panel).toContain('() => libraryBrowseProfile.profile.value')
     expect(panel).toContain(
+      'requestContentsForCurrentSelection({ force: true })\n    await hierarchyRead.refreshBrowserWindows(expandedLibraryNodeIds.value)'
+    )
+    expect(panel).toContain(
       'await hierarchyRead.refreshBrowserWindows(expandedLibraryNodeIds.value)'
     )
-    expect(panel).toContain('requestContentsForCurrentSelection({ force: true })')
+    expect(panel).toContain('requestContentsForCurrentSelection()\n    saveViewState()')
+    expect(panel).not.toContain(
+      'contentsRead.clear()\n    await hierarchyRead.refreshBrowserWindows(expandedLibraryNodeIds.value)'
+    )
     expect(panel).toContain('() => addSourceView.view.value')
     expect(panel).toContain('await localBrowse.refreshBrowserWindows(')
     expect(panel).toContain('expandedAddSourceNodeIds.value')

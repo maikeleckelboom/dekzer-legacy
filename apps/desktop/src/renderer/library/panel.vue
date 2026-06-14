@@ -558,9 +558,9 @@ watch(
 watch(
   () => libraryBrowseProfile.profile.value,
   async () => {
-    contentsRead.clear()
-    await hierarchyRead.refreshBrowserWindows(expandedLibraryNodeIds.value)
     requestContentsForCurrentSelection({ force: true })
+    await hierarchyRead.refreshBrowserWindows(expandedLibraryNodeIds.value)
+    requestContentsForCurrentSelection()
     saveViewState()
   }
 )

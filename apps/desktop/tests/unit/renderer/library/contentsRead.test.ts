@@ -134,7 +134,7 @@ describe('createContentsReadController', () => {
     ])
   })
 
-  it('clears accepted rows and cursor when a profile switch is pending', async () => {
+  it('retains accepted rows while an Audio to Audio + Video profile switch is pending', async () => {
     vi.useFakeTimers()
     const contentsApi = deferredContentsApi()
     const controller = createContentsReadController(contentsApi)
@@ -148,16 +148,53 @@ describe('createContentsReadController', () => {
     const switched = controller.readForBinding(directoryBinding())
 
     expect(controller.state.value).toMatchObject({
-      kind: 'idle',
+      kind: 'ready',
+      pending: {
+        requestKey: 'directory:7:11:playableMediaBrowse:recursive',
+        presentation: 'deferred'
+      }
+    })
+    expect(visibleLabels(controller.state.value)).toEqual(['A.wav'])
+
+    await vi.advanceTimersByTimeAsync(125)
+    expect(controller.state.value).toMatchObject({
+      kind: 'ready',
       pending: {
         requestKey: 'directory:7:11:playableMediaBrowse:recursive',
         presentation: 'visible'
       }
     })
+    expect(visibleLabels(controller.state.value)).toEqual(['A.wav'])
 
     contentsApi.resolveNext(readyContents(requestAt(contentsApi, 1), [contentsRow('b', 'B.mp4')]))
     await expect(switched).resolves.toBe(true)
     expect(visibleLabels(controller.state.value)).toEqual(['B.mp4'])
+  })
+
+  it('retains accepted rows while an Audio to All Files profile switch is pending', async () => {
+    const contentsApi = deferredContentsApi()
+    const controller = createContentsReadController(contentsApi)
+
+    controller.start()
+    const initial = controller.readForBinding(directoryBinding())
+    contentsApi.resolveNext(readyContents(requestAt(contentsApi, 0), [contentsRow('a', 'A.wav')]))
+    await initial
+
+    controller.setProfile('allFiles')
+    const switched = controller.readForBinding(directoryBinding())
+
+    expect(controller.state.value).toMatchObject({
+      kind: 'ready',
+      pending: {
+        requestKey: 'directory:7:11:sourceFileInventory:audio,video,image,unsupported:recursive',
+        presentation: 'deferred'
+      }
+    })
+    expect(visibleLabels(controller.state.value)).toEqual(['A.wav'])
+
+    contentsApi.resolveNext(readyContents(requestAt(contentsApi, 1), [contentsRow('b', 'B.png')]))
+    await expect(switched).resolves.toBe(true)
+    expect(visibleLabels(controller.state.value)).toEqual(['B.png'])
   })
 
   it('rejects ready responses whose echoed identity does not match the active request', async () => {
@@ -380,7 +417,7 @@ describe('createContentsReadController', () => {
     expect(visibleLabels(controller.state.value)).toEqual(['B.wav'])
   })
 
-  it('profile changes clear accepted cursor and warm snapshots', async () => {
+  it('profile changes retain accepted rows until the new policy result commits', async () => {
     vi.useFakeTimers()
     const contentsApi = deferredContentsApi()
     const controller = createContentsReadController(contentsApi)
@@ -400,10 +437,11 @@ describe('createContentsReadController', () => {
     })
 
     controller.setProfile('allFiles')
-    expect(controller.state.value).toEqual({
-      kind: 'idle',
-      detail: 'No contents scope is active.'
+    expect(controller.state.value).toMatchObject({
+      kind: 'ready',
+      nextCursor: 'cursor-a'
     })
+    expect(visibleLabels(controller.state.value)).toEqual(['A.wav'])
 
     const read = controller.readForBinding(directoryBinding())
     expect(contentsApi.requests).toHaveLength(2)
@@ -415,6 +453,8 @@ describe('createContentsReadController', () => {
     })
     contentsApi.resolveNext(readyContents(requestAt(contentsApi, 1), [contentsRow('b', 'B.png')]))
     await expect(read).resolves.toBe(true)
+    expect(visibleLabels(controller.state.value)).toEqual(['B.png'])
+    expect(controller.state.value).not.toHaveProperty('nextCursor')
   })
 
   it('late prefetch completion after force does not overwrite the refreshed warm snapshot', async () => {
@@ -467,6 +507,38 @@ describe('createContentsReadController', () => {
     contentsApi.resolveNext(readyContents(requestAt(contentsApi, 1), [contentsRow('a2', 'A2.wav')]))
     await expect(read).resolves.toBe(true)
     expect(visibleLabels(controller.state.value)).toEqual(['A2.wav'])
+  })
+
+  it('contents pagination uses the committed profile after a profile switch', async () => {
+    const contentsApi = deferredContentsApi()
+    const controller = createContentsReadController(contentsApi)
+
+    controller.start()
+    const initial = controller.readForBinding(directoryBinding())
+    contentsApi.resolveNext(readyContents(requestAt(contentsApi, 0), [contentsRow('a', 'A.wav')]))
+    await initial
+
+    controller.setProfile('allFiles')
+    const switched = controller.readForBinding(directoryBinding())
+    contentsApi.resolveNext(
+      readyContents(requestAt(contentsApi, 1), [contentsRow('b', 'B.png')], 'ready', 'cursor-b')
+    )
+    await expect(switched).resolves.toBe(true)
+
+    const loadMore = controller.readForBinding(directoryBinding(), { cursor: 'cursor-b' })
+
+    expect(contentsApi.requests).toHaveLength(3)
+    expect(contentsApi.requests[2]).toMatchObject({
+      cursor: 'cursor-b',
+      policy: {
+        kind: 'sourceFileInventory',
+        fileClasses: ['audio', 'video', 'image', 'unsupported']
+      }
+    })
+
+    contentsApi.resolveNext(readyContents(requestAt(contentsApi, 2), [contentsRow('c', 'C.cue')]))
+    await expect(loadMore).resolves.toBe(true)
+    expect(visibleLabels(controller.state.value)).toEqual(['B.png', 'C.cue'])
   })
 
   it('warm cache entries expire before selection consumes them', async () => {
@@ -883,6 +955,38 @@ describe('createContentsReadController', () => {
     })
   })
 
+  it('commits a new profile empty result instead of keeping old profile rows', async () => {
+    const contentsApi = deferredContentsApi()
+    const controller = createContentsReadController(contentsApi)
+
+    controller.start()
+    const initial = controller.readForBinding(directoryBinding())
+    contentsApi.resolveNext(readyContents(requestAt(contentsApi, 0), [contentsRow('a', 'A.wav')]))
+    await initial
+
+    controller.setProfile('allFiles')
+    const switched = controller.readForBinding(directoryBinding())
+    expect(visibleLabels(controller.state.value)).toEqual(['A.wav'])
+
+    contentsApi.resolveNext(readyContents(requestAt(contentsApi, 1), [], 'empty'))
+    await expect(switched).resolves.toBe(true)
+
+    expect(visibleLabels(controller.state.value)).toEqual([])
+    expect(controller.state.value).toMatchObject({
+      kind: 'ready',
+      result: {
+        state: 'ready',
+        result: {
+          policy: {
+            kind: 'sourceFileInventory',
+            fileClasses: ['audio', 'video', 'image', 'unsupported']
+          },
+          rows: []
+        }
+      }
+    })
+  })
+
   it('does not append stale load-more rows to a newer scope', async () => {
     const contentsApi = deferredContentsApi()
     const controller = createContentsReadController(contentsApi)
@@ -946,6 +1050,28 @@ describe('createContentsReadController', () => {
     expect(visibleLabels(controller.state.value)).toEqual(['A.wav'])
     expect(controller.state.value).toMatchObject({
       kind: 'ready',
+      refreshError: 'Unable to request library contents.'
+    })
+  })
+
+  it('retains accepted rows when a new profile read fails', async () => {
+    const contentsApi = deferredContentsApi()
+    const controller = createContentsReadController(contentsApi)
+
+    controller.start()
+    const initial = controller.readForBinding(directoryBinding())
+    contentsApi.resolveNext(readyContents(requestAt(contentsApi, 0), [contentsRow('a', 'A.wav')]))
+    await initial
+
+    controller.setProfile('playable')
+    const switched = controller.readForBinding(directoryBinding())
+    contentsApi.rejectNext(new Error('read failed'))
+
+    await expect(switched).resolves.toBe(true)
+    expect(visibleLabels(controller.state.value)).toEqual(['A.wav'])
+    expect(controller.state.value).toMatchObject({
+      kind: 'ready',
+      requestKey: 'directory:7:11:audioBrowse:recursive',
       refreshError: 'Unable to request library contents.'
     })
   })

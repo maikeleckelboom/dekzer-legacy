@@ -1126,6 +1126,9 @@ describe('projectContents', () => {
     expect(contents.kind).toBe('ready')
     expect(contents.rows.map((row) => row.label)).toEqual(['old.wav'])
     expect(contents.rows[0]).not.toMatchObject({ state: 'failed' })
+    expect(contents.detail).toBe(
+      'Showing previous contents. Unable to request library contents.'
+    )
   })
 
   it('distinguishes incomplete zero rows from complete authoritative empty', () => {
@@ -1154,24 +1157,33 @@ describe('projectContents', () => {
     })
   })
 
-  it('renders verified-empty policy copy when the cursor is exhausted', () => {
-    const contents = projectForSelection(
-      browserState({}),
-      'navigation-row:7',
-      readyContents({
-        rows: [],
-        state: 'empty',
-        profile: { kind: 'audioBrowse' },
-        emptyAuthoritative: true
-      })
-    )
+  it('renders verified-empty Library Browse profile copy when the cursor is exhausted', () => {
+    for (const [profile, expected] of [
+      [{ kind: 'audioBrowse' }, 'No audio tracks in this view.'],
+      [{ kind: 'playableMediaBrowse' }, 'No playable media in this view.'],
+      [
+        { kind: 'sourceFileInventory', fileClasses: ['audio', 'video', 'image', 'unsupported'] },
+        'No files in this source inventory view.'
+      ]
+    ] as const) {
+      const contents = projectForSelection(
+        browserState({}),
+        'navigation-row:7',
+        readyContents({
+          rows: [],
+          state: 'empty',
+          profile,
+          emptyAuthoritative: true
+        })
+      )
 
-    expect(contents.rows[0]).toMatchObject({
-      kind: 'state',
-      state: 'empty',
-      label: 'No audio tracks in this view.',
-      detail: 'No audio tracks in this view.'
-    })
+      expect(contents.rows[0]).toMatchObject({
+        kind: 'state',
+        state: 'empty',
+        label: expected,
+        detail: expected
+      })
+    }
   })
 
   it('does not verify empty when only the raw contents result carries nextCursor', () => {

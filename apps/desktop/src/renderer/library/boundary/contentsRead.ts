@@ -169,7 +169,24 @@ export function createContentsReadController(
     }
 
     profile.value = nextProfile
-    clear()
+    clearPreloadTimer()
+
+    const currentState = state.value
+    if (currentState.kind !== 'ready') {
+      clear()
+      return
+    }
+
+    clearThresholdTimer()
+    state.value = {
+      kind: 'ready',
+      requestKey: currentState.requestKey,
+      result: currentState.result,
+      ...(currentState.nextCursor === undefined ? {} : { nextCursor: currentState.nextCursor }),
+      ...(currentState.accumulatedRows === undefined
+        ? {}
+        : { accumulatedRows: currentState.accumulatedRows })
+    }
   }
 
   async function readForBinding(
