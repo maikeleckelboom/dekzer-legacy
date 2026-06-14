@@ -73,7 +73,7 @@ export function deriveSourceActionModel(input: SourceActionModelInput): SourceAc
     removeVisible,
     removeEnabled:
       removeVisible &&
-      !sourceScanBlocksSelectedRoot(input.scanStatus) &&
+      !globalScanLockActive(input.scanStatus) &&
       input.removeSourceStatus !== 'removing' &&
       input.refreshStatus !== 'refreshing',
     ...(reasonUnavailable === undefined ? {} : { reasonUnavailable })
@@ -178,7 +178,7 @@ function removeUnavailableReason(
       return 'A source scan is still running.'
     }
 
-    if (sourceScanBlocksSelectedRoot(input.scanStatus)) {
+    if (globalScanLockActive(input.scanStatus)) {
       return input.activeScanRootId === undefined
         ? 'A source scan is already running.'
         : 'Another source scan is running.'
@@ -224,7 +224,7 @@ function removeUnavailableReason(
   return undefined
 }
 
-function sourceScanBlocksSelectedRoot(scanStatus: LocalRootScanStatus): boolean {
+function globalScanLockActive(scanStatus: LocalRootScanStatus): boolean {
   return scanStatus === 'scanning'
 }
 

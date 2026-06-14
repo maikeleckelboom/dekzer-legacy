@@ -254,8 +254,13 @@ describe('source status projection', () => {
     ])
   })
 
-  it('scan running disables conflicting source actions', () => {
+  it('selected source scan running disables conflicting source actions with selected-source copy', () => {
     const view = registeredView({
+      activeSourceOperation: {
+        kind: 'scan',
+        scope: 'source',
+        sourceId: '7'
+      },
       scanStatus: 'scanning',
       sourceLifecycle: lifecycle({ scanPhase: 'scanning' }),
       sourceMaintenance: maintenance({ remainingHashCandidates: 1 })
@@ -264,7 +269,7 @@ describe('source status projection', () => {
     expect(view.badge).toBe('Indexing')
     expect(view.actions.find((action) => action.kind === 'scanSource')).toMatchObject({
       enabled: false,
-      reason: 'A scan is running.'
+      reason: 'A source scan is still running.'
     })
     expect(view.actions.find((action) => action.kind === 'runMaintenance')).toMatchObject({
       enabled: false,
@@ -299,7 +304,7 @@ describe('source status projection', () => {
         scope: 'source',
         sourceId: '8'
       },
-      scanStatus: 'idle',
+      scanStatus: 'scanning',
       sourceLifecycle: lifecycle({ scanPhase: 'complete' }),
       sourceIntegrity: integrity({ coverage: 'complete' }),
       sourceMaintenance: maintenance({ remainingHashCandidates: 1 })
@@ -313,6 +318,32 @@ describe('source status projection', () => {
     expect(view.actions.find((action) => action.kind === 'removeSource')).toMatchObject({
       enabled: false,
       reason: 'Another source scan is running.'
+    })
+    expect(view.actions.find((action) => action.kind === 'runMaintenance')).toMatchObject({
+      enabled: true
+    })
+  })
+
+  it('blocks scan and remove honestly when the active scan source is unknown', () => {
+    const view = registeredView({
+      activeSourceOperation: {
+        kind: 'scan',
+        scope: 'global'
+      },
+      scanStatus: 'scanning',
+      sourceLifecycle: lifecycle({ scanPhase: 'complete' }),
+      sourceIntegrity: integrity({ coverage: 'complete' }),
+      sourceMaintenance: maintenance({ remainingHashCandidates: 1 })
+    })
+
+    expect(view.badge).toBe('Preparation pending')
+    expect(view.actions.find((action) => action.kind === 'scanSource')).toMatchObject({
+      enabled: false,
+      reason: 'A source scan is already running.'
+    })
+    expect(view.actions.find((action) => action.kind === 'removeSource')).toMatchObject({
+      enabled: false,
+      reason: 'A source scan is already running.'
     })
     expect(view.actions.find((action) => action.kind === 'runMaintenance')).toMatchObject({
       enabled: true

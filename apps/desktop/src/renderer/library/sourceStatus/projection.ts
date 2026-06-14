@@ -254,8 +254,8 @@ function registeredStatus(
     { readonly kind: 'registeredSource' | 'registeredDirectory' | 'registeredFile' }
   >
 ): StatusView {
-  const badge = registeredBadge(input)
   const sourceId = context.sourceId
+  const badge = registeredBadge(input, sourceId)
   const inheritanceDetail =
     context.kind === 'registeredDirectory'
       ? 'Folder status follows its registered source.'
@@ -273,13 +273,16 @@ function registeredStatus(
   }
 }
 
-function registeredBadge(input: StatusViewInput): StatusBadge {
+function registeredBadge(input: StatusViewInput, sourceId: string): StatusBadge {
   const activityBadge = registeredActivityBadge(input)
   if (activityBadge !== undefined) {
     return activityBadge
   }
 
-  if (input.scanStatus === 'scanning' || input.sourceLifecycle?.scanPhase === 'scanning') {
+  if (
+    scanLockForSource(input, sourceId) === 'selectedSource' ||
+    input.sourceLifecycle?.scanPhase === 'scanning'
+  ) {
     return 'Indexing'
   }
 
@@ -593,9 +596,7 @@ function scanAction(input: StatusViewInput, sourceId: string): StatusAction | un
     return undefined
   }
 
-  const scanRunning = input.scanStatus === 'scanning'
-  const anotherScanRunning = isAnotherSourceScanRunning(input.activeSourceOperation, sourceId)
-  const globalScanRunning = isGlobalSourceOperation(input.activeSourceOperation, 'scan')
+  const scanLock = scanLockForSource(input, sourceId)
   const label: 'Scan source' | 'Rescan source' =
     input.sourceLifecycle?.lastSuccessfulScanAtMs === undefined ? 'Scan source' : 'Rescan source'
 
@@ -603,16 +604,12 @@ function scanAction(input: StatusViewInput, sourceId: string): StatusAction | un
     kind: 'scanSource',
     label,
     sourceId,
-    enabled:
-      !scanRunning &&
-      !anotherScanRunning &&
-      !globalScanRunning &&
-      input.refreshStatus !== 'refreshing',
-    ...(scanRunning
-      ? { reason: 'A scan is running.' }
-      : anotherScanRunning
+    enabled: scanLock === 'none' && input.refreshStatus !== 'refreshing',
+    ...(scanLock === 'selectedSource'
+      ? { reason: 'A source scan is still running.' }
+      : scanLock === 'anotherSource'
         ? { reason: 'Another source scan is running.' }
-        : globalScanRunning
+        : scanLock === 'unknownSource'
           ? { reason: 'A source scan is already running.' }
           : input.refreshStatus === 'refreshing'
             ? { reason: 'The library view is refreshing.' }
@@ -625,7 +622,7 @@ function maintenanceAction(input: StatusViewInput, sourceId: string): StatusActi
     return undefined
   }
 
-  const scanRunning = input.scanStatus === 'scanning'
+  const scanLock = scanLockForSource(input, sourceId)
   const maintenanceRunning =
     input.maintenanceRunState === 'running' || input.sourceMaintenance?.status === 'running'
   const maintenanceUnavailable =
@@ -637,8 +634,8 @@ function maintenanceAction(input: StatusViewInput, sourceId: string): StatusActi
     kind: 'runMaintenance',
     label: 'Run maintenance',
     sourceId,
-    enabled: !scanRunning && !maintenanceRunning && !maintenanceUnavailable,
-    ...(scanRunning
+    enabled: scanLock !== 'selectedSource' && !maintenanceRunning && !maintenanceUnavailable,
+    ...(scanLock === 'selectedSource'
       ? { reason: 'Wait for scan to finish.' }
       : maintenanceRunning
         ? { reason: 'Maintenance is running.' }
@@ -654,27 +651,20 @@ function removeAction(input: StatusViewInput, sourceId: string): StatusAction | 
   }
 
   const removing = input.removeSourceStatus === 'removing'
-  const scanRunning = input.scanStatus === 'scanning'
-  const anotherScanRunning = isAnotherSourceScanRunning(input.activeSourceOperation, sourceId)
-  const globalScanRunning = isGlobalSourceOperation(input.activeSourceOperation, 'scan')
+  const scanLock = scanLockForSource(input, sourceId)
 
   return {
     kind: 'removeSource',
     label: 'Remove source',
     sourceId,
-    enabled:
-      !removing &&
-      !scanRunning &&
-      !anotherScanRunning &&
-      !globalScanRunning &&
-      input.refreshStatus !== 'refreshing',
+    enabled: !removing && scanLock === 'none' && input.refreshStatus !== 'refreshing',
     ...(removing
       ? { reason: 'A source removal is already in progress.' }
-      : scanRunning
+      : scanLock === 'selectedSource'
         ? { reason: 'A source scan is still running.' }
-        : anotherScanRunning
+        : scanLock === 'anotherSource'
           ? { reason: 'Another source scan is running.' }
-          : globalScanRunning
+          : scanLock === 'unknownSource'
             ? { reason: 'A source scan is already running.' }
             : input.refreshStatus === 'refreshing'
               ? { reason: 'The library view is refreshing.' }
@@ -845,18 +835,18 @@ function maintenanceUnavailableReason(
   }
 }
 
-function isAnotherSourceScanRunning(
-  operation: ActiveSourceOperation | undefined,
-  sourceId: string
-): boolean {
-  return (
-    operation?.kind === 'scan' && operation.scope === 'source' && operation.sourceId !== sourceId
-  )
-}
+type SourceScanLock = 'none' | 'selectedSource' | 'anotherSource' | 'unknownSource'
 
-function isGlobalSourceOperation(
-  operation: ActiveSourceOperation | undefined,
-  kind: ActiveSourceOperation['kind']
-): boolean {
-  return operation?.kind === kind && operation.scope === 'global'
+function scanLockForSource(input: StatusViewInput, sourceId: string): SourceScanLock {
+  const operation = input.activeSourceOperation
+
+  if (operation?.kind === 'scan') {
+    if (operation.scope === 'source') {
+      return operation.sourceId === sourceId ? 'selectedSource' : 'anotherSource'
+    }
+
+    return 'unknownSource'
+  }
+
+  return input.scanStatus === 'scanning' ? 'selectedSource' : 'none'
 }
