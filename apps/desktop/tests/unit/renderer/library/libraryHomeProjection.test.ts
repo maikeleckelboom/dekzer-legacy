@@ -204,6 +204,66 @@ describe('Library home projection', () => {
     ])
   })
 
+  it('clears maintenanceNeeded when fresh maintenance has no remaining work', () => {
+    const projection = projectLibraryHome({
+      state: browserState({
+        sourceReadinessByNodeId: new Map([
+          [
+            'navigation-row:7',
+            {
+              kind: 'ready',
+              sourceNodeId: 'navigation-row:7',
+              detail: 'The source hierarchy is ready.'
+            }
+          ]
+        ])
+      }),
+      bindingsById: sourceProjection(['7']).bindingsById,
+      sourceIntegrityBySourceId: new Map([
+        [
+          '7',
+          integrity(undefined, {
+            currentLinksCount: 0,
+            staleLinksCount: 2,
+            missingLinksCount: 3,
+            sourceFilesWithCurrentBlake3ObservationsCount: 0,
+            sourceFilesWithAttachmentLinksCount: 0,
+            unmaterializedBlake3ObservationsCount: 0
+          })
+        ]
+      ]),
+      sourceMaintenanceBySourceId: new Map([['7', maintenance()]])
+    })
+
+    expect(projection.productState).toBe('ready')
+    expect(projection.rows).toEqual([
+      expect.objectContaining({
+        label: 'Ready'
+      })
+    ])
+  })
+
+  it('keeps maintenanceNeeded when current snapshots still contain remaining work', () => {
+    const projection = projectLibraryHome({
+      state: browserState({
+        sourceReadinessByNodeId: new Map([
+          [
+            'navigation-row:7',
+            {
+              kind: 'ready',
+              sourceNodeId: 'navigation-row:7',
+              detail: 'The source hierarchy is ready.'
+            }
+          ]
+        ])
+      }),
+      bindingsById: sourceProjection(['7']).bindingsById,
+      sourceIntegrityBySourceId: new Map([['7', integrity({ remainingProbeCandidates: 1 })]])
+    })
+
+    expect(projection.productState).toBe('maintenanceNeeded')
+  })
+
   it('does not let maintenance backlog beat harder source failures', () => {
     const projection = projectLibraryHome({
       state: browserState({
@@ -411,7 +471,8 @@ function maintenance(
 }
 
 function integrity(
-  overrides: Partial<ReadSourceIntegrityReply['evidenceAndMaintenance']> = {}
+  overrides: Partial<ReadSourceIntegrityReply['evidenceAndMaintenance']> = {},
+  attachmentIntegrity?: ReadSourceIntegrityReply['attachmentIntegrity']
 ): ReadSourceIntegrityReply {
   return {
     sourceId: '7',
@@ -437,6 +498,7 @@ function integrity(
       remainingTrackIdentityDecisionProductionCandidates: 0,
       ...overrides
     },
+    ...(attachmentIntegrity === undefined ? {} : { attachmentIntegrity }),
     runtimeMaintenance: {
       state: 'idle'
     }

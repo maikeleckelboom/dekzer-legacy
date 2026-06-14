@@ -20,7 +20,8 @@ describe('Add Source projection', () => {
     expect(projection.productState).toBe('suggestionsReady')
     expect(projection.surfaceLabel).toBe('Add Source')
     expect(projection.title).toBe('Add Source')
-    expect(projection.detail).toContain('Choose where your music lives')
+    expect(projection.detail).toContain('Suggested folders are shortcuts into local browse')
+    expect(projection.detail).toContain('manage it as a music source')
     expect(projection.detail).toContain('Inventory is for inspection')
     expect(projection.rows).toEqual([
       expect.objectContaining({

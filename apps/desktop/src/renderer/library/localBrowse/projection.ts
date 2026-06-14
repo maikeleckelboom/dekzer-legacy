@@ -134,7 +134,7 @@ export function projectAddSourceState(
 
 function addSourceSectionNode(
   children: BrowserTreeChildren,
-  detail = 'Suggested folders are starting points for adding a managed music source.'
+  detail = 'Suggested folders are shortcuts into local browse. Add a folder to manage it as a music source.'
 ): BrowserTreeNode {
   return {
     id: addSourceSectionNodeId,
@@ -749,9 +749,9 @@ function sourceAdmissionOperationDetail(
 
   switch (operation.requestKind) {
     case 'defaultMusicFolder':
-      return 'Ready to add.'
+      return 'Add this folder as a music source.'
     case 'selectedDirectory':
-      return 'Ready to add.'
+      return 'Add this folder as a music source.'
     case 'parentDirectory':
       return 'Parent folder can be added as a music source.'
   }

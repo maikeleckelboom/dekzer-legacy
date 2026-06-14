@@ -626,6 +626,43 @@ describe('createContentsReadController', () => {
     expect(controller.state.value).not.toHaveProperty('pending')
   })
 
+  it('can retain accumulated same-scope rows after a selected contents refresh', async () => {
+    const contentsApi = deferredContentsApi()
+    const controller = createContentsReadController(contentsApi)
+
+    controller.start()
+    const initial = controller.readForBinding(directoryBinding())
+    contentsApi.resolveNext(
+      readyContents(requestAt(contentsApi, 0), [contentsRow('a', 'A.wav')], 'ready', 'cursor-a')
+    )
+    await initial
+
+    const loadMore = controller.readForBinding(directoryBinding(), { cursor: 'cursor-a' })
+    contentsApi.resolveNext(readyContents(requestAt(contentsApi, 1), [contentsRow('b', 'B.wav')]))
+    await loadMore
+    expect(visibleLabels(controller.state.value)).toEqual(['A.wav', 'B.wav'])
+
+    const refresh = controller.readForBinding(directoryBinding(), {
+      force: true,
+      retainAccumulatedRows: true
+    })
+    contentsApi.resolveNext(
+      readyContents(
+        requestAt(contentsApi, 2),
+        [contentsRow('a', 'A refreshed.wav')],
+        'ready',
+        'cursor-a'
+      )
+    )
+    await expect(refresh).resolves.toBe(true)
+
+    expect(visibleLabels(controller.state.value)).toEqual(['A refreshed.wav', 'B.wav'])
+    expect(controller.state.value).toMatchObject({
+      kind: 'ready'
+    })
+    expect(controller.state.value).not.toHaveProperty('nextCursor')
+  })
+
   it('clears accepted rows when the selected binding disappears', async () => {
     const contentsApi = deferredContentsApi()
     const controller = createContentsReadController(contentsApi)

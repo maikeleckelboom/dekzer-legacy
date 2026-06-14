@@ -4,6 +4,7 @@ import type { Ref } from 'vue'
 import type {
   ContentsReadPolicy,
   ContentsReadResult,
+  ContentsResult,
   ContentsScopeDepth,
   ContentsFileRow
 } from '../../../shared/library/contents/read'
@@ -69,6 +70,7 @@ export type ContentsReadController = {
 type ReadOptions = {
   readonly force?: boolean
   readonly cursor?: string
+  readonly retainAccumulatedRows?: boolean
 }
 
 type LibraryContentsApi = RendererApi['library']['contents']
@@ -248,6 +250,13 @@ export function createContentsReadController(
       const previousRows = currentAcceptedRows(requestKey)
       if (isSameRequest && previousRows !== undefined && readyResult !== undefined) {
         rows = [...previousRows, ...(readyResult.rows ?? [])]
+      } else if (
+        options.retainAccumulatedRows === true &&
+        cursor === undefined &&
+        previousRows !== undefined &&
+        readyResult !== undefined
+      ) {
+        rows = retainedRefreshRows(readyResult.rows ?? [], previousRows)
       } else if (readyResult !== undefined) {
         rows = readyResult.rows ?? []
       } else {
@@ -259,7 +268,13 @@ export function createContentsReadController(
         return true
       }
 
-      const nextCursor = readyResult?.nextCursor
+      const nextCursor =
+        options.retainAccumulatedRows === true &&
+        cursor === undefined &&
+        previousRows !== undefined &&
+        rows.length > (readyResult?.rows ?? []).length
+          ? retainedRefreshCursor(currentState, readyResult)
+          : readyResult?.nextCursor
       const stateUpdate: ContentsBoundaryState = {
         kind: 'ready',
         requestKey,
@@ -488,6 +503,29 @@ export function createContentsReadController(
     }
 
     return currentState.result.state === 'ready' ? currentState.result.result.rows : undefined
+  }
+
+  function retainedRefreshRows(
+    refreshedRows: readonly ContentsFileRow[],
+    priorRows: readonly ContentsFileRow[]
+  ): readonly ContentsFileRow[] {
+    if (priorRows.length <= refreshedRows.length) {
+      return refreshedRows
+    }
+
+    const refreshedIds = new Set(refreshedRows.map((row) => row.id))
+    return [...refreshedRows, ...priorRows.filter((row) => !refreshedIds.has(row.id))]
+  }
+
+  function retainedRefreshCursor(
+    currentState: ContentsBoundaryState,
+    readyResult: ContentsResult | undefined
+  ): string | undefined {
+    if (currentState.kind === 'ready') {
+      return currentState.nextCursor
+    }
+
+    return readyResult?.nextCursor
   }
 
   function retainAcceptedSnapshot(detail: string): void {

@@ -609,6 +609,27 @@ describe('panel runtime wiring', () => {
     expect(panel).toContain('addSourceView: addSourceView.view.value')
   })
 
+  it('refreshes source status snapshots without directly resetting contents rows', () => {
+    const panel = readRendererSource('panel.vue')
+
+    expect(panel).toContain("case 'runMaintenance':")
+    expect(panel).toContain('await maintenanceRead.run(action.sourceId)')
+    expect(panel).toContain('await refreshSourceStatus(action.sourceId)')
+    expect(panel).toContain("case 'refreshStatus':")
+    expect(panel).toContain('sourceLifecycleRead.readSourceLifecycle(sourceId, { force: true })')
+    expect(panel).toContain('integrityRead.read(sourceId, { force: true })')
+    expect(panel).toContain('maintenanceRead.read(sourceId, { force: true })')
+    expect(panel).not.toContain(
+      'await refreshContentsForCurrentSelection()\n      await searchFilterRead.invalidationSignal()'
+    )
+  })
+
+  it('retains selected contents rows when refresh plans reread the same contents identity', () => {
+    const panel = readRendererSource('panel.vue')
+
+    expect(panel).toContain('retainAccumulatedRows: true')
+  })
+
   it('clears failed disclosure ledger entries from scan completion and manual retries', () => {
     const panel = readRendererSource('panel.vue')
 

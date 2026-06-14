@@ -268,7 +268,9 @@ describe('projectContents', () => {
     expect(contents.kind).toBe('notLoaded')
     expect(contents.surfaceLabel).toBe('Preview')
     expect(contents.title).toBe('Music')
-    expect(contents.detail).toContain('Inspect this folder before adding it as a music source')
+    expect(contents.detail).toContain(
+      'Inspect this folder before adding it as a managed music source'
+    )
     expect(contents.rows.map((row) => row.label)).toEqual(['Preview not loaded'])
     expect(contents.rows[0]).toMatchObject({
       state: 'notLoaded',
@@ -296,7 +298,7 @@ describe('projectContents', () => {
     expect(contents.surfaceLabel).toBe('Add Source')
     expect(contents.surfaceKind).toBe('addSource')
     expect(contents.title).toBe('Add Source')
-    expect(contents.detail).toContain('Suggested folders are starting points')
+    expect(contents.detail).toContain('Suggested folders are shortcuts into local browse')
     expect(contents.rows).toEqual([
       expect.objectContaining({
         kind: 'state',

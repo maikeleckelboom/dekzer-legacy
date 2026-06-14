@@ -13,10 +13,19 @@ export type ReadApi = Pick<RendererApi['library'], 'sourceIntegrity'>
 export type Controller = {
   readonly snapshotBySourceId: Ref<ReadonlyMap<string, ReadSourceIntegrityReply>>
   readonly readErrorsBySourceId: Ref<ReadonlyMap<string, SourceIntegrityReadError>>
-  readonly read: (sourceId: string) => Promise<boolean>
+  readonly read: (sourceId: string, options?: ReadOptions) => Promise<boolean>
   readonly refresh: (sourceIds: Iterable<string>) => Promise<boolean>
   readonly start: () => void
   readonly stop: () => void
+}
+
+type ReadOptions = {
+  readonly force?: boolean
+}
+
+type InFlightRead = {
+  readonly sequence: number
+  readonly promise: Promise<boolean>
 }
 
 export function useRead(libraryApi: ReadApi = getRendererApi().library): Controller {
@@ -36,7 +45,8 @@ export function useRead(libraryApi: ReadApi = getRendererApi().library): Control
 export function createController(libraryApi: ReadApi): Controller {
   const snapshotBySourceId = shallowRef<ReadonlyMap<string, ReadSourceIntegrityReply>>(new Map())
   const readErrorsBySourceId = shallowRef<ReadonlyMap<string, SourceIntegrityReadError>>(new Map())
-  const inFlightReadsBySourceId = new Map<string, Promise<boolean>>()
+  const inFlightReadsBySourceId = new Map<string, InFlightRead>()
+  const latestReadSequenceBySourceId = new Map<string, number>()
   let stopped = false
 
   function start(): void {
@@ -47,20 +57,23 @@ export function createController(libraryApi: ReadApi): Controller {
     stopped = true
   }
 
-  function read(sourceId: string): Promise<boolean> {
+  function read(sourceId: string, options: ReadOptions = {}): Promise<boolean> {
     const current = inFlightReadsBySourceId.get(sourceId)
-    if (current !== undefined) {
-      return current
+    if (!options.force && current !== undefined) {
+      return current.promise
     }
 
-    const nextRead = requestRead(sourceId).finally(() => {
-      inFlightReadsBySourceId.delete(sourceId)
+    const sequence = nextReadSequence(sourceId)
+    const nextRead = requestRead(sourceId, sequence).finally(() => {
+      if (inFlightReadsBySourceId.get(sourceId)?.sequence === sequence) {
+        inFlightReadsBySourceId.delete(sourceId)
+      }
     })
-    inFlightReadsBySourceId.set(sourceId, nextRead)
+    inFlightReadsBySourceId.set(sourceId, { sequence, promise: nextRead })
     return nextRead
   }
 
-  async function requestRead(sourceId: string): Promise<boolean> {
+  async function requestRead(sourceId: string, sequence: number): Promise<boolean> {
     let result: SourceIntegrityReadResult
 
     try {
@@ -75,7 +88,7 @@ export function createController(libraryApi: ReadApi): Controller {
       }
     }
 
-    if (stopped) {
+    if (stopped || !isCurrentRead(sourceId, sequence)) {
       return false
     }
 
@@ -111,6 +124,16 @@ export function createController(libraryApi: ReadApi): Controller {
     const next = new Map(readErrorsBySourceId.value)
     next.delete(sourceId)
     readErrorsBySourceId.value = next
+  }
+
+  function nextReadSequence(sourceId: string): number {
+    const sequence = (latestReadSequenceBySourceId.get(sourceId) ?? 0) + 1
+    latestReadSequenceBySourceId.set(sourceId, sequence)
+    return sequence
+  }
+
+  function isCurrentRead(sourceId: string, sequence: number): boolean {
+    return latestReadSequenceBySourceId.get(sourceId) === sequence
   }
 
   return {

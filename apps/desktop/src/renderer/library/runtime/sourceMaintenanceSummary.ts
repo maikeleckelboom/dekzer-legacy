@@ -40,7 +40,10 @@ export function sourceMaintenanceBacklog(input: {
     (maintenance?.remainingTrackIdentityDecisionProductionCandidates ??
       integrity?.evidenceAndMaintenance.remainingTrackIdentityDecisionProductionCandidates ??
       0)
-  const attachment = maintenanceAttachmentRemaining(input)
+  const attachment =
+    maintenance === undefined
+      ? integrityAttachmentRemaining(integrity)
+      : maintenanceAttachmentRemaining(maintenance)
 
   const categories = [
     { label: 'hash', count: hash },
@@ -56,18 +59,16 @@ export function sourceMaintenanceBacklog(input: {
   }
 }
 
-function maintenanceAttachmentRemaining(input: {
-  readonly maintenance?: ReadSourceMaintenanceReply
-  readonly integrity?: ReadSourceIntegrityReply
-}): number {
-  const staleLinks =
-    input.maintenance?.attachmentLinks?.staleLinksCount ??
-    input.integrity?.attachmentIntegrity?.staleLinksCount ??
-    0
-  const missingLinks =
-    input.maintenance?.attachmentLinks?.sourceFilesMissingAttachmentLinksCount ??
-    input.integrity?.attachmentIntegrity?.missingLinksCount ??
-    0
+function maintenanceAttachmentRemaining(maintenance: ReadSourceMaintenanceReply): number {
+  const staleLinks = maintenance.attachmentLinks?.staleLinksCount ?? 0
+  const missingLinks = maintenance.attachmentLinks?.sourceFilesMissingAttachmentLinksCount ?? 0
+
+  return staleLinks + missingLinks
+}
+
+function integrityAttachmentRemaining(integrity: ReadSourceIntegrityReply | undefined): number {
+  const staleLinks = integrity?.attachmentIntegrity?.staleLinksCount ?? 0
+  const missingLinks = integrity?.attachmentIntegrity?.missingLinksCount ?? 0
 
   return staleLinks + missingLinks
 }

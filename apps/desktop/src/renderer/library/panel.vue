@@ -46,6 +46,12 @@ import {
   sourceRegistrationIntent,
   type SourceRegistrationIntent
 } from './runtime/sourceActions'
+import {
+  projectSourceAdmissionHandoff,
+  sourceAdmissionHandoffFromRoot,
+  type SourceAdmissionHandoffAction,
+  type SourceAdmissionHandoffState
+} from './runtime/sourceAdmissionHandoff'
 import { projectLibraryToolbar } from './runtime/toolbarProjection'
 import { projectSourceReadinessByNodeId } from './runtime/sourceReadiness'
 import { projectStatusContext } from './sourceStatus/context'
@@ -117,6 +123,7 @@ const expandedAddSourceNodeIds = ref<ReadonlySet<BrowserTreeNodeId>>(
 const pendingLibraryRestoreIds = ref<ReadonlySet<BrowserTreeNodeId>>(new Set())
 const pendingAddSourceRestoreIds = ref<ReadonlySet<BrowserTreeNodeId>>(new Set())
 const pendingSourceRegistration = ref<SourceRegistrationIntent>()
+const sourceAdmissionHandoff = ref<SourceAdmissionHandoffState>()
 const sourceRevealRequest = ref<{
   readonly nodeId: BrowserTreeNodeId
   readonly sequence: number
@@ -171,6 +178,9 @@ const selectedLibraryBrowseProfileLabel = computed(() =>
   libraryBrowseProfileLabel(libraryBrowseProfile.profile.value)
 )
 const selectedAddSourceViewLabel = computed(() => addSourceViewLabel(addSourceView.view.value))
+const activeSurfaceTitle = computed(() =>
+  activeSurface.value === 'addSource' ? 'Add Source' : 'Library Browse'
+)
 
 const libraryBrowseProjection = computed(() => projectState(browserState.value))
 const addSourceProjection = computed(() =>
@@ -231,6 +241,7 @@ const rootLifecycle = useRootLifecycle({
     hasVisibleSourceRootBinding(libraryBrowseProjection.value, rootId),
   onSourceRegistered: (root) => {
     pendingSourceRegistration.value = sourceRegistrationIntent(root.rootId)
+    sourceAdmissionHandoff.value = sourceAdmissionHandoffFromRoot(root)
   },
   onSourceRemoved: clearBrowserView
 })
@@ -366,6 +377,18 @@ const sourceStatusView = computed(() => {
     canRunMaintenance: sourceId !== undefined
   })
 })
+
+const sourceAdmissionHandoffView = computed(() =>
+  projectSourceAdmissionHandoff({
+    ...(sourceAdmissionHandoff.value === undefined
+      ? {}
+      : { handoff: sourceAdmissionHandoff.value }),
+    ...(libraryBrowseProjection.value === undefined
+      ? {}
+      : { projection: libraryBrowseProjection.value }),
+    sourceReadinessByNodeId: sourceReadinessByNodeId.value
+  })
+)
 
 watch(scanProgressForRegisteredRoot, (progress) => {
   if (progress === undefined) {
@@ -732,9 +755,11 @@ function openLibraryBrowseSurface(): void {
   saveViewState()
 }
 
-function openAddSourceSurface(): void {
+function openAddSourceIntake(): void {
   markUserInteraction()
+  sourceAdmissionHandoff.value = undefined
   activeSurface.value = 'addSource'
+  selectedAddSourceNodeId.value = undefined
   saveViewState()
 }
 
@@ -744,7 +769,7 @@ function activateToolbarAddMusicFolder(): void {
   }
 
   if (toolbarModel.value.addMusicFolder.kind === 'openAddSource') {
-    openAddSourceSurface()
+    openAddSourceIntake()
     return
   }
 
@@ -1012,7 +1037,10 @@ function refreshContentsForCurrentSelection(): Promise<boolean> {
     return Promise.resolve(false)
   }
 
-  return contentsRead.readForBinding(projection.bindingsById.get(selectedId), { force: true })
+  return contentsRead.readForBinding(projection.bindingsById.get(selectedId), {
+    force: true,
+    retainAccumulatedRows: true
+  })
 }
 
 async function handleStatusAction(action: StatusAction): Promise<void> {
@@ -1040,8 +1068,6 @@ async function handleStatusAction(action: StatusAction): Promise<void> {
     case 'runMaintenance':
       await maintenanceRead.run(action.sourceId)
       await refreshSourceStatus(action.sourceId)
-      await refreshContentsForCurrentSelection()
-      await searchFilterRead.invalidationSignal()
       break
     case 'removeSource':
       await rootLifecycle.removeSource(action.sourceId)
@@ -1123,9 +1149,9 @@ async function refreshSelectedSourceStatus(): Promise<boolean> {
 
 async function refreshSourceStatus(sourceId: string): Promise<boolean> {
   const [lifecycle, integrity, maintenance] = await Promise.all([
-    sourceLifecycleRead.readSourceLifecycle(sourceId),
-    integrityRead.read(sourceId),
-    maintenanceRead.read(sourceId)
+    sourceLifecycleRead.readSourceLifecycle(sourceId, { force: true }),
+    integrityRead.read(sourceId, { force: true }),
+    maintenanceRead.read(sourceId, { force: true })
   ])
 
   return lifecycle && integrity && maintenance
@@ -1190,6 +1216,7 @@ function clearBrowserView(): void {
   expandedLibraryNodeIds.value = new Set()
   pendingLibraryRestoreIds.value = new Set()
   pendingSourceRegistration.value = undefined
+  sourceAdmissionHandoff.value = undefined
   sourceRevealRequest.value = undefined
   activeSurface.value = 'addSource'
 
@@ -1253,6 +1280,19 @@ function activateContentRowAction(row: ContentRow): void {
   }
 }
 
+function activateSourceAdmissionHandoffAction(action: SourceAdmissionHandoffAction): void {
+  if (!action.enabled) {
+    return
+  }
+
+  if (action.kind === 'viewSource') {
+    showAdmittedSource(action.sourceId)
+    return
+  }
+
+  openAddSourceIntake()
+}
+
 function requestContentsForCurrentSelection(options: { readonly force?: boolean } = {}): void {
   const selectedId = selectedLibraryNodeId.value
   const projection = libraryBrowseProjection.value
@@ -1275,7 +1315,7 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
   >
     <header class="flex shrink-0 items-center justify-between gap-4">
       <h2 id="library-hierarchy-title" class="text-xl font-bold leading-none text-(--color-text)">
-        Library
+        {{ activeSurfaceTitle }}
       </h2>
 
       <div class="flex flex-wrap items-center justify-end gap-2">
@@ -1440,8 +1480,10 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
       <ContentsTable
         :projection="contentsProjection"
         :status-view="sourceStatusView"
+        :source-admission-handoff="sourceAdmissionHandoffView"
         :activate-row-action="activateContentRowAction"
         :activate-status-action="handleStatusAction"
+        :activate-source-admission-handoff-action="activateSourceAdmissionHandoffAction"
       />
     </div>
   </section>

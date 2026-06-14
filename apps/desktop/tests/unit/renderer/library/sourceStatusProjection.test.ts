@@ -263,6 +263,25 @@ describe('source status projection', () => {
     expect(view.detail).not.toContain('maintenance items pending')
   })
 
+  it('clears maintenance backlog from source status when fresh maintenance has no remaining work', () => {
+    const view = registeredView({
+      sourceIntegrity: integrity({
+        attachmentIntegrity: {
+          currentLinksCount: 0,
+          staleLinksCount: 2,
+          missingLinksCount: 3,
+          sourceFilesWithCurrentBlake3ObservationsCount: 0,
+          sourceFilesWithAttachmentLinksCount: 0,
+          unmaterializedBlake3ObservationsCount: 0
+        }
+      }),
+      sourceMaintenance: maintenance()
+    })
+
+    expect(view.badge).toBe('Ready')
+    expect(view.detail).toBe('Source status is current.')
+  })
+
   it('missing, unavailable, and blocked sources project compact badges', () => {
     expect(registeredView({ sourceIntegrity: integrity({ availability: 'missing' }) }).badge).toBe(
       'Missing'
@@ -553,6 +572,7 @@ function integrity(
   options: {
     readonly availability?: ReadSourceIntegrityReply['sourceAvailability']['state']
     readonly coverage?: ReadSourceIntegrityReply['coverageIntegrity']['state']
+    readonly attachmentIntegrity?: ReadSourceIntegrityReply['attachmentIntegrity']
   } = {}
 ): ReadSourceIntegrityReply {
   return {
@@ -578,6 +598,9 @@ function integrity(
       remainingTrackIdentityCandidateProductionCandidates: 0,
       remainingTrackIdentityDecisionProductionCandidates: 0
     },
+    ...(options.attachmentIntegrity === undefined
+      ? {}
+      : { attachmentIntegrity: options.attachmentIntegrity }),
     runtimeMaintenance: {
       state: 'idle'
     }

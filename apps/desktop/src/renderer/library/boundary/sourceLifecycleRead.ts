@@ -21,10 +21,19 @@ export type SourceLifecycleReadError = {
 export type SourceLifecycleReadController = {
   readonly sourceLifecycleBySourceId: Ref<ReadonlyMap<string, SourceLifecycleRecord>>
   readonly sourceLifecycleReadErrorsBySourceId: Ref<ReadonlyMap<string, SourceLifecycleReadError>>
-  readonly readSourceLifecycle: (sourceId: string) => Promise<boolean>
+  readonly readSourceLifecycle: (sourceId: string, options?: ReadOptions) => Promise<boolean>
   readonly refreshSourceLifecycles: (sourceIds: Iterable<string>) => Promise<boolean>
   readonly start: () => void
   readonly stop: () => void
+}
+
+type ReadOptions = {
+  readonly force?: boolean
+}
+
+type InFlightRead = {
+  readonly sequence: number
+  readonly promise: Promise<boolean>
 }
 
 export function useSourceLifecycleRead(
@@ -52,7 +61,8 @@ export function createSourceLifecycleReadController(
   const sourceLifecycleReadErrorsBySourceId = shallowRef<
     ReadonlyMap<string, SourceLifecycleReadError>
   >(new Map())
-  const inFlightReadsBySourceId = new Map<string, Promise<boolean>>()
+  const inFlightReadsBySourceId = new Map<string, InFlightRead>()
+  const latestReadSequenceBySourceId = new Map<string, number>()
   let stopped = false
 
   function start(): void {
@@ -63,24 +73,27 @@ export function createSourceLifecycleReadController(
     stopped = true
   }
 
-  function readSourceLifecycle(sourceId: string): Promise<boolean> {
+  function readSourceLifecycle(sourceId: string, options: ReadOptions = {}): Promise<boolean> {
     const currentRead = inFlightReadsBySourceId.get(sourceId)
-    if (currentRead !== undefined) {
-      return currentRead
+    if (!options.force && currentRead !== undefined) {
+      return currentRead.promise
     }
 
-    const read = requestSourceLifecycle(sourceId).finally(() => {
-      inFlightReadsBySourceId.delete(sourceId)
+    const sequence = nextReadSequence(sourceId)
+    const read = requestSourceLifecycle(sourceId, sequence).finally(() => {
+      if (inFlightReadsBySourceId.get(sourceId)?.sequence === sequence) {
+        inFlightReadsBySourceId.delete(sourceId)
+      }
     })
-    inFlightReadsBySourceId.set(sourceId, read)
+    inFlightReadsBySourceId.set(sourceId, { sequence, promise: read })
     return read
   }
 
-  async function requestSourceLifecycle(sourceId: string): Promise<boolean> {
+  async function requestSourceLifecycle(sourceId: string, sequence: number): Promise<boolean> {
     try {
       const result = await libraryApi.sourceLifecycle.readSourceLifecycle({ sourceId })
 
-      if (stopped) {
+      if (stopped || !isCurrentRead(sourceId, sequence)) {
         return false
       }
 
@@ -96,7 +109,7 @@ export function createSourceLifecycleReadController(
       })
       return false
     } catch {
-      if (!stopped) {
+      if (!stopped && isCurrentRead(sourceId, sequence)) {
         setReadError(sourceId, {
           state: 'readFailed',
           error: {
@@ -141,6 +154,16 @@ export function createSourceLifecycleReadController(
     const next = new Map(sourceLifecycleReadErrorsBySourceId.value)
     next.delete(sourceId)
     sourceLifecycleReadErrorsBySourceId.value = next
+  }
+
+  function nextReadSequence(sourceId: string): number {
+    const sequence = (latestReadSequenceBySourceId.get(sourceId) ?? 0) + 1
+    latestReadSequenceBySourceId.set(sourceId, sequence)
+    return sequence
+  }
+
+  function isCurrentRead(sourceId: string, sequence: number): boolean {
+    return latestReadSequenceBySourceId.get(sourceId) === sequence
   }
 
   return {

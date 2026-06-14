@@ -53,6 +53,22 @@ describe('library browser surface containment', () => {
     expect(panel).not.toContain('Choose a specific folder inside this drive')
     expect(contents).toContain('projectAddSourceProjection')
   })
+
+  it('renders explicit workstation surfaces and source-added handoff wiring', () => {
+    const panel = readRendererSource('panel.vue')
+    const table = readRendererSource('contents/table.vue')
+
+    expect(panel).toContain('const activeSurfaceTitle = computed')
+    expect(panel).toContain("activeSurface.value === 'addSource' ? 'Add Source' : 'Library Browse'")
+    expect(panel).toContain('sourceAdmissionHandoffFromRoot(root)')
+    expect(panel).toContain('projectSourceAdmissionHandoff({')
+    expect(panel).toContain(':source-admission-handoff="sourceAdmissionHandoffView"')
+    expect(panel).toContain("action.kind === 'viewSource'")
+    expect(panel).toContain('showAdmittedSource(action.sourceId)')
+    expect(panel).toContain('openAddSourceIntake()')
+    expect(table).toContain('{{ sourceAdmissionHandoff.title }}')
+    expect(table).toContain('sourceAdmissionHandoff.actions')
+  })
 })
 
 function readRendererSource(relativePath: string): string {

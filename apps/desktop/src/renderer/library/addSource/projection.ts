@@ -247,7 +247,7 @@ function startProjection(
       surfaceKind: 'addSource',
       surfaceLabel: 'Add Source',
       title: 'Add Source',
-      detail: 'Choose where your music lives.',
+      detail: 'Add a folder to manage it as a music source.',
       rows: [
         stateRow({
           ownerId: 'add-source-suggestions',
@@ -265,7 +265,7 @@ function startProjection(
       surfaceKind: 'addSource',
       surfaceLabel: 'Add Source',
       title: 'Add Source',
-      detail: 'Choose where your music lives.',
+      detail: 'Add a folder to manage it as a music source.',
       rows: [
         stateRow({
           ownerId: 'add-source-suggestions',
@@ -290,7 +290,7 @@ function startProjection(
     surfaceLabel: 'Add Source',
     title: 'Add Source',
     detail:
-      'Choose where your music lives. Suggested folders are starting points, and Inventory is for inspection.',
+      'Suggested folders are shortcuts into local browse. Add a folder to manage it as a music source. Inventory is for inspection.',
     rows: [
       stateRow({
         ownerId: 'add-source',
@@ -298,7 +298,7 @@ function startProjection(
         label: 'Suggested folders',
         detail:
           entryPointsState?.refreshError ??
-          'Start with Music, Downloads, Desktop, Home, or use the folder picker.',
+          'Open a suggested folder, or use the folder picker to choose another location.',
         action: {
           kind: 'chooseMusicFolder',
           label: 'Add music folder'
@@ -340,7 +340,7 @@ function folderProjection(options: {
           detail:
             options.addSourceView === 'inventory'
               ? 'Load inventory to inspect local files without adding or indexing this folder.'
-              : 'Load preview to inspect this folder before adding it as a music source.',
+              : 'Load preview to inspect this folder before adding it as a managed music source.',
           action: {
             kind: 'loadLocalBrowseChildren',
             nodeId: options.targetNodeId,
@@ -517,7 +517,7 @@ function folderSelectionDetail(
     case 'inventory':
       return `Inventory is for inspection and does not add or index this folder. ${options.folderDetail}`
     default:
-      return `Inspect this folder before adding it as a music source. ${options.folderDetail}`
+      return `Inspect this folder before adding it as a managed music source. ${options.folderDetail}`
   }
 }
 

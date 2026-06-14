@@ -2,6 +2,10 @@
 import { Icon, type IconRole, type IconTone } from '../../icons'
 import { type ContentProjection, type ContentRow, type ContentRowIcon } from './projection'
 import { type StatusAction, type StatusView } from '../sourceStatus/projection'
+import {
+  type SourceAdmissionHandoffAction,
+  type SourceAdmissionHandoffProjection
+} from '../runtime/sourceAdmissionHandoff'
 
 defineOptions({
   name: 'ContentsTable'
@@ -10,8 +14,10 @@ defineOptions({
 defineProps<{
   projection: ContentProjection
   statusView?: StatusView
+  sourceAdmissionHandoff: SourceAdmissionHandoffProjection | undefined
   activateRowAction: (row: ContentRow) => void
   activateStatusAction?: (action: StatusAction) => void
+  activateSourceAdmissionHandoffAction?: (action: SourceAdmissionHandoffAction) => void
 }>()
 
 function formatContentDetail(row: ContentRow): string {
@@ -172,6 +178,15 @@ function resolveStatusActionIcon(action: StatusAction): IconRole {
       return 'state.unknown'
   }
 }
+
+function resolveHandoffActionIcon(action: SourceAdmissionHandoffAction): IconRole {
+  switch (action.kind) {
+    case 'viewSource':
+      return 'folder.plain'
+    case 'addAnotherSource':
+      return 'action.more'
+  }
+}
 </script>
 
 <template>
@@ -196,6 +211,32 @@ function resolveStatusActionIcon(action: StatusAction): IconRole {
       >
         {{ projection.detail }}
       </p>
+      <div
+        v-if="sourceAdmissionHandoff !== undefined"
+        class="mt-3 border border-(--color-border) bg-(--color-surface) px-3 py-2"
+        aria-label="Source added"
+      >
+        <div class="flex min-w-0 flex-wrap items-center gap-2">
+          <span class="text-sm font-bold text-(--color-text)">
+            {{ sourceAdmissionHandoff.title }}
+          </span>
+          <span class="min-w-0 flex-1 truncate text-xs leading-5 text-(--color-text-muted)">
+            {{ sourceAdmissionHandoff.detail }}
+            {{ sourceAdmissionHandoff.readinessDetail }}
+          </span>
+          <button
+            v-for="action in sourceAdmissionHandoff.actions"
+            :key="action.kind"
+            type="button"
+            class="inline-flex min-h-7 shrink-0 items-center justify-center gap-1.5 rounded-sm border border-(--color-border) bg-(--color-background) px-2 py-1 text-xs font-bold text-(--color-text) transition hover:border-(--color-accent) hover:text-(--color-accent) focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background) disabled:cursor-not-allowed disabled:opacity-60"
+            :disabled="!action.enabled"
+            @click="activateSourceAdmissionHandoffAction?.(action)"
+          >
+            <Icon :role="resolveHandoffActionIcon(action)" size="xs" />
+            <span>{{ action.label }}</span>
+          </button>
+        </div>
+      </div>
       <div
         v-if="statusView !== undefined && statusView.badge !== undefined"
         class="mt-2 flex min-w-0 flex-wrap items-center gap-2"
