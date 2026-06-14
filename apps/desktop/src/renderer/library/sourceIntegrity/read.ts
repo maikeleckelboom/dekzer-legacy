@@ -15,6 +15,7 @@ export type Controller = {
   readonly readErrorsBySourceId: Ref<ReadonlyMap<string, SourceIntegrityReadError>>
   readonly read: (sourceId: string, options?: ReadOptions) => Promise<boolean>
   readonly refresh: (sourceIds: Iterable<string>) => Promise<boolean>
+  readonly invalidateSource: (sourceId: string) => void
   readonly start: () => void
   readonly stop: () => void
 }
@@ -55,6 +56,16 @@ export function createController(libraryApi: ReadApi): Controller {
 
   function stop(): void {
     stopped = true
+  }
+
+  function invalidateSource(sourceId: string): void {
+    latestReadSequenceBySourceId.set(
+      sourceId,
+      (latestReadSequenceBySourceId.get(sourceId) ?? 0) + 1
+    )
+    inFlightReadsBySourceId.delete(sourceId)
+    deleteSnapshot(sourceId)
+    clearReadError(sourceId)
   }
 
   function read(sourceId: string, options: ReadOptions = {}): Promise<boolean> {
@@ -126,6 +137,16 @@ export function createController(libraryApi: ReadApi): Controller {
     readErrorsBySourceId.value = next
   }
 
+  function deleteSnapshot(sourceId: string): void {
+    if (!snapshotBySourceId.value.has(sourceId)) {
+      return
+    }
+
+    const next = new Map(snapshotBySourceId.value)
+    next.delete(sourceId)
+    snapshotBySourceId.value = next
+  }
+
   function nextReadSequence(sourceId: string): number {
     const sequence = (latestReadSequenceBySourceId.get(sourceId) ?? 0) + 1
     latestReadSequenceBySourceId.set(sourceId, sequence)
@@ -141,6 +162,7 @@ export function createController(libraryApi: ReadApi): Controller {
     readErrorsBySourceId,
     read,
     refresh,
+    invalidateSource,
     start,
     stop
   }

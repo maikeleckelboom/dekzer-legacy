@@ -62,6 +62,7 @@ import {
 import { projectLibraryToolbar } from './runtime/toolbarProjection'
 import { projectSourceActivityBySourceId } from './runtime/sourceActivity'
 import { projectSourceReadinessByNodeId } from './runtime/sourceReadiness'
+import { invalidateSourceStatus as invalidateSourceStatusReaders } from './runtime/sourceStatusInvalidation'
 import { projectStatusContext } from './sourceStatus/context'
 import {
   projectStatusView,
@@ -282,6 +283,7 @@ const rootLifecycle = useRootLifecycle({
   confirmRemoveSource: () => window.confirm(removeSourceMessage),
   isSourceRootVisible: (rootId) =>
     hasVisibleSourceRootBinding(libraryBrowseProjection.value, rootId),
+  invalidateSourceStatus,
   onSourceRegistered: (root) => {
     pendingSourceRegistration.value = sourceRegistrationIntent(root.rootId)
     sourceAdmissionHandoff.value = sourceAdmissionHandoffFromRoot(root)
@@ -1264,6 +1266,18 @@ async function refreshSourceStatus(sourceId: string): Promise<boolean> {
   ])
 
   return lifecycle && integrity && maintenance && activity
+}
+
+function invalidateSourceStatus(sourceId: string): void {
+  invalidateSourceStatusReaders(
+    {
+      sourceLifecycleRead,
+      integrityRead,
+      maintenanceRead,
+      activityRead
+    },
+    sourceId
+  )
 }
 
 function scheduleRunningMaintenanceRefresh(): void {

@@ -28,6 +28,7 @@ export type RootLifecycleDependencies = {
   readonly localBrowseRead?: Pick<LocalBrowseController, 'clearItemWindows' | 'refreshEntryPoints'>
   readonly confirmRemoveSource: () => boolean
   readonly isSourceRootVisible: (rootId: string) => boolean
+  readonly invalidateSourceStatus?: (rootId: string) => void
   readonly onSourceRegistered?: (root: LocalRootRegistrationRoot) => void
   readonly onSourceRemoved?: (rootId: string) => void
 }
@@ -95,6 +96,7 @@ export function createRootLifecycleController(
 
     const registeredRoot = dependencies.rootActions.registeredRoot.value
     if (registeredRoot !== undefined) {
+      dependencies.invalidateSourceStatus?.(registeredRoot.rootId)
       dependencies.onSourceRegistered?.(registeredRoot)
     }
 
@@ -168,6 +170,7 @@ export function createRootLifecycleController(
       return false
     }
 
+    dependencies.invalidateSourceStatus?.(rootIdToRemove)
     dependencies.onSourceRemoved?.(rootIdToRemove)
     dependencies.rootActions.completeRemoveSource(rootIdToRemove)
     return true

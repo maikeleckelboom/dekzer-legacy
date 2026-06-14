@@ -160,6 +160,40 @@ describe('local root scan lifecycle', () => {
     expect(events).toEqual(['registered:root-2', 'refresh', 'scan'])
   })
 
+  it('invalidates restored source status before registration handoff', async () => {
+    const events: string[] = []
+    const rootActions = createLocalRootActionsController(
+      testRootApi({
+        chooseAndRegisterLocal: async () =>
+          registeredChoice({ rootId: 'root-2', admittedRootPath: 'C:/Music/Two' }),
+        runScan: async () => {
+          events.push('scan')
+          return startedRootResult()
+        }
+      })
+    )
+    const lifecycle = createRootLifecycleController({
+      rootActions,
+      hierarchyRead: {
+        refresh: async () => {
+          events.push('refresh')
+          return true
+        }
+      },
+      confirmRemoveSource: () => true,
+      isSourceRootVisible: () => false,
+      invalidateSourceStatus: (rootId) => {
+        events.push(`invalidate:${rootId}`)
+      },
+      onSourceRegistered: (root) => {
+        events.push(`registered:${root.rootId}`)
+      }
+    })
+
+    await expect(lifecycle.addMusicFolder()).resolves.toBe(true)
+    expect(events).toEqual(['invalidate:root-2', 'registered:root-2', 'refresh', 'scan'])
+  })
+
   it('refreshes local browse entry points after successful registration', async () => {
     const events: string[] = []
     const rootActions = createLocalRootActionsController(
@@ -895,6 +929,38 @@ describe('local root remove lifecycle', () => {
     await expect(lifecycle.removeSource('root-1')).resolves.toBe(true)
     expect(onSourceRemoved).toHaveBeenCalledOnce()
     expect(onSourceRemoved).toHaveBeenCalledWith('root-1')
+    expect(rootActions.removeSourceStatus.value).toBe('removed')
+  })
+
+  it('invalidates removed source status before clearing removed-source projections', async () => {
+    const events: string[] = []
+    const rootActions = createLocalRootActionsController(
+      testRootApi({
+        chooseAndRegisterLocal: async () =>
+          registeredChoice({ rootId: 'root-1', admittedRootPath: 'C:/Music' }),
+        runScan: async () => startedRootResult(),
+        unregisterLocalRoot: async () => ({ state: 'unregistered', unregistered: true })
+      })
+    )
+    const lifecycle = createRootLifecycleController({
+      rootActions,
+      hierarchyRead: { refresh: async () => true },
+      confirmRemoveSource: () => true,
+      isSourceRootVisible: () => false,
+      invalidateSourceStatus: (rootId) => {
+        events.push(`invalidate:${rootId}`)
+      },
+      onSourceRemoved: (rootId) => {
+        events.push(`removed:${rootId}`)
+      }
+    })
+
+    await expect(lifecycle.addMusicFolder()).resolves.toBe(true)
+    rootActions.scanStatus.value = 'scanned'
+    events.length = 0
+
+    await expect(lifecycle.removeSource('root-1')).resolves.toBe(true)
+    expect(events).toEqual(['invalidate:root-1', 'removed:root-1'])
     expect(rootActions.removeSourceStatus.value).toBe('removed')
   })
 

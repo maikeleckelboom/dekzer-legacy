@@ -24,6 +24,7 @@ export type Controller = {
   readonly read: (sourceId: string, options?: ReadOptions) => Promise<boolean>
   readonly refresh: (sourceIds: Iterable<string>) => Promise<boolean>
   readonly run: (sourceId: string) => Promise<boolean>
+  readonly invalidateSource: (sourceId: string) => void
   readonly start: () => void
   readonly stop: () => void
 }
@@ -33,6 +34,11 @@ type ReadOptions = {
 }
 
 type InFlightRead = {
+  readonly sequence: number
+  readonly promise: Promise<boolean>
+}
+
+type InFlightRun = {
   readonly sequence: number
   readonly promise: Promise<boolean>
 }
@@ -57,8 +63,9 @@ export function createController(libraryApi: ReadApi): Controller {
   const runStateBySourceId = shallowRef<ReadonlyMap<string, RunState>>(new Map())
   const runErrorsBySourceId = shallowRef<ReadonlyMap<string, SourceMaintenanceError>>(new Map())
   const inFlightReadsBySourceId = new Map<string, InFlightRead>()
-  const inFlightRunsBySourceId = new Map<string, Promise<boolean>>()
+  const inFlightRunsBySourceId = new Map<string, InFlightRun>()
   const latestReadSequenceBySourceId = new Map<string, number>()
+  const latestRunSequenceBySourceId = new Map<string, number>()
   let stopped = false
 
   function start(): void {
@@ -67,6 +74,17 @@ export function createController(libraryApi: ReadApi): Controller {
 
   function stop(): void {
     stopped = true
+  }
+
+  function invalidateSource(sourceId: string): void {
+    invalidateReads(sourceId)
+    invalidateRuns(sourceId)
+    inFlightReadsBySourceId.delete(sourceId)
+    inFlightRunsBySourceId.delete(sourceId)
+    deleteSnapshot(sourceId)
+    clearReadError(sourceId)
+    clearRunState(sourceId)
+    clearRunError(sourceId)
   }
 
   function read(sourceId: string, options: ReadOptions = {}): Promise<boolean> {
@@ -127,17 +145,20 @@ export function createController(libraryApi: ReadApi): Controller {
   function run(sourceId: string): Promise<boolean> {
     const current = inFlightRunsBySourceId.get(sourceId)
     if (current !== undefined) {
-      return current
+      return current.promise
     }
 
-    const nextRun = requestRun(sourceId).finally(() => {
-      inFlightRunsBySourceId.delete(sourceId)
+    const sequence = nextRunSequence(sourceId)
+    const nextRun = requestRun(sourceId, sequence).finally(() => {
+      if (inFlightRunsBySourceId.get(sourceId)?.sequence === sequence) {
+        inFlightRunsBySourceId.delete(sourceId)
+      }
     })
-    inFlightRunsBySourceId.set(sourceId, nextRun)
+    inFlightRunsBySourceId.set(sourceId, { sequence, promise: nextRun })
     return nextRun
   }
 
-  async function requestRun(sourceId: string): Promise<boolean> {
+  async function requestRun(sourceId: string, sequence: number): Promise<boolean> {
     invalidateReads(sourceId)
     setRunState(sourceId, 'running')
     clearRunError(sourceId)
@@ -155,7 +176,7 @@ export function createController(libraryApi: ReadApi): Controller {
       }
     }
 
-    if (stopped) {
+    if (stopped || !isCurrentRun(sourceId, sequence)) {
       return false
     }
 
@@ -177,6 +198,16 @@ export function createController(libraryApi: ReadApi): Controller {
     snapshotBySourceId.value = next
   }
 
+  function deleteSnapshot(sourceId: string): void {
+    if (!snapshotBySourceId.value.has(sourceId)) {
+      return
+    }
+
+    const next = new Map(snapshotBySourceId.value)
+    next.delete(sourceId)
+    snapshotBySourceId.value = next
+  }
+
   function nextReadSequence(sourceId: string): number {
     const sequence = (latestReadSequenceBySourceId.get(sourceId) ?? 0) + 1
     latestReadSequenceBySourceId.set(sourceId, sequence)
@@ -190,8 +221,25 @@ export function createController(libraryApi: ReadApi): Controller {
     )
   }
 
+  function nextRunSequence(sourceId: string): number {
+    const sequence = (latestRunSequenceBySourceId.get(sourceId) ?? 0) + 1
+    latestRunSequenceBySourceId.set(sourceId, sequence)
+    return sequence
+  }
+
+  function invalidateRuns(sourceId: string): void {
+    latestRunSequenceBySourceId.set(
+      sourceId,
+      (latestRunSequenceBySourceId.get(sourceId) ?? 0) + 1
+    )
+  }
+
   function isCurrentRead(sourceId: string, sequence: number): boolean {
     return latestReadSequenceBySourceId.get(sourceId) === sequence
+  }
+
+  function isCurrentRun(sourceId: string, sequence: number): boolean {
+    return latestRunSequenceBySourceId.get(sourceId) === sequence
   }
 
   function setReadError(sourceId: string, error: SourceMaintenanceError): void {
@@ -213,6 +261,16 @@ export function createController(libraryApi: ReadApi): Controller {
   function setRunState(sourceId: string, state: RunState): void {
     const next = new Map(runStateBySourceId.value)
     next.set(sourceId, state)
+    runStateBySourceId.value = next
+  }
+
+  function clearRunState(sourceId: string): void {
+    if (!runStateBySourceId.value.has(sourceId)) {
+      return
+    }
+
+    const next = new Map(runStateBySourceId.value)
+    next.delete(sourceId)
     runStateBySourceId.value = next
   }
 
@@ -240,6 +298,7 @@ export function createController(libraryApi: ReadApi): Controller {
     read,
     refresh,
     run,
+    invalidateSource,
     start,
     stop
   }

@@ -81,6 +81,93 @@ describe('source maintenance read controller', () => {
       remainingHashCandidates: 0
     })
   })
+
+  it('invalidates one source maintenance snapshot and rejects late reads', async () => {
+    const staleRead = deferred<ReadSourceMaintenanceResult>()
+    const api = maintenanceApi({
+      readSourceMaintenance: vi
+        .fn()
+        .mockResolvedValueOnce({
+          state: 'ready',
+          snapshot: maintenanceSnapshot({ sourceId: '7', remainingHashCandidates: 2 })
+        })
+        .mockResolvedValueOnce({
+          state: 'ready',
+          snapshot: maintenanceSnapshot({ sourceId: '8', remainingHashCandidates: 4 })
+        })
+        .mockResolvedValueOnce({
+          state: 'readFailed',
+          error: { code: 'readFailed', message: 'Unable to read source maintenance.' }
+        })
+        .mockReturnValueOnce(staleRead.promise)
+        .mockResolvedValue({
+          state: 'ready',
+          snapshot: maintenanceSnapshot({ sourceId: '7', remainingHashCandidates: 0 })
+        }),
+      runSourceMaintenance: vi.fn(async () => ({
+        state: 'maintenanceFailed',
+        error: { code: 'maintenanceFailed', message: 'Unable to run source maintenance.' }
+      }))
+    })
+    const controller = createController(api)
+
+    controller.start()
+    await expect(controller.read('7')).resolves.toBe(true)
+    await expect(controller.read('8')).resolves.toBe(true)
+    await expect(controller.read('7')).resolves.toBe(false)
+    await expect(controller.run('7')).resolves.toBe(false)
+
+    const stale = controller.read('7')
+    controller.invalidateSource('7')
+
+    expect(controller.snapshotBySourceId.value.get('7')).toBeUndefined()
+    expect(controller.readErrorsBySourceId.value.get('7')).toBeUndefined()
+    expect(controller.runStateBySourceId.value.get('7')).toBeUndefined()
+    expect(controller.runErrorsBySourceId.value.get('7')).toBeUndefined()
+    expect(controller.snapshotBySourceId.value.get('8')).toMatchObject({
+      sourceId: '8',
+      remainingHashCandidates: 4
+    })
+
+    staleRead.resolve({
+      state: 'ready',
+      snapshot: maintenanceSnapshot({ sourceId: '7', remainingHashCandidates: 1 })
+    })
+
+    await expect(stale).resolves.toBe(false)
+    expect(controller.snapshotBySourceId.value.get('7')).toBeUndefined()
+
+    await expect(controller.refresh(['7'])).resolves.toBe(true)
+    expect(controller.snapshotBySourceId.value.get('7')).toMatchObject({
+      sourceId: '7',
+      remainingHashCandidates: 0
+    })
+  })
+
+  it('rejects a late in-flight maintenance run after invalidation', async () => {
+    const pendingRun = deferred<Awaited<ReturnType<ReadApi['sourceMaintenance']['runSourceMaintenance']>>>()
+    const api = maintenanceApi({
+      readSourceMaintenance: vi.fn(),
+      runSourceMaintenance: vi.fn().mockReturnValueOnce(pendingRun.promise)
+    })
+    const controller = createController(api)
+
+    controller.start()
+    const run = controller.run('7')
+    expect(controller.runStateBySourceId.value.get('7')).toBe('running')
+
+    controller.invalidateSource('7')
+    expect(controller.runStateBySourceId.value.get('7')).toBeUndefined()
+
+    pendingRun.resolve({
+      state: 'completed',
+      result: runResult({ sourceId: '7', remainingHashCandidates: 3 })
+    })
+
+    await expect(run).resolves.toBe(false)
+    expect(controller.snapshotBySourceId.value.get('7')).toBeUndefined()
+    expect(controller.runStateBySourceId.value.get('7')).toBeUndefined()
+  })
 })
 
 function maintenanceApi(overrides: ReadApi['sourceMaintenance']): ReadApi {

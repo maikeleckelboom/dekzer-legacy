@@ -23,6 +23,7 @@ export type SourceLifecycleReadController = {
   readonly sourceLifecycleReadErrorsBySourceId: Ref<ReadonlyMap<string, SourceLifecycleReadError>>
   readonly readSourceLifecycle: (sourceId: string, options?: ReadOptions) => Promise<boolean>
   readonly refreshSourceLifecycles: (sourceIds: Iterable<string>) => Promise<boolean>
+  readonly invalidateSource: (sourceId: string) => void
   readonly start: () => void
   readonly stop: () => void
 }
@@ -71,6 +72,16 @@ export function createSourceLifecycleReadController(
 
   function stop(): void {
     stopped = true
+  }
+
+  function invalidateSource(sourceId: string): void {
+    latestReadSequenceBySourceId.set(
+      sourceId,
+      (latestReadSequenceBySourceId.get(sourceId) ?? 0) + 1
+    )
+    inFlightReadsBySourceId.delete(sourceId)
+    deleteLifecycleRecord(sourceId)
+    clearReadError(sourceId)
   }
 
   function readSourceLifecycle(sourceId: string, options: ReadOptions = {}): Promise<boolean> {
@@ -140,6 +151,16 @@ export function createSourceLifecycleReadController(
     sourceLifecycleBySourceId.value = next
   }
 
+  function deleteLifecycleRecord(sourceId: string): void {
+    if (!sourceLifecycleBySourceId.value.has(sourceId)) {
+      return
+    }
+
+    const next = new Map(sourceLifecycleBySourceId.value)
+    next.delete(sourceId)
+    sourceLifecycleBySourceId.value = next
+  }
+
   function setReadError(sourceId: string, error: SourceLifecycleReadError): void {
     const next = new Map(sourceLifecycleReadErrorsBySourceId.value)
     next.set(sourceId, error)
@@ -171,6 +192,7 @@ export function createSourceLifecycleReadController(
     sourceLifecycleReadErrorsBySourceId,
     readSourceLifecycle,
     refreshSourceLifecycles,
+    invalidateSource,
     start,
     stop
   }

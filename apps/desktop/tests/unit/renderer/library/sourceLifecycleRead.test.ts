@@ -110,6 +110,62 @@ describe('createSourceLifecycleReadController', () => {
       error: { code: 'notFound' }
     })
   })
+
+  it('invalidates one source lifecycle snapshot and rejects late reads', async () => {
+    const staleRead = deferred<
+      Awaited<ReturnType<SourceLifecycleReadApi['sourceLifecycle']['readSourceLifecycle']>>
+    >()
+    const api = sourceLifecycleApi(
+      vi
+        .fn()
+        .mockResolvedValueOnce({
+          state: 'ready',
+          lifecycle: sourceLifecycle({ sourceId: '7', scanPhase: 'complete' })
+        })
+        .mockResolvedValueOnce({
+          state: 'ready',
+          lifecycle: sourceLifecycle({ sourceId: '8', scanPhase: 'idle' })
+        })
+        .mockResolvedValueOnce({
+          state: 'notFound',
+          error: { code: 'notFound', message: 'Source not found.' }
+        })
+        .mockReturnValueOnce(staleRead.promise)
+        .mockResolvedValue({
+          state: 'ready',
+          lifecycle: sourceLifecycle({ sourceId: '7', scanPhase: 'running' })
+        })
+    )
+    const controller = createSourceLifecycleReadController(api)
+
+    await expect(controller.readSourceLifecycle('7')).resolves.toBe(true)
+    await expect(controller.readSourceLifecycle('8')).resolves.toBe(true)
+    await expect(controller.readSourceLifecycle('7')).resolves.toBe(false)
+
+    const stale = controller.readSourceLifecycle('7')
+    controller.invalidateSource('7')
+
+    expect(controller.sourceLifecycleBySourceId.value.get('7')).toBeUndefined()
+    expect(controller.sourceLifecycleReadErrorsBySourceId.value.get('7')).toBeUndefined()
+    expect(controller.sourceLifecycleBySourceId.value.get('8')).toMatchObject({
+      sourceId: '8',
+      scanPhase: 'idle'
+    })
+
+    staleRead.resolve({
+      state: 'ready',
+      lifecycle: sourceLifecycle({ sourceId: '7', scanPhase: 'running' })
+    })
+
+    await expect(stale).resolves.toBe(false)
+    expect(controller.sourceLifecycleBySourceId.value.get('7')).toBeUndefined()
+
+    await expect(controller.refreshSourceLifecycles(['7'])).resolves.toBe(true)
+    expect(controller.sourceLifecycleBySourceId.value.get('7')).toMatchObject({
+      sourceId: '7',
+      scanPhase: 'running'
+    })
+  })
 })
 
 describe('sourceLifecycleIdsForBrowserContext', () => {
