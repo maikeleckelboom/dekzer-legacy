@@ -218,9 +218,7 @@ function projectLocalBrowseItem(options: {
 }): BrowserTreeNode {
   const item = options.item
   const nodeId = localBrowseItemNodeId(item)
-  const target = hasLocalBrowseOperation(item.availableOperations, 'browseChildren')
-    ? directoryTargetForItem(item, options.addSourceView)
-    : undefined
+  const target = directoryTargetForItem(item, options.addSourceView)
 
   options.bindingsById.set(nodeId, {
     kind: 'localBrowseItem',
@@ -615,7 +613,7 @@ function directoryTargetForItem(
   item: LocalBrowseItem,
   addSourceView: AddSourceView
 ): LocalBrowseDirectoryTarget | undefined {
-  if (!hasLocalBrowseOperation(item.availableOperations, 'browseChildren')) {
+  if (!isBrowsableLocalBrowseFolder(item)) {
     return undefined
   }
 
@@ -626,6 +624,13 @@ function directoryTargetForItem(
     resolvedParentPath: item.identity.resolvedItemPath,
     label: item.displayName
   }
+}
+
+function isBrowsableLocalBrowseFolder(item: LocalBrowseItem): boolean {
+  return (
+    (item.itemKind === 'directory' || item.itemKind === 'rejectedRoot') &&
+    hasLocalBrowseOperation(item.availableOperations, 'browseChildren')
+  )
 }
 
 function localBrowseEntryPointNodeId(entry: LocalBrowseEntryPoint): BrowserTreeNodeId {

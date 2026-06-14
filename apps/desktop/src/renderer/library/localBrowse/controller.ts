@@ -1,7 +1,10 @@
 import { onMounted, onUnmounted, ref, shallowRef } from 'vue'
 import type { Ref } from 'vue'
 
-import type { ReadLocalBrowseItemsRequest } from '../../../shared/library/localBrowse/items'
+import type {
+  LocalBrowseItem,
+  ReadLocalBrowseItemsRequest
+} from '../../../shared/library/localBrowse/items'
 import type { ReadLocalBrowseEntryPointsResult } from '../../../shared/library/localBrowse/entryPoints'
 import type { RendererApi } from '../../../shared/rendererApi'
 import type { BrowserProjection } from '../tree/projection'
@@ -21,11 +24,23 @@ import {
 import { defaultAddSourceView, type AddSourceView } from '../addSource/view'
 
 const readLimit = 50
+const branchWarmupDepth = 2
+const branchWarmupBreadth = 24
+const maxConcurrentBranchWarmReads = 2
 const safeEntryPointsReadFailure = 'Unable to read local browse entry points.'
 const safeItemsReadFailure = 'Unable to read local browse items.'
 const safeUnexpectedWindowFailure = 'The local browse read returned an unexpected item window.'
 
 export type LocalBrowseReadApi = Pick<RendererApi['library'], 'localBrowse'>
+
+export type LocalBrowseBranchWarmupTrace = {
+  readonly parentNodeId: BrowserTreeNodeId
+  readonly parentWindowIdentity: string
+  readonly scheduledChildCount: number
+  readonly skippedTerminalCount: number
+  readonly staleIgnoredCount: number
+  readonly reason?: string
+}
 
 export type LocalBrowseController = {
   readonly entryPointsState: Ref<LocalBrowseEntryPointsState>
@@ -50,7 +65,10 @@ export type LocalBrowseController = {
 
 export function useLocalBrowseController(
   libraryApi: LocalBrowseReadApi = getRendererApi().library,
-  options: { readonly addSourceView?: Ref<AddSourceView> } = {}
+  options: {
+    readonly addSourceView?: Ref<AddSourceView>
+    readonly warmup?: LocalBrowseBranchWarmupOptions
+  } = {}
 ): LocalBrowseController {
   const controller = createLocalBrowseController(libraryApi, options)
 
@@ -67,7 +85,10 @@ export function useLocalBrowseController(
 
 export function createLocalBrowseController(
   libraryApi: LocalBrowseReadApi,
-  options: { readonly addSourceView?: Ref<AddSourceView> } = {}
+  options: {
+    readonly addSourceView?: Ref<AddSourceView>
+    readonly warmup?: LocalBrowseBranchWarmupOptions
+  } = {}
 ): LocalBrowseController {
   const entryPointsState = ref<LocalBrowseEntryPointsState>({ kind: 'unread' })
   const itemStates = shallowRef<ReadonlyMap<string, LocalBrowseItemState>>(new Map())
@@ -75,6 +96,12 @@ export function createLocalBrowseController(
   let started = false
   let entryPointReadSequence = 0
   let itemReadSequence = 0
+  let warmupGeneration = 0
+  let activeWarmReads = 0
+  let staleIgnoredWarmReads = 0
+  const queuedWarmReadKeys = new Set<string>()
+  const activeWarmReadKeys = new Set<string>()
+  const warmReadQueue: LocalBrowseBranchWarmupTask[] = []
 
   function start(): void {
     started = true
@@ -82,10 +109,12 @@ export function createLocalBrowseController(
 
   function stop(): void {
     started = false
+    cancelBranchWarmups()
   }
 
   function clearItemWindows(): void {
     itemReadSequence += 1
+    cancelBranchWarmups()
     itemStates.value = new Map()
   }
 
@@ -177,9 +206,13 @@ export function createLocalBrowseController(
 
     switch (binding.kind) {
       case 'localBrowseEntryPoint':
-        return readItems(localBrowseRootTarget(binding.target, addSourceView.value))
+        return readItems(localBrowseRootTarget(binding.target, addSourceView.value), {
+          ownerNodeId: nodeId
+        })
       case 'localBrowseItem':
-        return binding.target === undefined ? false : readItems(binding.target)
+        return binding.target === undefined
+          ? false
+          : readItems(binding.target, { ownerNodeId: nodeId })
       case 'localBrowseMore':
         return readMore(binding.target)
       default:
@@ -230,9 +263,9 @@ export function createLocalBrowseController(
     let refreshedAny = false
     let allSucceeded = true
 
-    for (const target of targets.values()) {
+    for (const { nodeId, target } of targets.values()) {
       refreshedAny = true
-      allSucceeded = (await readItems(target)) && allSucceeded
+      allSucceeded = (await readItems(target, { ownerNodeId: nodeId })) && allSucceeded
     }
 
     return refreshedAny ? allSucceeded : true
@@ -241,30 +274,36 @@ export function createLocalBrowseController(
   function browserWindowRefreshTargets(
     expandedNodeIds: ReadonlySet<BrowserTreeNodeId>,
     projection: BrowserProjection | undefined
-  ): ReadonlyMap<string, LocalBrowseDirectoryTarget> | undefined {
+  ): ReadonlyMap<
+    string,
+    { readonly nodeId: BrowserTreeNodeId; readonly target: LocalBrowseDirectoryTarget }
+  > | undefined {
     if (projection?.kind !== 'tree') {
       return undefined
     }
 
-    const targets = new Map<string, LocalBrowseDirectoryTarget>()
+    const targets = new Map<
+      string,
+      { readonly nodeId: BrowserTreeNodeId; readonly target: LocalBrowseDirectoryTarget }
+    >()
 
-    function addTarget(target: LocalBrowseDirectoryTarget): void {
-      targets.set(localBrowseWindowKey(target), target)
+    function addTarget(nodeId: BrowserTreeNodeId, target: LocalBrowseDirectoryTarget): void {
+      targets.set(localBrowseWindowKey(target), { nodeId, target })
     }
 
-    for (const binding of projection.bindingsById.values()) {
+    for (const [nodeId, binding] of projection.bindingsById) {
       if (binding.kind === 'localBrowseEntryPoint') {
         const target = localBrowseRootTarget(binding.target, addSourceView.value)
         const state = itemStates.value.get(localBrowseWindowKey(target))
 
         if (state?.kind === 'loaded') {
-          addTarget(target)
+          addTarget(nodeId, target)
         }
       } else if (binding.kind === 'localBrowseItem' && binding.target !== undefined) {
         const state = itemStates.value.get(localBrowseWindowKey(binding.target))
 
         if (state?.kind === 'loaded') {
-          addTarget(binding.target)
+          addTarget(nodeId, binding.target)
         }
       }
     }
@@ -273,16 +312,19 @@ export function createLocalBrowseController(
       const binding = projection.bindingsById.get(nodeId)
 
       if (binding?.kind === 'localBrowseEntryPoint') {
-        addTarget(localBrowseRootTarget(binding.target, addSourceView.value))
+        addTarget(nodeId, localBrowseRootTarget(binding.target, addSourceView.value))
       } else if (binding?.kind === 'localBrowseItem' && binding.target !== undefined) {
-        addTarget(binding.target)
+        addTarget(nodeId, binding.target)
       }
     }
 
     return targets
   }
 
-  async function readItems(target: LocalBrowseDirectoryTarget): Promise<boolean> {
+  async function readItems(
+    target: LocalBrowseDirectoryTarget,
+    options: { readonly ownerNodeId?: BrowserTreeNodeId } = {}
+  ): Promise<boolean> {
     const requestKey = localBrowseWindowKey(target)
     const currentState = itemStates.value.get(requestKey)
 
@@ -352,10 +394,20 @@ export function createLocalBrowseController(
         return true
       }
 
+      const window = loadedWindowFromResult(result, target)
       setItemState(requestKey, {
         kind: 'loaded',
-        window: loadedWindowFromResult(result, target)
+        window
       })
+      if (options.ownerNodeId !== undefined) {
+        scheduleBranchWarmupFromWindow({
+          anchorNodeId: options.ownerNodeId,
+          parentNodeId: options.ownerNodeId,
+          parentTarget: target,
+          window,
+          remainingDepth: branchWarmupDepth
+        })
+      }
       return true
     } catch {
       if (!isCurrentItemRead(requestKey, sequence)) {
@@ -500,6 +552,233 @@ export function createLocalBrowseController(
     )
   }
 
+  function scheduleBranchWarmupFromWindow(options: {
+    readonly anchorNodeId: BrowserTreeNodeId
+    readonly parentNodeId: BrowserTreeNodeId
+    readonly parentTarget: LocalBrowseDirectoryTarget
+    readonly window: LoadedLocalBrowseItems
+    readonly remainingDepth: number
+  }): void {
+    if (!isBranchWarmupEnabled() || options.remainingDepth <= 0) {
+      return
+    }
+
+    if (!shouldContinueBranchWarmup(options.anchorNodeId)) {
+      traceBranchWarmup({
+        parentNodeId: options.parentNodeId,
+        parentWindowIdentity: localBrowseWindowKey(options.parentTarget),
+        scheduledChildCount: 0,
+        skippedTerminalCount: 0,
+        staleIgnoredCount: staleIgnoredWarmReads,
+        reason: 'inactive'
+      })
+      return
+    }
+
+    let skippedTerminalCount = 0
+    const childTargets: WarmableLocalBrowseTarget[] = []
+
+    for (const item of options.window.items) {
+      if (childTargets.length >= branchWarmupBreadth) {
+        break
+      }
+
+      if (!isWarmableLocalBrowseItem(item)) {
+        skippedTerminalCount += 1
+        continue
+      }
+
+      childTargets.push({
+        nodeId: localBrowseItemNodeId(item),
+        target: {
+          addSourceView: options.window.addSourceView,
+          entryPointKind: item.identity.entryPointKind,
+          resolvedRootPath: item.identity.resolvedRootPath,
+          resolvedParentPath: item.identity.resolvedItemPath,
+          label: item.displayName
+        }
+      })
+    }
+
+    traceBranchWarmup({
+      parentNodeId: options.parentNodeId,
+      parentWindowIdentity: localBrowseWindowKey(options.parentTarget),
+      scheduledChildCount: childTargets.length,
+      skippedTerminalCount,
+      staleIgnoredCount: staleIgnoredWarmReads
+    })
+
+    for (const child of childTargets) {
+      enqueueBranchWarmup({
+        generation: warmupGeneration,
+        anchorNodeId: options.anchorNodeId,
+        parentNodeId: options.parentNodeId,
+        parentTarget: options.parentTarget,
+        nodeId: child.nodeId,
+        target: child.target,
+        remainingDepth: options.remainingDepth
+      })
+    }
+
+    drainBranchWarmupQueue()
+  }
+
+  function enqueueBranchWarmup(task: Omit<LocalBrowseBranchWarmupTask, 'requestKey'>): void {
+    const requestKey = localBrowseWindowKey(task.target)
+
+    if (queuedWarmReadKeys.has(requestKey) || activeWarmReadKeys.has(requestKey)) {
+      return
+    }
+
+    if (!canWarmWindow(requestKey)) {
+      return
+    }
+
+    queuedWarmReadKeys.add(requestKey)
+    warmReadQueue.push({
+      ...task,
+      requestKey
+    })
+  }
+
+  function drainBranchWarmupQueue(): void {
+    if (!isBranchWarmupEnabled()) {
+      return
+    }
+
+    while (activeWarmReads < maxConcurrentBranchWarmReads && warmReadQueue.length > 0) {
+      const task = warmReadQueue.shift()
+
+      if (task === undefined) {
+        return
+      }
+
+      queuedWarmReadKeys.delete(task.requestKey)
+
+      if (!canStartWarmRead(task)) {
+        continue
+      }
+
+      activeWarmReads += 1
+      activeWarmReadKeys.add(task.requestKey)
+      void runBranchWarmupTask(task).finally(() => {
+        activeWarmReads -= 1
+        activeWarmReadKeys.delete(task.requestKey)
+        drainBranchWarmupQueue()
+      })
+    }
+  }
+
+  async function runBranchWarmupTask(task: LocalBrowseBranchWarmupTask): Promise<void> {
+    if (!canStartWarmRead(task)) {
+      return
+    }
+
+    try {
+      const result = await libraryApi.localBrowse.readItems(readItemsRequest(task.target, 0))
+
+      if (!canCommitWarmRead(task)) {
+        noteStaleWarmRead(task)
+        return
+      }
+
+      if (result.state !== 'read') {
+        return
+      }
+
+      if (!isExpectedWindow(result, task.target, 0)) {
+        return
+      }
+
+      if (!canCommitWarmRead(task)) {
+        noteStaleWarmRead(task)
+        return
+      }
+
+      const window = loadedWindowFromResult(result, task.target)
+      setItemState(task.requestKey, {
+        kind: 'loaded',
+        window
+      })
+
+      scheduleBranchWarmupFromWindow({
+        anchorNodeId: task.anchorNodeId,
+        parentNodeId: task.nodeId,
+        parentTarget: task.target,
+        window,
+        remainingDepth: task.remainingDepth - 1
+      })
+    } catch {
+      return
+    }
+  }
+
+  function canStartWarmRead(task: LocalBrowseBranchWarmupTask): boolean {
+    return (
+      started &&
+      task.generation === warmupGeneration &&
+      task.target.addSourceView === addSourceView.value &&
+      shouldContinueBranchWarmup(task.anchorNodeId) &&
+      isWarmParentCurrent(task) &&
+      canWarmWindow(task.requestKey)
+    )
+  }
+
+  function canCommitWarmRead(task: LocalBrowseBranchWarmupTask): boolean {
+    return canStartWarmRead(task)
+  }
+
+  function canWarmWindow(requestKey: string): boolean {
+    return itemStates.value.get(requestKey) === undefined
+  }
+
+  function isWarmParentCurrent(task: LocalBrowseBranchWarmupTask): boolean {
+    const parentState = itemStates.value.get(localBrowseWindowKey(task.parentTarget))
+
+    return (
+      parentState?.kind === 'loaded' &&
+      parentState.window.addSourceView === task.parentTarget.addSourceView &&
+      parentState.window.identity.entryPointKind === task.parentTarget.entryPointKind &&
+      parentState.window.identity.resolvedRootPath === task.parentTarget.resolvedRootPath &&
+      parentState.window.identity.resolvedParentPath === task.parentTarget.resolvedParentPath &&
+      parentState.window.items.some(
+        (item) =>
+          isWarmableLocalBrowseItem(item) &&
+          item.identity.resolvedItemPath === task.target.resolvedParentPath
+      )
+    )
+  }
+
+  function noteStaleWarmRead(task: LocalBrowseBranchWarmupTask): void {
+    staleIgnoredWarmReads += 1
+    traceBranchWarmup({
+      parentNodeId: task.parentNodeId,
+      parentWindowIdentity: localBrowseWindowKey(task.parentTarget),
+      scheduledChildCount: 0,
+      skippedTerminalCount: 0,
+      staleIgnoredCount: staleIgnoredWarmReads,
+      reason: 'stale'
+    })
+  }
+
+  function cancelBranchWarmups(): void {
+    warmupGeneration += 1
+    warmReadQueue.length = 0
+    queuedWarmReadKeys.clear()
+  }
+
+  function isBranchWarmupEnabled(): boolean {
+    return options.warmup !== undefined && options.warmup.enabled !== false
+  }
+
+  function shouldContinueBranchWarmup(anchorNodeId: BrowserTreeNodeId): boolean {
+    return options.warmup?.shouldContinue?.(anchorNodeId) ?? true
+  }
+
+  function traceBranchWarmup(trace: LocalBrowseBranchWarmupTrace): void {
+    options.warmup?.trace?.(trace)
+  }
+
   return {
     entryPointsState,
     itemStates,
@@ -638,4 +917,39 @@ export function localBrowseWindowKeyForIdentity(
   addSourceView: AddSourceView = defaultAddSourceView
 ): string {
   return localBrowseWindowKeyFromIdentity(identity, addSourceView)
+}
+
+type LocalBrowseBranchWarmupOptions = {
+  readonly enabled?: boolean
+  readonly shouldContinue?: (anchorNodeId: BrowserTreeNodeId) => boolean
+  readonly trace?: (trace: LocalBrowseBranchWarmupTrace) => void
+}
+
+type WarmableLocalBrowseTarget = {
+  readonly nodeId: BrowserTreeNodeId
+  readonly target: LocalBrowseDirectoryTarget
+}
+
+type LocalBrowseBranchWarmupTask = {
+  readonly generation: number
+  readonly anchorNodeId: BrowserTreeNodeId
+  readonly parentNodeId: BrowserTreeNodeId
+  readonly parentTarget: LocalBrowseDirectoryTarget
+  readonly nodeId: BrowserTreeNodeId
+  readonly target: LocalBrowseDirectoryTarget
+  readonly remainingDepth: number
+  readonly requestKey: string
+}
+
+function isWarmableLocalBrowseItem(item: LocalBrowseItem): boolean {
+  return (
+    (item.itemKind === 'directory' || item.itemKind === 'rejectedRoot') &&
+    item.availableOperations.some((operation) => operation.kind === 'browseChildren')
+  )
+}
+
+function localBrowseItemNodeId(item: LocalBrowseItem): BrowserTreeNodeId {
+  return `local-browse-item:${item.identity.entryPointKind}:${encodeURIComponent(
+    item.identity.resolvedRootPath
+  )}:${encodeURIComponent(item.identity.resolvedItemPath)}`
 }

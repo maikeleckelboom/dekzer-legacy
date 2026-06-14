@@ -427,15 +427,7 @@ function projectLiteralNodes(options: {
             bindingsById: options.bindingsById
           })
         ]
-      : options.profile === 'allFiles'
-        ? [
-            projectLiteralFileNode({
-              node,
-              entryPoint: options.entryPoint,
-              bindingsById: options.bindingsById
-            })
-          ]
-        : []
+      : []
   )
 }
 
@@ -505,31 +497,6 @@ function projectLiteralDirectoryNode(options: {
       directoryReadStates: options.directoryReadStates,
       bindingsById: options.bindingsById
     })
-  }
-}
-
-function projectLiteralFileNode(options: {
-  readonly node: Extract<ChildRow, { readonly kind: 'file' }>
-  readonly entryPoint: EntryPoint
-  readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
-}): BrowserTreeNode {
-  const node = options.node
-
-  options.bindingsById.set(node.id, {
-    kind: 'file',
-    sourceId: node.sourceId,
-    fileId: node.fileId,
-    ...(node.parentDirectoryId === undefined ? {} : { parentDirectoryId: node.parentDirectoryId }),
-    entryPoint: copyEntryPoint(options.entryPoint)
-  })
-
-  return {
-    id: node.id,
-    role: 'literalFile',
-    label: node.label,
-    icon: literalFileIcon(node.fileClass),
-    detail: formatLiteralFileDetail(node),
-    children: { kind: 'none' }
   }
 }
 
@@ -1014,46 +981,6 @@ function formatDirectoryDetail(presence: ChildRow['presence']): string {
       return 'Folder missing'
     case 'removed':
       return 'Folder removed'
-  }
-}
-
-function formatLiteralFileDetail(node: Extract<ChildRow, { readonly kind: 'file' }>): string {
-  if (node.presence === 'missing') {
-    return 'File missing'
-  }
-
-  if (node.presence === 'removed') {
-    return 'File removed'
-  }
-
-  switch (node.fileClass) {
-    case 'audio':
-      return 'Audio file'
-    case 'video':
-      return 'Video file'
-    case 'image':
-      return 'Image file'
-    case 'unsupported':
-      return 'Unsupported file'
-    case 'none':
-      return 'File'
-  }
-}
-
-function literalFileIcon(
-  fileClass: Extract<ChildRow, { readonly kind: 'file' }>['fileClass']
-): BrowserTreeIcon {
-  switch (fileClass) {
-    case 'audio':
-      return 'music'
-    case 'video':
-      return 'video'
-    case 'image':
-      return 'image'
-    case 'unsupported':
-      return 'metadata'
-    case 'none':
-      return 'file'
   }
 }
 

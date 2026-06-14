@@ -9,6 +9,7 @@ import {
   projectState,
   type BrowserProjection
 } from '../../../../src/renderer/library/tree/projection'
+import { canRevealBrowserTreeChildren } from '../../../../src/renderer/library/tree/listProjection'
 import type {
   LocalBrowseEntryPoint,
   LocalBrowseEntryPointKind
@@ -230,6 +231,62 @@ describe('local browse tree projection', () => {
     ).toHaveLength(5)
   })
 
+  it('keeps local browse file rows terminal even if an operation is present', () => {
+    const rootTarget = {
+      addSourceView: 'preview' as const,
+      entryPointKind: 'music' as const,
+      resolvedRootPath: 'C:\\Users\\Maikel\\Music',
+      resolvedParentPath: 'C:\\Users\\Maikel\\Music',
+      label: 'Music'
+    }
+    const projection = projectTree({
+      ...browserState({ entries: [musicEntryPoint()] }),
+      localBrowseItemStates: new Map([
+        [
+          'preview:music:C%3A%5CUsers%5CMaikel%5CMusic:C%3A%5CUsers%5CMaikel%5CMusic',
+          {
+            kind: 'loaded',
+            window: {
+              identity: {
+                entryPointKind: rootTarget.entryPointKind,
+                resolvedRootPath: rootTarget.resolvedRootPath,
+                resolvedParentPath: rootTarget.resolvedParentPath
+              },
+              addSourceView: rootTarget.addSourceView,
+              label: rootTarget.label,
+              items: [
+                item('mediaFile', 'track.flac', 'C:\\Users\\Maikel\\Music\\track.flac', {
+                  fileKind: 'audio',
+                  mediaRelevance: 'mediaRelevant',
+                  availableOperations: [{ kind: 'browseChildren' }]
+                })
+              ],
+              totalItems: 1,
+              status: 'complete',
+              failure: null,
+              limit: 50
+            }
+          }
+        ]
+      ])
+    })
+
+    const trackNode = findNode(projection, 'track.flac')
+    const trackBinding = trackNode === undefined ? undefined : projection.bindingsById.get(trackNode.id)
+
+    expect(trackNode).toMatchObject({
+      role: 'localBrowseFile',
+      children: { kind: 'none' }
+    })
+    expect(trackNode === undefined ? undefined : canRevealBrowserTreeChildren(trackNode)).toBe(
+      false
+    )
+    expect(trackBinding).toMatchObject({
+      kind: 'localBrowseItem'
+    })
+    expect(trackBinding).not.toHaveProperty('target')
+  })
+
   it('does not reuse a loaded window from another Add Source view', () => {
     const rootTarget = {
       addSourceView: 'preview' as const,
@@ -422,6 +479,25 @@ function findNodeDetail(projection: BrowserProjection, label: string): string | 
     const node = nodes.shift()
     if (node?.label === label) {
       return node.detail
+    }
+    if (node?.children.kind === 'loaded') {
+      nodes.push(...node.children.nodes)
+    }
+  }
+
+  return undefined
+}
+
+function findNode(
+  projection: BrowserProjection,
+  label: string
+): BrowserProjection['nodes'][number] | undefined {
+  const nodes = [...projection.nodes]
+
+  while (nodes.length > 0) {
+    const node = nodes.shift()
+    if (node?.label === label) {
+      return node
     }
     if (node?.children.kind === 'loaded') {
       nodes.push(...node.children.nodes)

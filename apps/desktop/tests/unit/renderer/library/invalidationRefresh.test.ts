@@ -581,7 +581,8 @@ describe('panel runtime wiring', () => {
   it('wires local browse refresh from host start and refresh dependencies', () => {
     const panel = readRendererSource('panel.vue')
 
-    expect(panel).toContain("import { useLocalBrowseController } from './localBrowse/controller'")
+    expect(panel).toContain('useLocalBrowseController,')
+    expect(panel).toContain("} from './localBrowse/controller'")
     expect(panel).toContain('const libraryBrowseProfile = createLibraryBrowseProfileController()')
     expect(panel).toContain('const addSourceView = createAddSourceViewController()')
     expect(panel).toContain('const localBrowse = useLocalBrowseController(undefined, {')
@@ -591,6 +592,33 @@ describe('panel runtime wiring', () => {
     )
     expect(panel).toContain('void localBrowse.refreshEntryPoints()')
     expect(panel).toContain('refreshLocalBrowseEntryPoints: () => localBrowse.refreshEntryPoints()')
+  })
+
+  it('wires branch warmup to surface and disclosure guards without contents reads', () => {
+    const panel = readRendererSource('panel.vue')
+
+    expect(panel).toContain('type LibraryBranchWarmupTrace')
+    expect(panel).toContain('type LocalBrowseBranchWarmupTrace')
+    expect(panel).toContain('warmup: {')
+    expect(panel).toContain("activeSurface.value === 'libraryBrowse'")
+    expect(panel).toContain('expandedLibraryNodeIds.value.has(nodeId)')
+    expect(panel).toContain("activeSurface.value === 'addSource'")
+    expect(panel).toContain('expandedAddSourceNodeIds.value.has(nodeId)')
+    expect(panel).toContain('selectedAddSourceNodeId.value === nodeId')
+    expect(panel).toContain("console.debug('[dekzer:library:branch-warmup]', trace)")
+    expect(panel).toContain("console.debug('[dekzer:library:local-browse-warmup]', trace)")
+    expect(panel).not.toContain(
+      'function requestLibraryNodeChildren(nodeId: BrowserTreeNodeId): Promise<boolean> {\n  requestContentsForCurrentSelection()'
+    )
+  })
+
+  it('keeps content-row child loading routed through the child-window owners', () => {
+    const panel = readRendererSource('panel.vue')
+
+    expect(panel).toContain("if (action.kind === 'loadChildren')")
+    expect(panel).toContain('void hierarchyRead.requestNodeChildren(action.nodeId)')
+    expect(panel).toContain("} else if (action.kind === 'loadLocalBrowseChildren') {")
+    expect(panel).toContain('void localBrowse.requestNodeChildren(action.nodeId, addSourceProjection.value)')
   })
 
   it('keeps library profile and Add Source view watchers separate', () => {

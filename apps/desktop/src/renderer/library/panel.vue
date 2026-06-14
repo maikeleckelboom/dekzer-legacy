@@ -8,10 +8,16 @@ import {
   type LibraryBrowseProfile
 } from './libraryBrowseProfile/types'
 import { createLibraryBrowseProfileController } from './libraryBrowseProfile/controller'
-import { useLibraryHierarchyRead } from './boundary/hierarchyRead'
+import {
+  useLibraryHierarchyRead,
+  type LibraryBranchWarmupTrace
+} from './boundary/hierarchyRead'
 import { useContentsRead } from './boundary/contentsRead'
 import { useLocalRootActions } from './boundary/localRootActions'
-import { useLocalBrowseController } from './localBrowse/controller'
+import {
+  useLocalBrowseController,
+  type LocalBrowseBranchWarmupTrace
+} from './localBrowse/controller'
 import { addSourceSectionNodeId, projectAddSourceState } from './localBrowse/projection'
 import {
   createAddSourceViewController,
@@ -89,11 +95,37 @@ const iconButtonClass = `${buttonBaseClass} h-9 w-9 min-w-0 ${toolbarControlClas
 const viewStateStore = createViewStateStore()
 const libraryBrowseProfile = createLibraryBrowseProfileController()
 const addSourceView = createAddSourceViewController()
+const activeSurface = ref<LibraryPanelSurface>('libraryBrowse')
+const selectedLibraryNodeId = ref<BrowserTreeNodeId>()
+const selectedAddSourceNodeId = ref<BrowserTreeNodeId>()
+const expandedLibraryNodeIds = ref<ReadonlySet<BrowserTreeNodeId>>(new Set())
+const expandedAddSourceNodeIds = ref<ReadonlySet<BrowserTreeNodeId>>(
+  new Set([addSourceSectionNodeId])
+)
+const pendingLibraryRestoreIds = ref<ReadonlySet<BrowserTreeNodeId>>(new Set())
+const pendingAddSourceRestoreIds = ref<ReadonlySet<BrowserTreeNodeId>>(new Set())
+const pendingSourceRegistration = ref<SourceRegistrationIntent>()
+const sourceAdmissionHandoff = ref<SourceAdmissionHandoffState>()
+const sourceRevealRequest = ref<{
+  readonly nodeId: BrowserTreeNodeId
+  readonly sequence: number
+}>()
 const hierarchyRead = useLibraryHierarchyRead(undefined, {
-  profile: libraryBrowseProfile.profile
+  profile: libraryBrowseProfile.profile,
+  warmup: {
+    shouldContinue: (nodeId) =>
+      activeSurface.value === 'libraryBrowse' && expandedLibraryNodeIds.value.has(nodeId),
+    trace: traceLibraryBranchWarmup
+  }
 })
 const localBrowse = useLocalBrowseController(undefined, {
-  addSourceView: addSourceView.view
+  addSourceView: addSourceView.view,
+  warmup: {
+    shouldContinue: (nodeId) =>
+      activeSurface.value === 'addSource' &&
+      (expandedAddSourceNodeIds.value.has(nodeId) || selectedAddSourceNodeId.value === nodeId),
+    trace: traceLocalBrowseBranchWarmup
+  }
 })
 const contentsRead = useContentsRead(undefined, { profile: libraryBrowseProfile.profile })
 const rootActions = useLocalRootActions()
@@ -122,21 +154,6 @@ const scanProgressForRegisteredRoot = computed<ScanProgressState | undefined>(()
   return boundaryEvents.scanProgress.value.get(root.rootId)
 })
 
-const activeSurface = ref<LibraryPanelSurface>('libraryBrowse')
-const selectedLibraryNodeId = ref<BrowserTreeNodeId>()
-const selectedAddSourceNodeId = ref<BrowserTreeNodeId>()
-const expandedLibraryNodeIds = ref<ReadonlySet<BrowserTreeNodeId>>(new Set())
-const expandedAddSourceNodeIds = ref<ReadonlySet<BrowserTreeNodeId>>(
-  new Set([addSourceSectionNodeId])
-)
-const pendingLibraryRestoreIds = ref<ReadonlySet<BrowserTreeNodeId>>(new Set())
-const pendingAddSourceRestoreIds = ref<ReadonlySet<BrowserTreeNodeId>>(new Set())
-const pendingSourceRegistration = ref<SourceRegistrationIntent>()
-const sourceAdmissionHandoff = ref<SourceAdmissionHandoffState>()
-const sourceRevealRequest = ref<{
-  readonly nodeId: BrowserTreeNodeId
-  readonly sequence: number
-}>()
 const libraryBrowseProfileMenuOpen = ref(false)
 const libraryBrowseProfileMenuRef = ref<HTMLElement>()
 const addSourceViewMenuOpen = ref(false)
@@ -466,6 +483,22 @@ watch(
     )
   }
 )
+
+function traceLibraryBranchWarmup(trace: LibraryBranchWarmupTrace): void {
+  if (!import.meta.env.DEV) {
+    return
+  }
+
+  console.debug('[dekzer:library:branch-warmup]', trace)
+}
+
+function traceLocalBrowseBranchWarmup(trace: LocalBrowseBranchWarmupTrace): void {
+  if (!import.meta.env.DEV) {
+    return
+  }
+
+  console.debug('[dekzer:library:local-browse-warmup]', trace)
+}
 
 const sourceAdmissionHandoffView = computed(() =>
   projectSourceAdmissionHandoff({

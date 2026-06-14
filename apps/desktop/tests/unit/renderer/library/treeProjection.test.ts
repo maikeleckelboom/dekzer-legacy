@@ -129,7 +129,7 @@ describe('projectState', () => {
     })
   })
 
-  it('projects literal file rows in the all-files tree projection', () => {
+  it('excludes literal file rows from the all-files tree projection', () => {
     const projection = projectTree(
       browserState({
         libraryBrowseProfile: 'allFiles',
@@ -144,25 +144,14 @@ describe('projectState', () => {
 
     const sourceNode = requiredNode(projection.nodes, 'navigation-row:7')
 
-    expect(loadedChildIds(sourceNode)).toEqual([
-      'source-file:11',
-      'source-file:12',
-      'source-file:13',
-      'source-file:14'
-    ])
-    expect(requiredNode(projection.nodes, 'source-file:11')).toMatchObject({
-      role: 'literalFile',
-      icon: 'music',
-      children: { kind: 'none' }
-    })
-    expect(requiredNode(projection.nodes, 'source-file:14')).toMatchObject({
-      role: 'literalFile',
-      icon: 'metadata'
-    })
-    expect(projection.bindingsById.get('source-file:14')).toMatchObject({
-      kind: 'file',
-      sourceId: '7',
-      fileId: '14'
+    expect(loadedChildIds(sourceNode)).toEqual(['read-state:navigation-row:7'])
+    for (const fileId of ['11', '12', '13', '14']) {
+      expect(findNode(projection.nodes, `source-file:${fileId}`)).toBeUndefined()
+      expect(projection.bindingsById.has(`source-file:${fileId}`)).toBe(false)
+    }
+    expect(requiredNode(projection.nodes, 'read-state:navigation-row:7')).toMatchObject({
+      role: 'state',
+      label: 'No child folders in this view'
     })
   })
 

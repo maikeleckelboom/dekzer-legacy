@@ -80,6 +80,143 @@ describe('createLibraryHierarchyReadController', () => {
     })
   })
 
+  it('warms expandable child directory windows with bounded concurrency and skips files', async () => {
+    const pendingWarmReads = new Map<string, ReturnType<typeof deferred<ReadResult>>>()
+    const readRequests: ReadRequest[] = []
+    const controller = createLibraryHierarchyReadController(
+      testLibraryApi({
+        readRows: async () => navigationSourceReadRowsResult(),
+        readChildren: async (request) => {
+          readRequests.push(structuredClone(request))
+
+          if (request.parentDirectoryId === undefined) {
+            return hierarchyReadResultWithRows([
+              directoryNode('1', 'One'),
+              fileNode('file-1', 'track.wav'),
+              directoryNode('2', 'Two'),
+              directoryNode('3', 'Three')
+            ])
+          }
+
+          const read = deferred<ReadResult>()
+          pendingWarmReads.set(request.parentDirectoryId, read)
+          return read.promise
+        }
+      }),
+      { warmup: { enabled: true } }
+    )
+
+    await expect(controller.refresh()).resolves.toBe(true)
+
+    expect(readRequests.map((request) => request.parentDirectoryId ?? 'root')).toEqual([
+      'root',
+      '1',
+      '2'
+    ])
+
+    pendingWarmReads.get('1')?.resolve(emptyDirectoryReadResult('1'))
+    await waitForMicrotasks()
+
+    expect(readRequests.map((request) => request.parentDirectoryId ?? 'root')).toEqual([
+      'root',
+      '1',
+      '2',
+      '3'
+    ])
+    expect(pendingWarmReads.has('file-1')).toBe(false)
+  })
+
+  it('respects branch warmup breadth and depth limits', async () => {
+    const readRequests: ReadRequest[] = []
+    const controller = createLibraryHierarchyReadController(
+      testLibraryApi({
+        readRows: async () => navigationSourceReadRowsResult(),
+        readChildren: async (request) => {
+          readRequests.push(structuredClone(request))
+
+          if (request.parentDirectoryId === undefined) {
+            return hierarchyReadResultWithRows(
+              Array.from({ length: 30 }, (_, index) =>
+                directoryNode(String(index + 1), `Directory ${index + 1}`)
+              )
+            )
+          }
+
+          if (request.parentDirectoryId === '1') {
+            return hierarchyReadResultWithRows([directoryNode('101', 'Grandchild', '1')], {
+              parentDirectoryId: '1'
+            })
+          }
+
+          if (request.parentDirectoryId === '101') {
+            return hierarchyReadResultWithRows([directoryNode('1001', 'Too Deep', '101')], {
+              parentDirectoryId: '101'
+            })
+          }
+
+          return emptyDirectoryReadResult(request.parentDirectoryId)
+        }
+      }),
+      { warmup: { enabled: true } }
+    )
+
+    await expect(controller.refresh()).resolves.toBe(true)
+    await waitForWarmupQueue()
+
+    const warmedParentIds = readRequests
+      .slice(1)
+      .map((request) => request.parentDirectoryId)
+      .filter((id): id is string => id !== undefined)
+
+    expect(warmedParentIds.filter((id) => Number(id) >= 1 && Number(id) <= 30)).toEqual(
+      Array.from({ length: 24 }, (_, index) => String(index + 1))
+    )
+    expect(warmedParentIds).toContain('101')
+    expect(warmedParentIds).not.toContain('1001')
+  })
+
+  it('does not let a late warm read overwrite an explicit directory read', async () => {
+    const warmRead = deferred<ReadResult>()
+    const explicitRead = deferred<ReadResult>()
+    let directoryReadCount = 0
+    const controller = createLibraryHierarchyReadController(
+      testLibraryApi({
+        readRows: async () => navigationSourceReadRowsResult(),
+        readChildren: async (request) => {
+          if (request.parentDirectoryId === undefined) {
+            return hierarchyReadResultWithRows([directoryNode('12', 'Album')])
+          }
+
+          directoryReadCount += 1
+          return directoryReadCount === 1 ? warmRead.promise : explicitRead.promise
+        }
+      }),
+      { warmup: { enabled: true } }
+    )
+
+    await expect(controller.refresh()).resolves.toBe(true)
+    const explicitPromise = controller.requestDirectoryChildren('source-directory:12')
+    await waitForMicrotasks()
+
+    explicitRead.resolve(
+      hierarchyReadResultWithRows([directoryNode('20', 'Explicit Child', '12')], {
+        parentDirectoryId: '12'
+      })
+    )
+    await expect(explicitPromise).resolves.toBe(true)
+
+    warmRead.resolve(
+      hierarchyReadResultWithRows([directoryNode('99', 'Stale Child', '12')], {
+        parentDirectoryId: '12'
+      })
+    )
+    await waitForMicrotasks()
+
+    expect(firstLoadedChildIds(treeNodes(controller), 'source-directory:12')).toEqual([
+      'source-directory:20'
+    ])
+  })
+
   it('loads source and directory continuation windows and retries failed directory continuations', async () => {
     const readRequests: ReadRequest[] = []
     let directoryMoreAttempts = 0
@@ -910,6 +1047,26 @@ function directoryRootHierarchyReadResult(): Extract<ReadResult, { state: 'ready
   }
 }
 
+function hierarchyReadResultWithRows(
+  nodes: readonly ChildRow[],
+  options: { readonly parentDirectoryId?: string } = {}
+): Extract<ReadResult, { state: 'ready' }> {
+  return {
+    state: 'ready',
+    window: {
+      root: sourceRoot(),
+      ...(options.parentDirectoryId === undefined
+        ? {}
+        : { parentDirectoryId: options.parentDirectoryId }),
+      offset: 0,
+      limit: 50,
+      totalRows: nodes.length,
+      coverage: nodes.length === 0 ? completeEmptyCoverage() : completeCoverage(),
+      nodes
+    }
+  }
+}
+
 function partialSourceHierarchyReadResult(): Extract<ReadResult, { state: 'ready' }> {
   return {
     state: 'ready',
@@ -1168,6 +1325,12 @@ function deferred<T>(): { readonly promise: Promise<T>; readonly resolve: (value
 async function waitForMicrotasks(): Promise<void> {
   await Promise.resolve()
   await Promise.resolve()
+}
+
+async function waitForWarmupQueue(): Promise<void> {
+  for (let index = 0; index < 80; index += 1) {
+    await waitForMicrotasks()
+  }
 }
 
 function treeNodes(
