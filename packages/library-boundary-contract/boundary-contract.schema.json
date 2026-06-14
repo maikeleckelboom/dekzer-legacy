@@ -3134,6 +3134,44 @@
         }
       }
     },
+    "ReadSourceActivityReply": {
+      "type": "object",
+      "properties": {
+        "admissionState": {
+          "$ref": "#/$defs/SourceActivityAdmissionState"
+        },
+        "browseReadiness": {
+          "$ref": "#/$defs/SourceBrowseReadiness"
+        },
+        "preparationActivity": {
+          "$ref": "#/$defs/SourcePreparationActivity"
+        },
+        "scanActivity": {
+          "$ref": "#/$defs/SourceScanActivity"
+        },
+        "sourceId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceId",
+        "admissionState",
+        "browseReadiness",
+        "scanActivity",
+        "preparationActivity"
+      ]
+    },
+    "ReadSourceActivityRequest": {
+      "type": "object",
+      "properties": {
+        "sourceId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceId"
+      ]
+    },
     "ReadSourceAttachmentSummaryReply": {
       "type": "object",
       "properties": {
@@ -4415,6 +4453,22 @@
           "type": "object",
           "properties": {
             "payload": {
+              "$ref": "#/$defs/ReadSourceActivityRequest"
+            },
+            "type": {
+              "type": "string",
+              "const": "readSourceActivity"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
               "$ref": "#/$defs/ReadSourceFileAttachmentRequest"
             },
             "type": {
@@ -4659,6 +4713,22 @@
           "type": "object",
           "properties": {
             "payload": {
+              "$ref": "#/$defs/ReadSourceActivityReply"
+            },
+            "type": {
+              "type": "string",
+              "const": "sourceActivity"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
               "$ref": "#/$defs/ReadSourceFileAttachmentReply"
             },
             "type": {
@@ -4762,6 +4832,14 @@
         "unknown"
       ]
     },
+    "SourceActivityAdmissionState": {
+      "type": "string",
+      "enum": [
+        "active",
+        "restorable",
+        "notAdmitted"
+      ]
+    },
     "SourceAttachmentSummary": {
       "type": "object",
       "properties": {
@@ -4807,6 +4885,35 @@
         "sourceFilesWithAttachmentLinksCount",
         "sourceFilesMissingAttachmentLinksCount",
         "unmaterializedBlake3ObservationsCount"
+      ]
+    },
+    "SourceBrowseReadiness": {
+      "type": "object",
+      "properties": {
+        "detail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "state": {
+          "$ref": "#/$defs/SourceBrowseReadinessState"
+        }
+      },
+      "required": [
+        "state"
+      ]
+    },
+    "SourceBrowseReadinessState": {
+      "type": "string",
+      "enum": [
+        "needsScan",
+        "indexing",
+        "ready",
+        "empty",
+        "missing",
+        "blocked",
+        "unavailable"
       ]
     },
     "SourceClass": {
@@ -6113,6 +6220,153 @@
         "ejectPending"
       ]
     },
+    "SourcePreparationActivity": {
+      "type": "object",
+      "properties": {
+        "backlog": {
+          "$ref": "#/$defs/SourcePreparationBacklogCounts"
+        },
+        "boundedBatch": {
+          "type": "boolean"
+        },
+        "lastRunProcessed": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcePreparationProcessedCounts"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lastRunStatus": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceMaintenanceRunStatus"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "provenance": {
+          "$ref": "#/$defs/SourcePreparationProvenance"
+        },
+        "sourceFailure": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceMaintenanceSourceFailure"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "$ref": "#/$defs/SourcePreparationActivityState"
+        }
+      },
+      "required": [
+        "state",
+        "backlog",
+        "provenance",
+        "boundedBatch"
+      ]
+    },
+    "SourcePreparationActivityState": {
+      "type": "string",
+      "enum": [
+        "idle",
+        "running",
+        "completedWithRemainingWork",
+        "complete",
+        "failed",
+        "unavailable"
+      ]
+    },
+    "SourcePreparationBacklogCounts": {
+      "type": "object",
+      "properties": {
+        "attachment": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "hash": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "identity": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "probe": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "promotion": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "hash",
+        "probe",
+        "attachment",
+        "promotion",
+        "identity"
+      ]
+    },
+    "SourcePreparationProcessedCounts": {
+      "type": "object",
+      "properties": {
+        "attachment": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "hash": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "identity": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "probe": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "promotion": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "hash",
+        "probe",
+        "attachment",
+        "promotion",
+        "identity"
+      ]
+    },
+    "SourcePreparationProvenance": {
+      "type": "string",
+      "enum": [
+        "maintenanceSnapshot",
+        "runResult",
+        "integrityFallback",
+        "unavailable"
+      ]
+    },
     "SourceRegistrationProposalRequired": {
       "type": "object",
       "properties": {
@@ -6193,6 +6447,103 @@
         "protectedRoot",
         "indirectionRoot",
         "unknownRoot"
+      ]
+    },
+    "SourceScanActivity": {
+      "type": "object",
+      "properties": {
+        "counters": {
+          "$ref": "#/$defs/SourceScanActivityCounters"
+        },
+        "detail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lastFinishedAtMs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
+        },
+        "lastStartedAtMs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
+        },
+        "scanRunId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "state": {
+          "$ref": "#/$defs/SourceScanActivityState"
+        }
+      },
+      "required": [
+        "state",
+        "counters"
+      ]
+    },
+    "SourceScanActivityCounters": {
+      "type": "object",
+      "properties": {
+        "directoriesVisited": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
+        },
+        "filesDiscovered": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
+        },
+        "filesVisited": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
+        },
+        "mediaCandidates": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
+        },
+        "queuedWorkItems": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
+        }
+      }
+    },
+    "SourceScanActivityState": {
+      "type": "string",
+      "enum": [
+        "idle",
+        "running",
+        "completed",
+        "failed",
+        "blocked",
+        "cancelled"
       ]
     },
     "SourceScanEvent": {

@@ -28,6 +28,7 @@ import {
 import type { BrowserProjection } from '../tree/projection'
 import type { BrowserState, RowBinding } from '../state'
 import type { BrowserTreeNodeId } from '../tree/types'
+import type { ProjectedSourceActivity } from '../runtime/sourceActivity'
 import { formatSourceDisplayName } from '../tree/sourcePresentation'
 
 export type ContentProjectionKind =
@@ -134,6 +135,7 @@ export type ProjectContentsOptions = {
   readonly contentsState?: ContentsBoundaryState
   readonly sourceIntegrityBySourceId?: ReadonlyMap<string, ReadSourceIntegrityReply>
   readonly sourceMaintenanceBySourceId?: ReadonlyMap<string, ReadSourceMaintenanceReply>
+  readonly sourceActivityBySourceId?: ReadonlyMap<string, ProjectedSourceActivity>
 }
 
 type ContentSurface = {
@@ -205,7 +207,10 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
             : { sourceIntegrityBySourceId: options.sourceIntegrityBySourceId }),
           ...(options.sourceMaintenanceBySourceId === undefined
             ? {}
-            : { sourceMaintenanceBySourceId: options.sourceMaintenanceBySourceId })
+            : { sourceMaintenanceBySourceId: options.sourceMaintenanceBySourceId }),
+          ...(options.sourceActivityBySourceId === undefined
+            ? {}
+            : { sourceActivityBySourceId: options.sourceActivityBySourceId })
         })
       )
     }

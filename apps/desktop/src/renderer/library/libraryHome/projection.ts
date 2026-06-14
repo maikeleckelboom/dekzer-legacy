@@ -10,6 +10,12 @@ import {
   defaultLibraryBrowseProfile,
   type LibraryBrowseProfile
 } from '../libraryBrowseProfile/types'
+import {
+  sourceActivityBacklogTotal,
+  sourceActivityPreparationSummary,
+  sourceActivityScanSummary,
+  type ProjectedSourceActivity
+} from '../runtime/sourceActivity'
 import { sourceMaintenanceBacklog } from '../runtime/sourceMaintenanceSummary'
 
 export type LibraryHomeProductState =
@@ -51,6 +57,10 @@ export type LibrarySourceReadinessBadge =
   | 'Ready'
   | 'Indexing'
   | 'Needs scan'
+  | 'Scanning source'
+  | 'Preparing source'
+  | 'Maintenance completed; pending work remains'
+  | 'Preparation complete'
   | 'Missing'
   | 'Blocked'
   | 'Offline/unavailable'
@@ -71,6 +81,7 @@ export function projectLibraryHome(input: {
   readonly bindingsById?: ReadonlyMap<BrowserTreeNodeId, RowBinding>
   readonly sourceIntegrityBySourceId?: ReadonlyMap<string, ReadSourceIntegrityReply>
   readonly sourceMaintenanceBySourceId?: ReadonlyMap<string, ReadSourceMaintenanceReply>
+  readonly sourceActivityBySourceId?: ReadonlyMap<string, ProjectedSourceActivity>
 }): LibraryHomeProjection {
   const sourceBindings = admittedLibraryHomeRootBindings(input.bindingsById)
   const navigationReadResult = input.state.navigationReadResult
@@ -138,12 +149,15 @@ export function projectLibraryHome(input: {
       sourceId === undefined ? undefined : input.sourceIntegrityBySourceId?.get(sourceId)
     const sourceMaintenance =
       sourceId === undefined ? undefined : input.sourceMaintenanceBySourceId?.get(sourceId)
+    const sourceActivity =
+      sourceId === undefined ? undefined : input.sourceActivityBySourceId?.get(sourceId)
 
     return projectLibraryHomeRootReadiness({
       profile,
       ...(sourceReadiness === undefined ? {} : { sourceReadiness }),
       ...(sourceIntegrity === undefined ? {} : { sourceIntegrity }),
-      ...(sourceMaintenance === undefined ? {} : { sourceMaintenance })
+      ...(sourceMaintenance === undefined ? {} : { sourceMaintenance }),
+      ...(sourceActivity === undefined ? {} : { sourceActivity })
     })
   })
   const dominant = dominantLibraryHomeState(summaries, profile)
@@ -239,7 +253,16 @@ function projectLibraryHomeRootReadiness(input: {
   readonly sourceReadiness?: SourceReadiness
   readonly sourceIntegrity?: ReadSourceIntegrityReply
   readonly sourceMaintenance?: ReadSourceMaintenanceReply
+  readonly sourceActivity?: ProjectedSourceActivity
 }): LibrarySourceReadinessProjection {
+  const activitySummary = projectLibraryHomeSourceActivity({
+    profile: input.profile,
+    ...(input.sourceActivity === undefined ? {} : { sourceActivity: input.sourceActivity })
+  })
+  if (activitySummary !== undefined) {
+    return activitySummary
+  }
+
   const summary = projectLibrarySourceReadiness({
     profile: input.profile,
     ...(input.sourceReadiness === undefined ? {} : { sourceReadiness: input.sourceReadiness })
@@ -263,6 +286,148 @@ function projectLibraryHomeRootReadiness(input: {
   }
 
   return summary
+}
+
+function projectLibraryHomeSourceActivity(input: {
+  readonly profile: LibraryBrowseProfile
+  readonly sourceActivity?: ProjectedSourceActivity
+}): LibrarySourceReadinessProjection | undefined {
+  const activity = input.sourceActivity
+  if (activity === undefined) {
+    return undefined
+  }
+
+  switch (activity.browseReadiness.state) {
+    case 'missing':
+      return {
+        productState: 'missing',
+        badge: 'Missing',
+        tone: 'danger',
+        detail: activity.browseReadiness.detail ?? 'This source is missing.'
+      }
+    case 'blocked':
+      return {
+        productState: 'blocked',
+        badge: 'Blocked',
+        tone: 'danger',
+        detail: activity.browseReadiness.detail ?? 'This source is blocked.'
+      }
+    case 'unavailable':
+      return {
+        productState: 'unavailable',
+        badge: 'Offline/unavailable',
+        tone: 'danger',
+        detail: activity.browseReadiness.detail ?? 'This source is offline or unavailable.'
+      }
+    case 'indexing':
+      return {
+        productState: 'indexing',
+        badge: 'Scanning source',
+        tone: 'active',
+        detail: sourceActivityScanSummary(activity) ?? 'Scanning source.'
+      }
+    case 'needsScan':
+    case 'ready':
+    case 'empty':
+      break
+  }
+
+  if (activity.scanActivity.state === 'running') {
+    return {
+      productState: 'indexing',
+      badge: 'Scanning source',
+      tone: 'active',
+      detail: sourceActivityScanSummary(activity) ?? 'Scanning source.'
+    }
+  }
+  if (activity.scanActivity.state === 'failed' || activity.scanActivity.state === 'blocked') {
+    return {
+      productState: 'blocked',
+      badge: 'Blocked',
+      tone: 'danger',
+      detail: sourceActivityScanSummary(activity) ?? 'Scan is blocked.'
+    }
+  }
+  if (activity.scanActivity.state === 'cancelled') {
+    return {
+      productState: 'needsScan',
+      badge: 'Needs scan',
+      tone: 'warning',
+      detail: sourceActivityScanSummary(activity) ?? 'Scan was cancelled.'
+    }
+  }
+
+  switch (activity.preparationActivity.state) {
+    case 'running':
+      return {
+        productState: 'maintenanceNeeded',
+        badge: 'Preparing source',
+        tone: 'active',
+        detail: sourceActivityPreparationSummary(activity) ?? 'Preparing source.'
+      }
+    case 'completedWithRemainingWork':
+      return {
+        productState: 'maintenanceNeeded',
+        badge: 'Maintenance completed; pending work remains',
+        tone: 'warning',
+        detail:
+          sourceActivityPreparationSummary(activity) ??
+          'Maintenance completed; pending work remains.'
+      }
+    case 'idle':
+      if (sourceActivityBacklogTotal(activity) > 0) {
+        return {
+          productState: 'maintenanceNeeded',
+          badge: 'Preparation pending',
+          tone: 'warning',
+          detail:
+            sourceActivityPreparationSummary(activity) ??
+            'Preparation pending. Run maintenance processes a bounded batch.'
+        }
+      }
+      break
+    case 'failed':
+      return {
+        productState: 'maintenanceNeeded',
+        badge: 'Preparation pending',
+        tone: 'warning',
+        detail: sourceActivityPreparationSummary(activity) ?? 'Preparation failed.'
+      }
+    case 'unavailable':
+      return {
+        productState: 'maintenanceNeeded',
+        badge: 'Preparation pending',
+        tone: 'warning',
+        detail:
+          sourceActivityPreparationSummary(activity) ?? 'Preparation status unavailable.'
+      }
+    case 'complete':
+      break
+  }
+
+  switch (activity.browseReadiness.state) {
+    case 'needsScan':
+      return {
+        productState: 'needsScan',
+        badge: 'Needs scan',
+        tone: 'warning',
+        detail: activity.browseReadiness.detail ?? 'Scan source to index your music.'
+      }
+    case 'empty':
+      return {
+        productState: 'emptyCurrentView',
+        badge: libraryBrowseEmptyStateBadge(input.profile),
+        tone: 'warning',
+        detail: libraryBrowseEmptyStateLabel(input.profile)
+      }
+    case 'ready':
+      return {
+        productState: 'ready',
+        badge: 'Ready',
+        tone: 'ready',
+        detail: sourceActivityPreparationSummary(activity) ?? 'Ready to browse.'
+      }
+  }
 }
 
 function libraryHomeMaintenancePrefix(
@@ -449,7 +614,9 @@ function sourceSummaryDetail(summary: LibrarySourceReadinessProjection): string 
   }
 }
 
-function libraryBrowseEmptyStateBadge(profile: LibraryBrowseProfile): LibrarySourceReadinessBadge {
+export function libraryBrowseEmptyStateBadge(
+  profile: LibraryBrowseProfile
+): LibrarySourceReadinessBadge {
   switch (profile) {
     case 'audio':
       return 'No audio tracks in this view'

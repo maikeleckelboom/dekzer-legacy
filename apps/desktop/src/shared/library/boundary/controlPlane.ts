@@ -41,6 +41,7 @@ export const libraryControlChannels = {
     unregister: 'desktop:library-roots:unregister-local-root'
   },
   source: {
+    activity: 'desktop:library-source-activity:read-source-activity',
     fileHashing: 'desktop:library-source-file-hashing:hash-source-files-blake3',
     integrity: 'desktop:library-source-integrity:read-source-integrity',
     lifecycle: 'desktop:library-source-lifecycle:read-source-lifecycle',

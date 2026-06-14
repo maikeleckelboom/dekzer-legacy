@@ -21,6 +21,7 @@ import { type ContentsReadResult } from '../../../src/shared/library/contents/re
 
 import type { ReadSourceLifecycleResult } from '../../../src/shared/library/source/lifecycle'
 import type { SourceIntegrityReadResult } from '../../../src/shared/library/source/integrity'
+import type { SourceActivityReadResult } from '../../../src/shared/library/source/activity'
 
 import type {
   ReadAttachmentSourceFilesResult,
@@ -57,6 +58,7 @@ describe('preload renderer API', () => {
     }
     const sourceLifecycleRequest = { sourceId: '7' }
     const sourceIntegrityRequest = { sourceId: '7' }
+    const sourceActivityRequest = { sourceId: '7' }
     const sourceFileAttachmentRequest = { sourceFileId: '11' }
     const attachmentSourceFilesRequest = { attachmentId: '7', limit: 25 }
     const sourceAttachmentSummaryRequest = { sourceId: '7' }
@@ -167,6 +169,34 @@ describe('preload renderer API', () => {
         },
         runtimeMaintenance: {
           state: 'idle'
+        }
+      }
+    }
+    const sourceActivityResult: SourceActivityReadResult = {
+      state: 'ready',
+      activity: {
+        sourceId: '7',
+        admissionState: 'active',
+        browseReadiness: {
+          state: 'ready',
+          detail: 'Source is ready to browse.'
+        },
+        scanActivity: {
+          state: 'completed',
+          counters: {},
+          detail: 'Scan completed.'
+        },
+        preparationActivity: {
+          state: 'complete',
+          backlog: {
+            hash: 0,
+            probe: 0,
+            attachment: 0,
+            promotion: 0,
+            identity: 0
+          },
+          provenance: 'maintenanceSnapshot',
+          boundedBatch: true
         }
       }
     }
@@ -467,6 +497,7 @@ describe('preload renderer API', () => {
     let receivedContentsRequest: unknown
     let receivedSourceLifecycleRequest: unknown
     let receivedSourceIntegrityRequest: unknown
+    let receivedSourceActivityRequest: unknown
     let receivedSourceFileAttachmentRequest: unknown
     let receivedAttachmentSourceFilesRequest: unknown
     let receivedSourceAttachmentSummaryRequest: unknown
@@ -511,6 +542,11 @@ describe('preload renderer API', () => {
         if (channel === libraryControlChannels.source.integrity) {
           receivedSourceIntegrityRequest = args[0]
           return sourceIntegrityResult
+        }
+
+        if (channel === libraryControlChannels.source.activity) {
+          receivedSourceActivityRequest = args[0]
+          return sourceActivityResult
         }
 
         if (channel === libraryControlChannels.attachmentIdentity.readSourceFileAttachment) {
@@ -669,6 +705,10 @@ describe('preload renderer API', () => {
       api.library.sourceIntegrity.readSourceIntegrity(sourceIntegrityRequest)
     ).resolves.toBe(sourceIntegrityResult)
     expect(receivedSourceIntegrityRequest).toBe(sourceIntegrityRequest)
+    await expect(
+      api.library.sourceActivity.readSourceActivity(sourceActivityRequest)
+    ).resolves.toBe(sourceActivityResult)
+    expect(receivedSourceActivityRequest).toBe(sourceActivityRequest)
     await expect(
       api.library.attachmentIdentity.readSourceFileAttachment(sourceFileAttachmentRequest)
     ).resolves.toBe(sourceFileAttachmentResult)

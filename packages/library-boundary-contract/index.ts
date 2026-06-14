@@ -55,7 +55,7 @@ export type RejectTrackIdentityCandidateRequest = { candidateId: string, reason?
 
 export type DeferTrackIdentityCandidateRequest = { candidateId: string, reason?: string, };
 
-export type SnapshotReadCommand = { "type": "readNavigationRows", "payload": ReadNavigationRowsRequest } | { "type": "loadNavigationRow", "payload": LoadNavigationRowRequest } | { "type": "loadNavigationRowByStableKey", "payload": LoadNavigationRowByStableKeyRequest } | { "type": "readLocalBrowseEntryPoints", "payload": ReadLocalBrowseEntryPointsRequest } | { "type": "readLocalBrowseItems", "payload": ReadLocalBrowseItemsRequest } | { "type": "readLibraryTreeChildren", "payload": ReadLibraryTreeChildrenRequest } | { "type": "readSourceLifecycle", "payload": ReadSourceLifecycleRequest } | { "type": "readSourceIntegrity", "payload": ReadSourceIntegrityRequest } | { "type": "readSourceMaintenance", "payload": ReadSourceMaintenanceRequest } | { "type": "readSourceFileAttachment", "payload": ReadSourceFileAttachmentRequest } | { "type": "readAttachmentSourceFiles", "payload": ReadAttachmentSourceFilesRequest } | { "type": "readSourceAttachmentSummary", "payload": ReadSourceAttachmentSummaryRequest } | { "type": "readTrackIdentityReviewCandidates", "payload": ReadTrackIdentityReviewCandidatesRequest } | { "type": "contentsRead", "payload": ContentsReadRequest } | { "type": "searchFilterRead", "payload": SearchFilterReadRequest };
+export type SnapshotReadCommand = { "type": "readNavigationRows", "payload": ReadNavigationRowsRequest } | { "type": "loadNavigationRow", "payload": LoadNavigationRowRequest } | { "type": "loadNavigationRowByStableKey", "payload": LoadNavigationRowByStableKeyRequest } | { "type": "readLocalBrowseEntryPoints", "payload": ReadLocalBrowseEntryPointsRequest } | { "type": "readLocalBrowseItems", "payload": ReadLocalBrowseItemsRequest } | { "type": "readLibraryTreeChildren", "payload": ReadLibraryTreeChildrenRequest } | { "type": "readSourceLifecycle", "payload": ReadSourceLifecycleRequest } | { "type": "readSourceIntegrity", "payload": ReadSourceIntegrityRequest } | { "type": "readSourceMaintenance", "payload": ReadSourceMaintenanceRequest } | { "type": "readSourceActivity", "payload": ReadSourceActivityRequest } | { "type": "readSourceFileAttachment", "payload": ReadSourceFileAttachmentRequest } | { "type": "readAttachmentSourceFiles", "payload": ReadAttachmentSourceFilesRequest } | { "type": "readSourceAttachmentSummary", "payload": ReadSourceAttachmentSummaryRequest } | { "type": "readTrackIdentityReviewCandidates", "payload": ReadTrackIdentityReviewCandidatesRequest } | { "type": "contentsRead", "payload": ContentsReadRequest } | { "type": "searchFilterRead", "payload": SearchFilterReadRequest };
 
 export type ReadNavigationRowsRequest = { parentNavigationRowId: string | null, };
 
@@ -100,6 +100,8 @@ export type ReadSourceLifecycleRequest = { sourceId: string, };
 export type ReadSourceIntegrityRequest = { sourceId: string, };
 
 export type ReadSourceMaintenanceRequest = { sourceId: string, };
+
+export type ReadSourceActivityRequest = { sourceId: string, };
 
 export type SourceClass = "internal" | "externalMounted" | "removableMounted";
 
@@ -224,7 +226,7 @@ export type TrackIdentityEffectiveDecisionPrecedence = "user" | "system" | "none
 
 export type TrackIdentityUserBlockingDecisionState = "none" | "rejected" | "deferred";
 
-export type SnapshotReadReply = { "type": "navigationRows", "payload": ReadNavigationRowsReply } | { "type": "navigationRow", "payload": LoadNavigationRowReply } | { "type": "navigationRowByStableKey", "payload": LoadNavigationRowByStableKeyReply } | { "type": "localBrowseEntryPoints", "payload": ReadLocalBrowseEntryPointsReply } | { "type": "localBrowseItems", "payload": ReadLocalBrowseItemsReply } | { "type": "libraryTreeChildren", "payload": ReadLibraryTreeChildrenReply } | { "type": "sourceLifecycle", "payload": ReadSourceLifecycleReply } | { "type": "sourceIntegrity", "payload": ReadSourceIntegrityReply } | { "type": "sourceMaintenance", "payload": ReadSourceMaintenanceReply } | { "type": "sourceFileAttachment", "payload": ReadSourceFileAttachmentReply } | { "type": "attachmentSourceFiles", "payload": ReadAttachmentSourceFilesReply } | { "type": "sourceAttachmentSummary", "payload": ReadSourceAttachmentSummaryReply } | { "type": "trackIdentityReviewCandidates", "payload": ReadTrackIdentityReviewCandidatesReply } | { "type": "contents", "payload": ContentsReadReply } | { "type": "searchFilter", "payload": SearchFilterReadReply };
+export type SnapshotReadReply = { "type": "navigationRows", "payload": ReadNavigationRowsReply } | { "type": "navigationRow", "payload": LoadNavigationRowReply } | { "type": "navigationRowByStableKey", "payload": LoadNavigationRowByStableKeyReply } | { "type": "localBrowseEntryPoints", "payload": ReadLocalBrowseEntryPointsReply } | { "type": "localBrowseItems", "payload": ReadLocalBrowseItemsReply } | { "type": "libraryTreeChildren", "payload": ReadLibraryTreeChildrenReply } | { "type": "sourceLifecycle", "payload": ReadSourceLifecycleReply } | { "type": "sourceIntegrity", "payload": ReadSourceIntegrityReply } | { "type": "sourceMaintenance", "payload": ReadSourceMaintenanceReply } | { "type": "sourceActivity", "payload": ReadSourceActivityReply } | { "type": "sourceFileAttachment", "payload": ReadSourceFileAttachmentReply } | { "type": "attachmentSourceFiles", "payload": ReadAttachmentSourceFilesReply } | { "type": "sourceAttachmentSummary", "payload": ReadSourceAttachmentSummaryReply } | { "type": "trackIdentityReviewCandidates", "payload": ReadTrackIdentityReviewCandidatesReply } | { "type": "contents", "payload": ContentsReadReply } | { "type": "searchFilter", "payload": SearchFilterReadReply };
 
 export type ReadNavigationRowsReply = { rows: Array<NavigationRow>, };
 
@@ -261,6 +263,8 @@ export type ReadSourceLifecycleReply = { lifecycle: SourceLifecycle | null, };
 export type ReadSourceIntegrityReply = { sourceId: string, sourceAvailability: SourceIntegrityAvailability, coverageIntegrity: SourceIntegrityCoverage, inventory?: SourceIntegrityInventory, evidenceAndMaintenance: SourceIntegrityEvidenceAndMaintenance, attachmentIntegrity?: SourceIntegrityAttachmentIntegrity, runtimeMaintenance: SourceIntegrityRuntimeMaintenance, };
 
 export type ReadSourceMaintenanceReply = { sourceId: string, status: SourceMaintenanceSnapshotStatus, remainingHashCandidates: number, remainingProbeCandidates: number, remainingPlayableMediaPromotionCandidates: number, remainingTrackIdentityCandidateProductionCandidates: number, remainingTrackIdentityDecisionProductionCandidates: number, attachmentLinks?: SourceMaintenanceAttachmentLinkSummary, sourceFailure?: SourceMaintenanceSourceFailure, lastRun?: SourceMaintenanceLastRunSummary, };
+
+export type ReadSourceActivityReply = { sourceId: string, admissionState: SourceActivityAdmissionState, browseReadiness: SourceBrowseReadiness, scanActivity: SourceScanActivity, preparationActivity: SourcePreparationActivity, };
 
 export type ReadSourceFileAttachmentReply = { status: AttachmentIdentityReadStatus, attachmentLink?: SourceFileAttachmentLink, };
 
@@ -345,6 +349,28 @@ export type SourceIntegrityAttachmentIntegrity = { currentLinksCount: number, st
 export type SourceIntegrityRuntimeMaintenance = { state: SourceIntegrityRuntimeMaintenanceState, lastRun?: SourceMaintenanceLastRunSummary, };
 
 export type SourceIntegrityRuntimeMaintenanceState = "idle" | "running";
+
+export type SourceActivityAdmissionState = "active" | "restorable" | "notAdmitted";
+
+export type SourceBrowseReadiness = { state: SourceBrowseReadinessState, detail?: string, };
+
+export type SourceBrowseReadinessState = "needsScan" | "indexing" | "ready" | "empty" | "missing" | "blocked" | "unavailable";
+
+export type SourceScanActivity = { state: SourceScanActivityState, counters: SourceScanActivityCounters, detail?: string, scanRunId?: string | null, lastStartedAtMs?: number, lastFinishedAtMs?: number, };
+
+export type SourceScanActivityState = "idle" | "running" | "completed" | "failed" | "blocked" | "cancelled";
+
+export type SourceScanActivityCounters = { directoriesVisited?: number, filesVisited?: number, filesDiscovered?: number, mediaCandidates?: number, queuedWorkItems?: number, };
+
+export type SourcePreparationActivity = { state: SourcePreparationActivityState, backlog: SourcePreparationBacklogCounts, provenance: SourcePreparationProvenance, boundedBatch: boolean, lastRunStatus?: SourceMaintenanceRunStatus, lastRunProcessed?: SourcePreparationProcessedCounts, sourceFailure?: SourceMaintenanceSourceFailure, };
+
+export type SourcePreparationActivityState = "idle" | "running" | "completedWithRemainingWork" | "complete" | "failed" | "unavailable";
+
+export type SourcePreparationProvenance = "maintenanceSnapshot" | "runResult" | "integrityFallback" | "unavailable";
+
+export type SourcePreparationBacklogCounts = { hash: number, probe: number, attachment: number, promotion: number, identity: number, };
+
+export type SourcePreparationProcessedCounts = { hash: number, probe: number, attachment: number, promotion: number, identity: number, };
 
 export type AttachmentIdentityReadStatus = "ok" | "notFound" | "invalidRequest" | "readFailed";
 

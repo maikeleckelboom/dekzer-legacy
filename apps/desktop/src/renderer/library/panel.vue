@@ -26,6 +26,7 @@ import {
 } from './boundary/sourceLifecycleRead'
 import { useRead as useIntegrityRead } from './sourceIntegrity/read'
 import { useRead as useMaintenanceRead } from './sourceMaintenance/read'
+import { useRead as useActivityRead } from './sourceActivity/read'
 import ContentsTable from './contents/table.vue'
 import { projectContents, type ContentRow } from './contents/projection'
 import { projectSearchFilterContents } from './searchFilter/contentsProjection'
@@ -53,6 +54,7 @@ import {
   type SourceAdmissionHandoffState
 } from './runtime/sourceAdmissionHandoff'
 import { projectLibraryToolbar } from './runtime/toolbarProjection'
+import { projectSourceActivityBySourceId } from './runtime/sourceActivity'
 import { projectSourceReadinessByNodeId } from './runtime/sourceReadiness'
 import { projectStatusContext } from './sourceStatus/context'
 import {
@@ -99,6 +101,7 @@ const boundaryEvents = useBoundaryEvents()
 const sourceLifecycleRead = useSourceLifecycleRead()
 const integrityRead = useIntegrityRead()
 const maintenanceRead = useMaintenanceRead()
+const activityRead = useActivityRead()
 const searchFilterRead = useSearchFilterRead()
 const librarySearch = createLibrarySearchController({
   profile: libraryBrowseProfile.profile,
@@ -161,6 +164,14 @@ const sourceReadinessByNodeId = computed(() =>
       ? {}
       : { currentScanRootId: rootActions.registeredRoot.value.rootId }),
     currentScanStatus: rootActions.scanStatus.value
+  })
+)
+
+const sourceActivityBySourceId = computed(() =>
+  projectSourceActivityBySourceId({
+    activityBySourceId: activityRead.snapshotBySourceId.value,
+    scanProgressByRootId: boundaryEvents.scanProgress.value,
+    maintenanceRunStateBySourceId: maintenanceRead.runStateBySourceId.value
   })
 )
 
@@ -283,7 +294,8 @@ const selectedLibraryContentsProjection = computed(() => {
     ...(projection === undefined ? {} : { bindingsById: projection.bindingsById }),
     contentsState: contentsRead.state.value,
     sourceIntegrityBySourceId: integrityRead.snapshotBySourceId.value,
-    sourceMaintenanceBySourceId: maintenanceRead.snapshotBySourceId.value
+    sourceMaintenanceBySourceId: maintenanceRead.snapshotBySourceId.value,
+    sourceActivityBySourceId: sourceActivityBySourceId.value
   })
 })
 
@@ -373,6 +385,8 @@ const sourceStatusView = computed(() => {
     sourceId === undefined ? undefined : integrityRead.snapshotBySourceId.value.get(sourceId)
   const sourceMaintenance =
     sourceId === undefined ? undefined : maintenanceRead.snapshotBySourceId.value.get(sourceId)
+  const sourceActivity =
+    sourceId === undefined ? undefined : sourceActivityBySourceId.value.get(sourceId)
   const maintenanceRunState =
     sourceId === undefined ? undefined : maintenanceRead.runStateBySourceId.value.get(sourceId)
   const sourceReadiness =
@@ -388,6 +402,7 @@ const sourceStatusView = computed(() => {
     ...(sourceLifecycle === undefined ? {} : { sourceLifecycle }),
     ...(sourceIntegrity === undefined ? {} : { sourceIntegrity }),
     ...(sourceMaintenance === undefined ? {} : { sourceMaintenance }),
+    ...(sourceActivity === undefined ? {} : { sourceActivity }),
     ...(maintenanceRunState === undefined ? {} : { maintenanceRunState }),
     ...(sourceReadiness === undefined ? {} : { sourceReadiness }),
     ...(selectedStatusSourcePath.value === undefined
@@ -409,6 +424,8 @@ watch(
     selectedStatusSourcePath,
     () => integrityRead.snapshotBySourceId.value,
     () => maintenanceRead.snapshotBySourceId.value,
+    () => activityRead.snapshotBySourceId.value,
+    () => boundaryEvents.scanProgress.value,
     () => maintenanceRead.runStateBySourceId.value
   ],
   () => {
@@ -422,6 +439,8 @@ watch(
       sourceId === undefined ? undefined : integrityRead.snapshotBySourceId.value.get(sourceId)
     const sourceMaintenance =
       sourceId === undefined ? undefined : maintenanceRead.snapshotBySourceId.value.get(sourceId)
+    const sourceActivity =
+      sourceId === undefined ? undefined : sourceActivityBySourceId.value.get(sourceId)
     const maintenanceRunState =
       sourceId === undefined ? undefined : maintenanceRead.runStateBySourceId.value.get(sourceId)
 
@@ -431,6 +450,7 @@ watch(
         context,
         ...(sourceIntegrity === undefined ? {} : { sourceIntegrity }),
         ...(sourceMaintenance === undefined ? {} : { sourceMaintenance }),
+        ...(sourceActivity === undefined ? {} : { sourceActivity }),
         ...(maintenanceRunState === undefined ? {} : { maintenanceRunState }),
         ...(selectedStatusSourcePath.value === undefined
           ? {}
@@ -455,7 +475,8 @@ const sourceAdmissionHandoffView = computed(() =>
     ...(libraryBrowseProjection.value === undefined
       ? {}
       : { projection: libraryBrowseProjection.value }),
-    sourceReadinessByNodeId: sourceReadinessByNodeId.value
+    sourceReadinessByNodeId: sourceReadinessByNodeId.value,
+    sourceActivityBySourceId: sourceActivityBySourceId.value
   })
 )
 
@@ -645,6 +666,7 @@ watch(
 
     void integrityRead.refresh(sourceIds)
     void maintenanceRead.refresh(sourceIds)
+    void activityRead.refresh(sourceIds)
   },
   { immediate: true }
 )
@@ -1217,13 +1239,14 @@ async function refreshSelectedSourceStatus(): Promise<boolean> {
 }
 
 async function refreshSourceStatus(sourceId: string): Promise<boolean> {
-  const [lifecycle, integrity, maintenance] = await Promise.all([
+  const [lifecycle, integrity, maintenance, activity] = await Promise.all([
     sourceLifecycleRead.readSourceLifecycle(sourceId, { force: true }),
     integrityRead.read(sourceId, { force: true }),
-    maintenanceRead.read(sourceId, { force: true })
+    maintenanceRead.read(sourceId, { force: true }),
+    activityRead.read(sourceId, { force: true })
   ])
 
-  return lifecycle && integrity && maintenance
+  return lifecycle && integrity && maintenance && activity
 }
 
 function scheduleRunningMaintenanceRefresh(): void {

@@ -10,6 +10,7 @@ mod search_filter_protocol;
 mod service;
 mod session_events;
 mod snapshot_read_protocol;
+mod source_activity;
 mod source_file_hash_protocol;
 mod source_maintenance;
 mod storage_environment;

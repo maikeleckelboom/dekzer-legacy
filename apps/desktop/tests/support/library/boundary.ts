@@ -112,6 +112,7 @@ export function createFakeClient(
     readLibraryTreeChildren: rejectUnexpectedClientCall,
     readSourceLifecycle: rejectUnexpectedClientCall,
     readSourceIntegrity: rejectUnexpectedClientCall,
+    readSourceActivity: rejectUnexpectedClientCall,
     readSourceMaintenance: rejectUnexpectedClientCall,
     readSourceFileAttachment: rejectUnexpectedClientCall,
     readAttachmentSourceFiles: rejectUnexpectedClientCall,

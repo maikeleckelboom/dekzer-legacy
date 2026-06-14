@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { ReadSourceActivityReply } from '@dekzer/library-boundary-contract'
 
 import {
   projectSourceAdmissionHandoff,
@@ -66,6 +67,28 @@ describe('source admission handoff projection', () => {
       readinessDetail: 'Checking source readiness.'
     })
   })
+
+  it('uses source activity for preparation handoff detail', () => {
+    const projection = projectSourceAdmissionHandoff({
+      handoff: sourceAdmissionHandoffFromRoot({
+        rootId: '7',
+        admittedRootPath: 'C:/Music'
+      }),
+      projection: sourceProjection('7', 'Music'),
+      sourceActivityBySourceId: new Map([
+        [
+          '7',
+          sourceActivity({
+            preparationActivity: {
+              state: 'running'
+            }
+          })
+        ]
+      ])
+    })
+
+    expect(projection?.readinessDetail).toBe('Preparing source.')
+  })
 })
 
 function sourceProjection(sourceId: string, label: string): BrowserProjection {
@@ -107,5 +130,50 @@ function sourceBinding(sourceId: string, label: string): RowBinding {
       entryPoint: { kind: 'source', sourceId },
       label
     }
+  }
+}
+
+function sourceActivity(
+  overrides: {
+    readonly preparationActivity?: Partial<ReadSourceActivityReply['preparationActivity']>
+  } = {}
+): ReadSourceActivityReply {
+  const base: ReadSourceActivityReply = {
+    sourceId: '7',
+    admissionState: 'active',
+    browseReadiness: {
+      state: 'ready'
+    },
+    scanActivity: {
+      state: 'completed',
+      counters: {}
+    },
+    preparationActivity: {
+      state: 'complete',
+      backlog: {
+        hash: 0,
+        probe: 0,
+        attachment: 0,
+        promotion: 0,
+        identity: 0
+      },
+      provenance: 'maintenanceSnapshot',
+      boundedBatch: true
+    }
+  }
+
+  return {
+    ...base,
+    preparationActivity:
+      overrides.preparationActivity === undefined
+        ? base.preparationActivity
+        : {
+            ...base.preparationActivity,
+            ...overrides.preparationActivity,
+            backlog: {
+              ...base.preparationActivity.backlog,
+              ...(overrides.preparationActivity.backlog ?? {})
+            }
+          }
   }
 }

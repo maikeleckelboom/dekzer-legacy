@@ -1,8 +1,8 @@
 use super::{
-    ReadSourceMaintenanceReply, ReadSourceMaintenanceRequest, SourceMaintenanceLastRunSummary,
-    SourceMaintenanceSourceFailure, TrackIdentityDecisionState,
-    TrackIdentityEffectiveDecisionCurrentStatus, TrackIdentityUserBlockingDecisionState,
-    search_filter::*,
+    ReadSourceActivityReply, ReadSourceActivityRequest, ReadSourceMaintenanceReply,
+    ReadSourceMaintenanceRequest, SourceMaintenanceLastRunSummary, SourceMaintenanceSourceFailure,
+    TrackIdentityDecisionState, TrackIdentityEffectiveDecisionCurrentStatus,
+    TrackIdentityUserBlockingDecisionState, search_filter::*,
 };
 
 #[derive(
@@ -2502,6 +2502,7 @@ pub enum SnapshotReadCommand {
     ReadSourceLifecycle(ReadSourceLifecycleRequest),
     ReadSourceIntegrity(ReadSourceIntegrityRequest),
     ReadSourceMaintenance(ReadSourceMaintenanceRequest),
+    ReadSourceActivity(ReadSourceActivityRequest),
     ReadSourceFileAttachment(ReadSourceFileAttachmentRequest),
     ReadAttachmentSourceFiles(ReadAttachmentSourceFilesRequest),
     ReadSourceAttachmentSummary(ReadSourceAttachmentSummaryRequest),
@@ -2525,6 +2526,7 @@ pub enum SnapshotReadReply {
     SourceLifecycle(ReadSourceLifecycleReply),
     SourceIntegrity(Box<ReadSourceIntegrityReply>),
     SourceMaintenance(Box<ReadSourceMaintenanceReply>),
+    SourceActivity(Box<ReadSourceActivityReply>),
     SourceFileAttachment(ReadSourceFileAttachmentReply),
     AttachmentSourceFiles(ReadAttachmentSourceFilesReply),
     SourceAttachmentSummary(ReadSourceAttachmentSummaryReply),

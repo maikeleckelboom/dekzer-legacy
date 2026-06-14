@@ -1,5 +1,11 @@
 import type { LocalRootRegistrationRoot } from '../../../shared/library/roots/register'
 import type { SourceReadiness } from './sourceReadiness'
+import {
+  sourceActivityBacklogTotal,
+  sourceActivityPreparationSummary,
+  sourceActivityScanSummary,
+  type ProjectedSourceActivity
+} from './sourceActivity'
 import type { BrowserProjection } from '../tree/projection'
 import type { BrowserTreeNodeId } from '../tree/types'
 import type { RowBinding } from '../state'
@@ -45,6 +51,7 @@ export function projectSourceAdmissionHandoff(input: {
   readonly handoff?: SourceAdmissionHandoffState
   readonly projection?: BrowserProjection
   readonly sourceReadinessByNodeId?: ReadonlyMap<BrowserTreeNodeId, SourceReadiness>
+  readonly sourceActivityBySourceId?: ReadonlyMap<string, ProjectedSourceActivity>
 }): SourceAdmissionHandoffProjection | undefined {
   const handoff = input.handoff
 
@@ -57,6 +64,7 @@ export function projectSourceAdmissionHandoff(input: {
     visibleSource === undefined
       ? undefined
       : input.sourceReadinessByNodeId?.get(visibleSource.nodeId)
+  const sourceActivity = input.sourceActivityBySourceId?.get(handoff.sourceId)
   const sourceName = visibleSource?.label
 
   return {
@@ -65,7 +73,10 @@ export function projectSourceAdmissionHandoff(input: {
     ...(sourceName === undefined ? {} : { sourceName }),
     ...(handoff.sourcePath === undefined ? {} : { sourcePath: handoff.sourcePath }),
     detail: sourceAddedDetail(sourceName, handoff.sourcePath),
-    readinessDetail: readinessDetail(readiness),
+    readinessDetail: readinessDetail({
+      ...(readiness === undefined ? {} : { readiness }),
+      ...(sourceActivity === undefined ? {} : { sourceActivity })
+    }),
     actions: [
       {
         kind: 'viewSource',
@@ -129,7 +140,39 @@ function sourceAddedDetail(sourceName: string | undefined, sourcePath: string | 
   return 'Source added.'
 }
 
-function readinessDetail(readiness: SourceReadiness | undefined): string {
+function readinessDetail(input: {
+  readonly readiness?: SourceReadiness
+  readonly sourceActivity?: ProjectedSourceActivity
+}): string {
+  const activity = input.sourceActivity
+  if (activity !== undefined) {
+    if (
+      activity.scanActivity.state === 'running' ||
+      activity.browseReadiness.state === 'indexing'
+    ) {
+      return sourceActivityScanSummary(activity) ?? 'Scanning source.'
+    }
+
+    if (activity.preparationActivity.state === 'running') {
+      return sourceActivityPreparationSummary(activity) ?? 'Preparing source.'
+    }
+
+    if (
+      activity.preparationActivity.state === 'completedWithRemainingWork' ||
+      (activity.preparationActivity.state === 'idle' && sourceActivityBacklogTotal(activity) > 0)
+    ) {
+      return (
+        sourceActivityPreparationSummary(activity) ??
+        'Maintenance completed; pending work remains.'
+      )
+    }
+
+    if (activity.preparationActivity.state === 'complete') {
+      return activity.browseReadiness.state === 'ready' ? 'Ready.' : 'Preparation complete.'
+    }
+  }
+
+  const readiness = input.readiness
   if (readiness === undefined) {
     return 'Checking source readiness.'
   }

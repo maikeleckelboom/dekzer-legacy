@@ -1,4 +1,5 @@
 import type {
+  ReadSourceActivityReply,
   ReadSourceIntegrityReply,
   ReadSourceMaintenanceReply
 } from '@dekzer/library-boundary-contract'
@@ -10,6 +11,7 @@ import type { SourceLifecycleRecord } from '../../../shared/library/source/lifec
 import type { StatusContext } from './context'
 import { projectAddSourceStatusText } from '../addSource/projection'
 import {
+  libraryBrowseEmptyStateBadge,
   libraryBrowseEmptyStateLabel,
   projectLibrarySourceReadiness
 } from '../libraryHome/projection'
@@ -22,9 +24,20 @@ import {
   sourceMaintenanceBacklog,
   type SourceMaintenanceBacklog
 } from '../runtime/sourceMaintenanceSummary'
+import {
+  sourceActivityBacklogCategories,
+  sourceActivityBacklogTotal,
+  sourceActivityPreparationSummary,
+  sourceActivityScanSummary,
+  type ProjectedSourceActivity
+} from '../runtime/sourceActivity'
 
 export type StatusBadge =
   | 'Ready'
+  | 'Scanning source'
+  | 'Preparing source'
+  | 'Maintenance completed; pending work remains'
+  | 'Preparation complete'
   | 'Indexing'
   | 'Still indexing'
   | 'No audio tracks in this view'
@@ -103,6 +116,7 @@ export type StatusViewInput = {
   readonly libraryBrowseProfile?: LibraryBrowseProfile
   readonly sourceLifecycle?: SourceLifecycleRecord
   readonly sourceReadiness?: SourceReadiness
+  readonly sourceActivity?: ProjectedSourceActivity
   readonly sourceIntegrity?: ReadSourceIntegrityReply
   readonly sourceMaintenance?: ReadSourceMaintenanceReply
   readonly canAddLocalPath: boolean
@@ -119,10 +133,19 @@ export type StatusViewInput = {
 export type SourceStatusDiagnosticTrace = {
   readonly sourceId?: string
   readonly sourcePath?: string
+  readonly admissionState?:
+    | ReadSourceActivityReply['admissionState']
+    | 'active'
+    | 'restorable'
+    | 'notAdmitted'
+  readonly browseReadiness?: ReadSourceActivityReply['browseReadiness']
+  readonly scanActivity?: ReadSourceActivityReply['scanActivity']
+  readonly preparationActivity?: ReadSourceActivityReply['preparationActivity']
   readonly duplicateStatus?: 'active' | 'restorable' | 'none'
   readonly maintenanceSnapshotSource?: ReturnType<typeof sourceMaintenanceBacklog>['source']
   readonly backlogCounts?: SourceMaintenanceBacklog['categories']
   readonly backlogTotal?: number
+  readonly provenance?: ReadSourceActivityReply['preparationActivity']['provenance']
   readonly lastRunStatus?: SourceMaintenanceBacklog['lastRunStatus']
 }
 
@@ -239,6 +262,11 @@ function registeredStatus(
 }
 
 function registeredBadge(input: StatusViewInput): StatusBadge {
+  const activityBadge = registeredActivityBadge(input)
+  if (activityBadge !== undefined) {
+    return activityBadge
+  }
+
   if (input.scanStatus === 'scanning' || input.sourceLifecycle?.scanPhase === 'scanning') {
     return 'Indexing'
   }
@@ -359,12 +387,70 @@ function registeredBadge(input: StatusViewInput): StatusBadge {
   return 'Still indexing'
 }
 
+function registeredActivityBadge(input: StatusViewInput): StatusBadge | undefined {
+  const activity = input.sourceActivity
+  if (activity === undefined) {
+    return undefined
+  }
+
+  if (activity.scanActivity.state === 'running') {
+    return 'Scanning source'
+  }
+  if (activity.scanActivity.state === 'failed' || activity.scanActivity.state === 'blocked') {
+    return 'Blocked'
+  }
+  if (activity.scanActivity.state === 'cancelled') {
+    return 'Needs scan'
+  }
+
+  switch (activity.browseReadiness.state) {
+    case 'missing':
+      return 'Missing'
+    case 'blocked':
+      return 'Blocked'
+    case 'unavailable':
+      return 'Offline/unavailable'
+    case 'indexing':
+      return 'Scanning source'
+    case 'needsScan':
+    case 'ready':
+    case 'empty':
+      break
+  }
+
+  switch (activity.preparationActivity.state) {
+    case 'running':
+      return 'Preparing source'
+    case 'completedWithRemainingWork':
+      return 'Maintenance completed; pending work remains'
+    case 'idle':
+      return sourceActivityBacklogTotal(activity) > 0 ? 'Preparation pending' : undefined
+    case 'failed':
+    case 'unavailable':
+      return 'Maintenance unavailable'
+    case 'complete':
+      break
+  }
+
+  switch (activity.browseReadiness.state) {
+    case 'needsScan':
+      return 'Needs scan'
+    case 'empty':
+      return libraryBrowseEmptyStateBadge(input.libraryBrowseProfile ?? defaultLibraryBrowseProfile)
+    case 'ready':
+      return 'Ready'
+  }
+}
+
 function compactDetail(input: StatusViewInput, prefix: string | undefined): string {
   const parts = [prefix].filter((part): part is string => part !== undefined)
-  const maintenanceDetail = maintenanceSummary(input)
+  const activityDetail = sourceActivityDetail(input)
+  const maintenanceDetail = activityDetail ?? maintenanceSummary(input)
   const healthDetail = healthSummary(input.sourceIntegrity, input.sourceLifecycle)
 
-  if (input.sourceMaintenance?.lastRun?.status === 'failed') {
+  if (activityDetail !== undefined) {
+    parts.push(activityDetail)
+  } else if (input.sourceMaintenance?.lastRun?.status === 'failed') {
     parts.push('Last maintenance failed.')
   } else if (
     input.maintenanceRunState === 'running' ||
@@ -418,6 +504,29 @@ function maintenanceSummary(input: StatusViewInput): string | undefined {
   }
 
   return undefined
+}
+
+function sourceActivityDetail(input: StatusViewInput): string | undefined {
+  const activity = input.sourceActivity
+  if (activity === undefined) {
+    return undefined
+  }
+
+  if (
+    activity.scanActivity.state === 'running' ||
+    activity.scanActivity.state === 'failed' ||
+    activity.scanActivity.state === 'blocked' ||
+    activity.scanActivity.state === 'cancelled'
+  ) {
+    return sourceActivityScanSummary(activity)
+  }
+
+  const preparation = sourceActivityPreparationSummary(activity)
+  if (preparation !== undefined) {
+    return preparation
+  }
+
+  return activity.browseReadiness.detail
 }
 
 function maintenanceBacklogPrefix(backlog: SourceMaintenanceBacklog): string {
@@ -553,13 +662,17 @@ function refreshAction(input: StatusViewInput, sourceId: string): StatusAction {
 function toneForBadge(badge: StatusBadge): StatusView['tone'] {
   switch (badge) {
     case 'Ready':
+    case 'Preparation complete':
       return 'ready'
+    case 'Scanning source':
+    case 'Preparing source':
     case 'Indexing':
     case 'Still indexing':
       return 'active'
     case 'Needs scan':
     case 'Preparation pending':
     case 'Maintenance unavailable':
+    case 'Maintenance completed; pending work remains':
     case 'Ready to add':
     case 'Restore source':
     case 'Choose a music folder':
@@ -601,15 +714,54 @@ export function sourceStatusDiagnosticTrace(input: StatusViewInput): SourceStatu
           ? 'restorable'
           : 'none'
       : undefined
+  const activity = input.sourceActivity
+  const activityBacklogCounts =
+    activity === undefined ? undefined : sourceActivityBacklogCategories(activity)
+  const activityBacklogTotal =
+    activity === undefined ? undefined : sourceActivityBacklogTotal(activity)
+  const admissionState =
+    activity?.admissionState ??
+    (duplicateStatus === 'active'
+      ? 'active'
+      : duplicateStatus === 'restorable'
+        ? 'restorable'
+        : sourceId === undefined
+          ? undefined
+          : 'notAdmitted')
+  const provenance =
+    activity?.preparationActivity.provenance ?? diagnosticProvenanceFromBacklog(backlog.source)
 
   return {
     ...(sourceId === undefined ? {} : { sourceId }),
     ...(input.sourcePath === undefined ? {} : { sourcePath: input.sourcePath }),
+    ...(admissionState === undefined ? {} : { admissionState }),
+    ...(activity === undefined ? {} : { browseReadiness: activity.browseReadiness }),
+    ...(activity === undefined ? {} : { scanActivity: activity.scanActivity }),
+    ...(activity === undefined ? {} : { preparationActivity: activity.preparationActivity }),
     ...(duplicateStatus === undefined ? {} : { duplicateStatus }),
     maintenanceSnapshotSource: backlog.source,
-    backlogCounts: backlog.categories,
-    backlogTotal: backlog.total,
-    ...(backlog.lastRunStatus === undefined ? {} : { lastRunStatus: backlog.lastRunStatus })
+    backlogCounts: activityBacklogCounts ?? backlog.categories,
+    backlogTotal: activityBacklogTotal ?? backlog.total,
+    provenance,
+    ...(activity?.preparationActivity.lastRunStatus === undefined &&
+    backlog.lastRunStatus === undefined
+      ? {}
+      : { lastRunStatus: activity?.preparationActivity.lastRunStatus ?? backlog.lastRunStatus })
+  }
+}
+
+function diagnosticProvenanceFromBacklog(
+  source: SourceMaintenanceBacklog['source']
+): ReadSourceActivityReply['preparationActivity']['provenance'] {
+  switch (source) {
+    case 'maintenance':
+      return 'maintenanceSnapshot'
+    case 'runResult':
+      return 'runResult'
+    case 'integrityFallback':
+      return 'integrityFallback'
+    case 'unavailable':
+      return 'unavailable'
   }
 }
 

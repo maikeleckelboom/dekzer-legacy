@@ -36,6 +36,7 @@ use crate::snapshot_read_protocol::{
     store_contents_scope_depth, store_library_tree_entry_point,
     store_track_identity_review_state_filter,
 };
+use crate::source_activity::map_read_source_activity_reply;
 use crate::source_file_hash_protocol::{
     empty_hash_source_files_blake3_reply, map_hash_lifecycle_source_failure,
     map_hash_source_files_blake3_reply,
@@ -812,6 +813,24 @@ impl LibraryBoundaryService {
         })
     }
 
+    pub fn read_source_activity(
+        &self,
+        request: protocol::ReadSourceActivityRequest,
+    ) -> protocol::ProtocolResult<protocol::ReadSourceActivityReply> {
+        let source_id = require_positive_i64(request.source_id, "sourceId")?;
+        let source_integrity = self
+            .durable_store
+            .read_source_integrity(source_id)
+            .map_err(map_store_error)?;
+        let maintenance = self
+            .source_maintenance
+            .read_snapshot(&self.durable_store, source_id)?;
+        Ok(map_read_source_activity_reply(
+            source_integrity,
+            maintenance,
+        ))
+    }
+
     fn handle_library_boundary_event_command(
         &self,
         command: protocol::LibraryBoundaryEventStreamCommand,
@@ -941,6 +960,10 @@ impl LibraryBoundaryService {
                 .read_source_maintenance(request)
                 .map(Box::new)
                 .map(protocol::SnapshotReadReply::SourceMaintenance),
+            protocol::SnapshotReadCommand::ReadSourceActivity(request) => self
+                .read_source_activity(request)
+                .map(Box::new)
+                .map(protocol::SnapshotReadReply::SourceActivity),
             protocol::SnapshotReadCommand::ReadSourceFileAttachment(request) => self
                 .read_source_file_attachment(request)
                 .map(protocol::SnapshotReadReply::SourceFileAttachment),

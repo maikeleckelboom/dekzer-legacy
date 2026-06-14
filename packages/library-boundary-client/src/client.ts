@@ -33,6 +33,8 @@ import type {
   ReadSourceLifecycleRequest,
   ReadSourceMaintenanceReply,
   ReadSourceMaintenanceRequest,
+  ReadSourceActivityReply,
+  ReadSourceActivityRequest,
   SearchFilterReadReply,
   SearchFilterReadRequest,
   ReadLocalRootsReply,
@@ -308,6 +310,20 @@ export class LibraryBoundaryClient {
       },
       'snapshotRead',
       'sourceMaintenance'
+    )
+  }
+
+  readSourceActivity(request: ReadSourceActivityRequest): Promise<ReadSourceActivityReply> {
+    return this.sendAndExpect(
+      {
+        type: 'snapshotRead',
+        payload: {
+          type: 'readSourceActivity',
+          payload: request
+        }
+      },
+      'snapshotRead',
+      'sourceActivity'
     )
   }
 

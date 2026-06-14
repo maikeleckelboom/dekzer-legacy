@@ -19,6 +19,7 @@ import type { LocalBrowseItem } from '../../../../src/shared/library/localBrowse
 import type { SourceLifecycleRecord } from '../../../../src/shared/library/source/lifecycle'
 import type { LibraryBrowseProfile } from '../../../../src/renderer/library/libraryBrowseProfile/types'
 import type {
+  ReadSourceActivityReply,
   ReadSourceIntegrityReply,
   ReadSourceMaintenanceReply
 } from '@dekzer/library-boundary-contract'
@@ -409,6 +410,89 @@ describe('source status projection', () => {
     expect(view.detail).toBe('Source status is current.')
   })
 
+  it('maps running source activity to scanning copy without percentages', () => {
+    const view = registeredView({
+      sourceActivity: sourceActivity({
+        scanActivity: {
+          state: 'running',
+          counters: {
+            directoriesVisited: 3,
+            filesDiscovered: 12,
+            queuedWorkItems: 4
+          }
+        }
+      })
+    })
+
+    expect(view.badge).toBe('Scanning source')
+    expect(view.detail).toContain('Scanning source: 12 files discovered, 3 folders visited')
+    expect(view.detail).toContain('4 work items queued')
+    expect(`${view.badge} ${view.detail}`).not.toContain('%')
+  })
+
+  it('does not let ready rows clear source preparation activity', () => {
+    const view = registeredView({
+      sourceReadiness: {
+        kind: 'ready',
+        sourceNodeId: 'selected',
+        detail: 'The source hierarchy is ready.'
+      },
+      sourceActivity: sourceActivity({
+        preparationActivity: {
+          state: 'idle',
+          backlog: {
+            hash: 2,
+            probe: 1,
+            attachment: 3,
+            promotion: 4,
+            identity: 5
+          }
+        }
+      })
+    })
+
+    expect(view.badge).toBe('Preparation pending')
+    expect(view.detail).toContain(
+      'Preparation pending: hash 2, probe 1, attachment 3, promotion 4, identity 5.'
+    )
+  })
+
+  it('keeps completed maintenance with remaining activity distinct from complete preparation', () => {
+    const view = registeredView({
+      sourceActivity: sourceActivity({
+        preparationActivity: {
+          state: 'completedWithRemainingWork',
+          provenance: 'runResult',
+          lastRunStatus: 'completed',
+          backlog: {
+            hash: 7,
+            probe: 0,
+            attachment: 0,
+            promotion: 0,
+            identity: 0
+          }
+        }
+      })
+    })
+
+    expect(view.badge).toBe('Maintenance completed; pending work remains')
+    expect(view.detail).toContain('Maintenance completed; pending work remains: hash 7.')
+  })
+
+  it('source activity complete clears preparation warning state', () => {
+    const view = registeredView({
+      sourceActivity: sourceActivity({
+        preparationActivity: {
+          state: 'complete'
+        }
+      })
+    })
+
+    expect(view.badge).toBe('Ready')
+    expect(view.tone).toBe('ready')
+    expect(view.detail).toBe('Preparation complete.')
+  })
+
   it('does not let stale integrity attachment counts keep backlog alive after a zero run result', () => {
     const view = registeredView({
       maintenanceRunState: 'completed',
@@ -490,10 +574,77 @@ describe('source status projection', () => {
     expect(trace).toEqual({
       sourceId: '7',
       sourcePath: 'C:/Music/Removed',
+      admissionState: 'restorable',
       duplicateStatus: 'restorable',
       maintenanceSnapshotSource: 'runResult',
       backlogCounts: [{ label: 'hash', count: 2 }],
       backlogTotal: 2,
+      provenance: 'runResult',
+      lastRunStatus: 'completed'
+    })
+  })
+
+  it('development diagnostic trace includes source activity truth and provenance', () => {
+    const trace = sourceStatusDiagnosticTrace({
+      context: {
+        kind: 'registeredSource',
+        title: 'Source Fixture',
+        sourceId: '7',
+        nodeId: 'selected'
+      },
+      sourcePath: 'C:/Music',
+      sourceActivity: sourceActivity({
+        admissionState: 'active',
+        browseReadiness: {
+          state: 'ready',
+          detail: 'Source is ready to browse.'
+        },
+        scanActivity: {
+          state: 'running',
+          counters: {
+            filesDiscovered: 9
+          },
+          scanRunId: 'scan-1'
+        },
+        preparationActivity: {
+          state: 'completedWithRemainingWork',
+          provenance: 'runResult',
+          lastRunStatus: 'completed',
+          backlog: {
+            hash: 0,
+            probe: 2,
+            attachment: 0,
+            promotion: 0,
+            identity: 1
+          }
+        }
+      }),
+      canAddLocalPath: true,
+      scanStatus: 'idle',
+      removeSourceStatus: 'idle',
+      refreshStatus: 'idle',
+      canScan: true,
+      canRemove: true,
+      canRunMaintenance: true
+    })
+
+    expect(trace).toMatchObject({
+      sourceId: '7',
+      sourcePath: 'C:/Music',
+      admissionState: 'active',
+      browseReadiness: { state: 'ready' },
+      scanActivity: { state: 'running', counters: { filesDiscovered: 9 } },
+      preparationActivity: {
+        state: 'completedWithRemainingWork',
+        provenance: 'runResult',
+        lastRunStatus: 'completed'
+      },
+      backlogCounts: [
+        { label: 'probe', count: 2 },
+        { label: 'identity', count: 1 }
+      ],
+      backlogTotal: 3,
+      provenance: 'runResult',
       lastRunStatus: 'completed'
     })
   })
@@ -781,6 +932,79 @@ function lifecycle(overrides: Partial<SourceLifecycleRecord> = {}): SourceLifecy
     lastSuccessfulScanAtMs: 20,
     updatedAtMs: 100,
     ...overrides
+  }
+}
+
+function sourceActivity(
+  overrides: {
+    readonly admissionState?: ReadSourceActivityReply['admissionState']
+    readonly browseReadiness?: Partial<ReadSourceActivityReply['browseReadiness']>
+    readonly scanActivity?: Partial<ReadSourceActivityReply['scanActivity']>
+    readonly preparationActivity?: Partial<ReadSourceActivityReply['preparationActivity']>
+  } = {}
+): ReadSourceActivityReply {
+  const base: ReadSourceActivityReply = {
+    sourceId: '7',
+    admissionState: 'active',
+    browseReadiness: {
+      state: 'ready',
+      detail: 'Source is ready to browse.'
+    },
+    scanActivity: {
+      state: 'completed',
+      counters: {},
+      detail: 'Scan completed.'
+    },
+    preparationActivity: {
+      state: 'complete',
+      backlog: {
+        hash: 0,
+        probe: 0,
+        attachment: 0,
+        promotion: 0,
+        identity: 0
+      },
+      provenance: 'maintenanceSnapshot',
+      boundedBatch: true
+    }
+  }
+
+  const preparationActivity =
+    overrides.preparationActivity === undefined
+      ? base.preparationActivity
+      : {
+          ...base.preparationActivity,
+          ...overrides.preparationActivity,
+          backlog: {
+            ...base.preparationActivity.backlog,
+            ...(overrides.preparationActivity.backlog ?? {})
+          }
+        }
+
+  return {
+    ...base,
+    ...(overrides.admissionState === undefined
+      ? {}
+      : { admissionState: overrides.admissionState }),
+    browseReadiness:
+      overrides.browseReadiness === undefined
+        ? base.browseReadiness
+        : {
+            ...base.browseReadiness,
+            ...overrides.browseReadiness
+          },
+    scanActivity:
+      overrides.scanActivity === undefined
+        ? base.scanActivity
+        : {
+            ...base.scanActivity,
+            ...overrides.scanActivity,
+            counters: {
+              ...base.scanActivity.counters,
+              ...(overrides.scanActivity.counters ?? {})
+            }
+          },
+    preparationActivity
   }
 }
 

@@ -8,6 +8,7 @@ import type {
   MaintainedSnapshotInvalidation,
   ProtocolError,
   HashSourceFilesBlake3Reply,
+  ReadSourceActivityReply,
   ReadSourceIntegrityReply,
   ReadSourceMaintenanceReply,
   ReadSourceFileAttachmentReply,
@@ -81,6 +82,13 @@ type ReadSourceIntegrityReturnIsGenerated = AssertType<
   EqualTypes<
     Awaited<ReturnType<LibraryBoundaryClient['readSourceIntegrity']>>,
     ReadSourceIntegrityReply
+  >
+>
+
+type ReadSourceActivityReturnIsGenerated = AssertType<
+  EqualTypes<
+    Awaited<ReturnType<LibraryBoundaryClient['readSourceActivity']>>,
+    ReadSourceActivityReply
   >
 >
 
@@ -671,6 +679,74 @@ async function validatesSourceIntegrityReadRequestAndReply(): Promise<void> {
   )
 }
 
+async function validatesSourceActivityReadRequestAndReply(): Promise<void> {
+  const transport = new RecordingTransport()
+  transport.enqueueOutcome(
+    success({
+      type: 'snapshotRead',
+      payload: {
+        type: 'sourceActivity',
+        payload: {
+          sourceId: '7',
+          admissionState: 'active',
+          browseReadiness: {
+            state: 'ready',
+            detail: 'Source is ready to browse.'
+          },
+          scanActivity: {
+            state: 'completed',
+            counters: {},
+            detail: 'Scan completed.',
+            lastStartedAtMs: 10,
+            lastFinishedAtMs: 20
+          },
+          preparationActivity: {
+            state: 'completedWithRemainingWork',
+            backlog: {
+              hash: 2,
+              probe: 0,
+              attachment: 1,
+              promotion: 0,
+              identity: 0
+            },
+            provenance: 'maintenanceSnapshot',
+            boundedBatch: true,
+            lastRunStatus: 'completed',
+            lastRunProcessed: {
+              hash: 8,
+              probe: 4,
+              attachment: 2,
+              promotion: 1,
+              identity: 1
+            }
+          }
+        }
+      }
+    })
+  )
+  const client = new LibraryBoundaryClient(transport)
+
+  const reply = await client.readSourceActivity({ sourceId: '7' })
+
+  deepEqual(
+    transport.sentRequests[0],
+    {
+      type: 'snapshotRead',
+      payload: {
+        type: 'readSourceActivity',
+        payload: { sourceId: '7' }
+      }
+    } satisfies CommandRequest,
+    'readSourceActivity sends the generated snapshot command'
+  )
+  equal(reply.admissionState, 'active', 'readSourceActivity unwraps admission state')
+  equal(
+    reply.preparationActivity.provenance,
+    'maintenanceSnapshot',
+    'readSourceActivity preserves preparation provenance'
+  )
+}
+
 async function validatesLocalBrowseEntryPointReadRequestAndReply(): Promise<void> {
   const transport = new RecordingTransport()
   transport.enqueueOutcome(
@@ -788,6 +864,7 @@ async function validatesLocalBrowseItemReadRequestAndReply(): Promise<void> {
     entryPointKind: 'music',
     resolvedRootPath: 'C:\\Users\\DJ\\Music',
     resolvedParentPath: 'C:\\Users\\DJ\\Music',
+    itemFilter: 'audio',
     offset: 0,
     limit: 50,
     profile: 'audio'
@@ -1585,6 +1662,7 @@ await validatesRegisterLocalRootRequestAndReply()
 await validatesHashSourceFilesBlake3RequestAndReply()
 await validatesSourceMaintenanceRequestsAndReplies()
 await validatesSourceIntegrityReadRequestAndReply()
+await validatesSourceActivityReadRequestAndReply()
 await validatesLocalBrowseEntryPointReadRequestAndReply()
 await validatesLocalBrowseItemReadRequestAndReply()
 await validatesTrackIdentityDecisionRequestsAndReplies()

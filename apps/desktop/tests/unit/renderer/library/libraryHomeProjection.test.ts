@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type {
+  ReadSourceActivityReply,
   ReadSourceIntegrityReply,
   ReadSourceMaintenanceReply
 } from '@dekzer/library-boundary-contract'
@@ -264,6 +265,49 @@ describe('Library home projection', () => {
     expect(projection.productState).toBe('maintenanceNeeded')
   })
 
+  it('keeps preparation pending from source activity even when readiness is ready', () => {
+    const projection = projectLibraryHome({
+      state: browserState({
+        sourceReadinessByNodeId: new Map([
+          [
+            'navigation-row:7',
+            {
+              kind: 'ready',
+              sourceNodeId: 'navigation-row:7',
+              detail: 'The source hierarchy is ready.'
+            }
+          ]
+        ])
+      }),
+      bindingsById: sourceProjection(['7']).bindingsById,
+      sourceActivityBySourceId: new Map([
+        [
+          '7',
+          sourceActivity({
+            preparationActivity: {
+              state: 'idle',
+              backlog: {
+                hash: 2,
+                probe: 0,
+                attachment: 0,
+                promotion: 0,
+                identity: 0
+              }
+            }
+          })
+        ]
+      ])
+    })
+
+    expect(projection.productState).toBe('maintenanceNeeded')
+    expect(projection.rows).toEqual([
+      expect.objectContaining({
+        label: 'Preparation pending',
+        detail: 'Preparation pending: hash 2. Run maintenance processes a bounded batch.'
+      })
+    ])
+  })
+
   it('does not let maintenance backlog beat harder source failures', () => {
     const projection = projectLibraryHome({
       state: browserState({
@@ -467,6 +511,52 @@ function maintenance(
     remainingTrackIdentityCandidateProductionCandidates: 0,
     remainingTrackIdentityDecisionProductionCandidates: 0,
     ...overrides
+  }
+}
+
+function sourceActivity(
+  overrides: {
+    readonly preparationActivity?: Partial<ReadSourceActivityReply['preparationActivity']>
+  } = {}
+): ReadSourceActivityReply {
+  const base: ReadSourceActivityReply = {
+    sourceId: '7',
+    admissionState: 'active',
+    browseReadiness: {
+      state: 'ready',
+      detail: 'Source is ready to browse.'
+    },
+    scanActivity: {
+      state: 'completed',
+      counters: {}
+    },
+    preparationActivity: {
+      state: 'complete',
+      backlog: {
+        hash: 0,
+        probe: 0,
+        attachment: 0,
+        promotion: 0,
+        identity: 0
+      },
+      provenance: 'maintenanceSnapshot',
+      boundedBatch: true
+    }
+  }
+
+  return {
+    ...base,
+    preparationActivity:
+      overrides.preparationActivity === undefined
+        ? base.preparationActivity
+        : {
+            ...base.preparationActivity,
+            ...overrides.preparationActivity,
+            backlog: {
+              ...base.preparationActivity.backlog,
+              ...(overrides.preparationActivity.backlog ?? {})
+            }
+          }
   }
 }
 

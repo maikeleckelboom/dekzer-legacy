@@ -22,6 +22,7 @@ import {
 } from '../source/fileHashing'
 import { readSourceLifecycleThroughHost } from '../source/lifecycle'
 import { readSourceIntegrityThroughHost } from '../source/integrity'
+import { readSourceActivityThroughHost } from '../source/activity'
 import {
   readSourceMaintenanceThroughHost,
   runSourceMaintenanceThroughHost
@@ -108,6 +109,9 @@ export function registerLibraryIpcCommands(options: RegisterLibraryIpcCommandsOp
   )
   ipcMain.handle(libraryControlChannels.source.integrity, (_event, request) =>
     readSourceIntegrityThroughHost(host, request)
+  )
+  ipcMain.handle(libraryControlChannels.source.activity, (_event, request) =>
+    readSourceActivityThroughHost(host, request)
   )
   ipcMain.handle(
     libraryControlChannels.attachmentIdentity.readSourceFileAttachment,

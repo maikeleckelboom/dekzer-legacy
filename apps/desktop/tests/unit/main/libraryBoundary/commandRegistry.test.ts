@@ -107,6 +107,7 @@ function expectedLibraryControlChannels(): readonly string[] {
     libraryControlChannels.roots.registerLocalPath,
     libraryControlChannels.roots.scan,
     libraryControlChannels.roots.unregister,
+    libraryControlChannels.source.activity,
     libraryControlChannels.source.fileHashing,
     libraryControlChannels.source.integrity,
     libraryControlChannels.source.lifecycle,

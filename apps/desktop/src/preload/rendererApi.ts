@@ -30,6 +30,10 @@ import type {
   ReadSourceIntegrityRequest,
   SourceIntegrityReadResult
 } from '../shared/library/source/integrity'
+import type {
+  ReadSourceActivityRequest,
+  SourceActivityReadResult
+} from '../shared/library/source/activity'
 
 import type {
   ReadAttachmentSourceFilesRequest,
@@ -166,6 +170,16 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
             libraryControlChannels.source.integrity,
             request
           )) as SourceIntegrityReadResult
+        }
+      },
+      sourceActivity: {
+        async readSourceActivity(
+          request: ReadSourceActivityRequest
+        ): Promise<SourceActivityReadResult> {
+          return (await ipcRenderer.invoke(
+            libraryControlChannels.source.activity,
+            request
+          )) as SourceActivityReadResult
         }
       },
       attachmentIdentity: {

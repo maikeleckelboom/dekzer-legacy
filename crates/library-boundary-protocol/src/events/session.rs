@@ -37,6 +37,7 @@ impl MaintainedSnapshotScope {
             | SnapshotReadCommand::ReadSourceLifecycle(_)
             | SnapshotReadCommand::ReadSourceIntegrity(_)
             | SnapshotReadCommand::ReadSourceMaintenance(_)
+            | SnapshotReadCommand::ReadSourceActivity(_)
             | SnapshotReadCommand::ReadTrackIdentityReviewCandidates(_)
             | SnapshotReadCommand::ContentsRead(_) => Some(Self::Contents),
             SnapshotReadCommand::ReadSourceFileAttachment(_)

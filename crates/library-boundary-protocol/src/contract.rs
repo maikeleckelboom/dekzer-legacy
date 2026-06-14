@@ -71,6 +71,7 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::ReadSourceLifecycleRequest>(&cfg, &mut output);
     push_ts_decl::<crate::ReadSourceIntegrityRequest>(&cfg, &mut output);
     push_ts_decl::<crate::ReadSourceMaintenanceRequest>(&cfg, &mut output);
+    push_ts_decl::<crate::ReadSourceActivityRequest>(&cfg, &mut output);
     push_ts_decl::<crate::SourceClass>(&cfg, &mut output);
     push_ts_decl::<crate::SourceMountStatus>(&cfg, &mut output);
     push_ts_decl::<crate::SourceAccessState>(&cfg, &mut output);
@@ -142,6 +143,7 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::ReadSourceLifecycleReply>(&cfg, &mut output);
     push_ts_decl::<crate::ReadSourceIntegrityReply>(&cfg, &mut output);
     push_ts_decl::<crate::ReadSourceMaintenanceReply>(&cfg, &mut output);
+    push_ts_decl::<crate::ReadSourceActivityReply>(&cfg, &mut output);
     push_ts_decl::<crate::ReadSourceFileAttachmentReply>(&cfg, &mut output);
     push_ts_decl::<crate::ReadAttachmentSourceFilesReply>(&cfg, &mut output);
     push_ts_decl::<crate::ReadSourceAttachmentSummaryReply>(&cfg, &mut output);
@@ -184,6 +186,17 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::SourceIntegrityAttachmentIntegrity>(&cfg, &mut output);
     push_ts_decl::<crate::SourceIntegrityRuntimeMaintenance>(&cfg, &mut output);
     push_ts_decl::<crate::SourceIntegrityRuntimeMaintenanceState>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceActivityAdmissionState>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceBrowseReadiness>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceBrowseReadinessState>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceScanActivity>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceScanActivityState>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceScanActivityCounters>(&cfg, &mut output);
+    push_ts_decl::<crate::SourcePreparationActivity>(&cfg, &mut output);
+    push_ts_decl::<crate::SourcePreparationActivityState>(&cfg, &mut output);
+    push_ts_decl::<crate::SourcePreparationProvenance>(&cfg, &mut output);
+    push_ts_decl::<crate::SourcePreparationBacklogCounts>(&cfg, &mut output);
+    push_ts_decl::<crate::SourcePreparationProcessedCounts>(&cfg, &mut output);
     push_ts_decl::<crate::AttachmentIdentityReadStatus>(&cfg, &mut output);
     push_ts_decl::<crate::AttachmentIdentity>(&cfg, &mut output);
     push_ts_decl::<crate::AttachmentSourceFileOccurrenceStatus>(&cfg, &mut output);
