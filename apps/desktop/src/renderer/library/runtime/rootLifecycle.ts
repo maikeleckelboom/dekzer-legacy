@@ -25,7 +25,7 @@ export type RootLifecycleController = {
 export type RootLifecycleDependencies = {
   readonly rootActions: LocalRootActionsController
   readonly hierarchyRead: Pick<LibraryHierarchyReadController, 'refresh'>
-  readonly localBrowseRead?: Pick<LocalBrowseController, 'refreshEntryPoints'>
+  readonly localBrowseRead?: Pick<LocalBrowseController, 'clearItemWindows' | 'refreshEntryPoints'>
   readonly confirmRemoveSource: () => boolean
   readonly isSourceRootVisible: (rootId: string) => boolean
   readonly onSourceRegistered?: (root: LocalRootRegistrationRoot) => void
@@ -150,6 +150,7 @@ export function createRootLifecycleController(
       return false
     }
 
+    dependencies.localBrowseRead?.clearItemWindows()
     resetRefreshState()
     const refreshed = await runRefresh()
 

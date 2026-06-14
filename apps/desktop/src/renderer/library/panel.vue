@@ -77,7 +77,7 @@ const buttonBaseClass =
 
 const primaryButtonClass = `${buttonBaseClass} min-w-38.5 border border-(--color-accent) bg-(--color-accent) text-(--color-background) hover:brightness-110`
 const toolbarControlClass =
-  'border border-(--color-border) bg-(--color-surface-strong) text-(--color-text) shadow-[inset_0_0_0_1px_var(--color-border)] hover:border-(--color-accent) hover:text-(--color-accent)'
+  'border border-(--color-text-muted) bg-(--color-background) text-(--color-text) shadow-[inset_0_0_0_1px_var(--color-border)] hover:border-(--color-accent) hover:bg-(--color-surface) hover:text-(--color-accent) focus-visible:border-(--color-accent)'
 const iconButtonClass = `${buttonBaseClass} h-9 w-9 min-w-0 ${toolbarControlClass} p-0`
 
 const viewStateStore = createViewStateStore()
@@ -236,6 +236,7 @@ const rootLifecycle = useRootLifecycle({
     refresh: hierarchyRead.refresh
   },
   localBrowseRead: {
+    clearItemWindows: localBrowse.clearItemWindows,
     refreshEntryPoints: localBrowse.refreshEntryPoints
   },
   confirmRemoveSource: () => window.confirm(removeSourceMessage),

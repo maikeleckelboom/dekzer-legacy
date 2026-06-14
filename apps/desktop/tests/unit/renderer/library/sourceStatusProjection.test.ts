@@ -334,6 +334,29 @@ describe('source status projection', () => {
     expect(view.detail).toBe('Source status is current.')
   })
 
+  it('does not let stale integrity attachment counts keep backlog alive after a zero run result', () => {
+    const view = registeredView({
+      maintenanceRunState: 'completed',
+      sourceIntegrity: integrity({
+        coverage: 'complete',
+        attachmentIntegrity: {
+          currentLinksCount: 0,
+          staleLinksCount: 8,
+          missingLinksCount: 13,
+          sourceFilesWithCurrentBlake3ObservationsCount: 0,
+          sourceFilesWithAttachmentLinksCount: 0,
+          unmaterializedBlake3ObservationsCount: 0
+        }
+      }),
+      sourceMaintenance: maintenance({
+        lastRun: maintenanceLastRun()
+      })
+    })
+
+    expect(view.badge).toBe('Ready')
+    expect(view.detail).toBe('Source status is current.')
+  })
+
   it('keeps running, failed, and unavailable maintenance states distinct', () => {
     const running = registeredView({
       maintenanceRunState: 'running',

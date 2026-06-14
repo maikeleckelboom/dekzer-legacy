@@ -181,6 +181,7 @@ describe('local root scan lifecycle', () => {
         }
       },
       localBrowseRead: {
+        clearItemWindows: () => undefined,
         refreshEntryPoints: async () => {
           events.push('localBrowseEntryPoints')
           return true
@@ -239,6 +240,7 @@ describe('local root scan lifecycle', () => {
         }
       },
       localBrowseRead: {
+        clearItemWindows: () => undefined,
         refreshEntryPoints: async () => {
           events.push('localBrowseEntryPoints')
           return true
@@ -777,6 +779,9 @@ describe('local root remove lifecycle', () => {
         }
       },
       localBrowseRead: {
+        clearItemWindows: () => {
+          events.push('clearLocalBrowseItems')
+        },
         refreshEntryPoints: async () => {
           events.push('localBrowseEntryPoints')
           return true
@@ -791,7 +796,12 @@ describe('local root remove lifecycle', () => {
     events.length = 0
 
     await expect(lifecycle.removeSource()).resolves.toBe(true)
-    expect(events).toEqual(['unregister', 'durableNavigation', 'localBrowseEntryPoints'])
+    expect(events).toEqual([
+      'unregister',
+      'clearLocalBrowseItems',
+      'durableNavigation',
+      'localBrowseEntryPoints'
+    ])
   })
 
   it('clears selected browser contents intentionally after removal is authoritative', async () => {

@@ -34,6 +34,8 @@ describe('library browser surface containment', () => {
   it('keeps library search control compact, icon-first, and accessible', () => {
     const panel = readRendererSource('panel.vue')
 
+    expect(panel).toContain('border border-(--color-text-muted) bg-(--color-background)')
+    expect(panel).toContain('focus-visible:border-(--color-accent)')
     expect(panel).toContain(':aria-label="toolbarModel.search.label"')
     expect(panel).toContain(':title="toolbarModel.search.title"')
     expect(panel).toContain('<Icon role="action.search" size="md" />')
