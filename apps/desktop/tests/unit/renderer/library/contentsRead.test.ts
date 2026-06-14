@@ -141,7 +141,9 @@ describe('createContentsReadController', () => {
 
     controller.start()
     const initial = controller.readForBinding(directoryBinding())
-    contentsApi.resolveNext(readyContents(requestAt(contentsApi, 0), [contentsRow('a', 'A.wav')]))
+    contentsApi.resolveNext(
+      readyContents(requestAt(contentsApi, 0), [contentsRow('a', 'A.wav')], 'ready', 'cursor-a')
+    )
     await initial
 
     controller.setProfile('playable')
@@ -154,6 +156,7 @@ describe('createContentsReadController', () => {
         presentation: 'deferred'
       }
     })
+    expect(controller.state.value).not.toHaveProperty('nextCursor')
     expect(visibleLabels(controller.state.value)).toEqual(['A.wav'])
 
     await vi.advanceTimersByTimeAsync(125)
@@ -164,6 +167,7 @@ describe('createContentsReadController', () => {
         presentation: 'visible'
       }
     })
+    expect(controller.state.value).not.toHaveProperty('nextCursor')
     expect(visibleLabels(controller.state.value)).toEqual(['A.wav'])
 
     contentsApi.resolveNext(readyContents(requestAt(contentsApi, 1), [contentsRow('b', 'B.mp4')]))
@@ -177,7 +181,9 @@ describe('createContentsReadController', () => {
 
     controller.start()
     const initial = controller.readForBinding(directoryBinding())
-    contentsApi.resolveNext(readyContents(requestAt(contentsApi, 0), [contentsRow('a', 'A.wav')]))
+    contentsApi.resolveNext(
+      readyContents(requestAt(contentsApi, 0), [contentsRow('a', 'A.wav')], 'ready', 'cursor-a')
+    )
     await initial
 
     controller.setProfile('allFiles')
@@ -190,6 +196,7 @@ describe('createContentsReadController', () => {
         presentation: 'deferred'
       }
     })
+    expect(controller.state.value).not.toHaveProperty('nextCursor')
     expect(visibleLabels(controller.state.value)).toEqual(['A.wav'])
 
     contentsApi.resolveNext(readyContents(requestAt(contentsApi, 1), [contentsRow('b', 'B.png')]))
@@ -438,9 +445,9 @@ describe('createContentsReadController', () => {
 
     controller.setProfile('allFiles')
     expect(controller.state.value).toMatchObject({
-      kind: 'ready',
-      nextCursor: 'cursor-a'
+      kind: 'ready'
     })
+    expect(controller.state.value).not.toHaveProperty('nextCursor')
     expect(visibleLabels(controller.state.value)).toEqual(['A.wav'])
 
     const read = controller.readForBinding(directoryBinding())
@@ -1060,7 +1067,9 @@ describe('createContentsReadController', () => {
 
     controller.start()
     const initial = controller.readForBinding(directoryBinding())
-    contentsApi.resolveNext(readyContents(requestAt(contentsApi, 0), [contentsRow('a', 'A.wav')]))
+    contentsApi.resolveNext(
+      readyContents(requestAt(contentsApi, 0), [contentsRow('a', 'A.wav')], 'ready', 'cursor-a')
+    )
     await initial
 
     controller.setProfile('playable')
@@ -1074,6 +1083,7 @@ describe('createContentsReadController', () => {
       requestKey: 'directory:7:11:audioBrowse:recursive',
       refreshError: 'Unable to request library contents.'
     })
+    expect(controller.state.value).not.toHaveProperty('nextCursor')
   })
 
   it('clears stale contents when readForBinding receives undefined binding', async () => {

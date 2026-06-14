@@ -182,7 +182,6 @@ export function createContentsReadController(
       kind: 'ready',
       requestKey: currentState.requestKey,
       result: currentState.result,
-      ...(currentState.nextCursor === undefined ? {} : { nextCursor: currentState.nextCursor }),
       ...(currentState.accumulatedRows === undefined
         ? {}
         : { accumulatedRows: currentState.accumulatedRows })
@@ -363,11 +362,14 @@ export function createContentsReadController(
 
     const currentState = state.value
     if (currentState.kind === 'ready') {
+      const shouldRetainNextCursor = pending.requestKey === currentState.requestKey
       state.value = {
         kind: 'ready',
         requestKey: currentState.requestKey,
         result: currentState.result,
-        ...(currentState.nextCursor === undefined ? {} : { nextCursor: currentState.nextCursor }),
+        ...(shouldRetainNextCursor && currentState.nextCursor !== undefined
+          ? { nextCursor: currentState.nextCursor }
+          : {}),
         ...(currentState.accumulatedRows === undefined
           ? {}
           : { accumulatedRows: currentState.accumulatedRows }),
@@ -556,12 +558,22 @@ export function createContentsReadController(
       kind: 'ready',
       requestKey: currentState.requestKey,
       result: currentState.result,
-      ...(currentState.nextCursor === undefined ? {} : { nextCursor: currentState.nextCursor }),
+      ...(retainedSnapshotCanLoadMore(currentState) && currentState.nextCursor !== undefined
+        ? { nextCursor: currentState.nextCursor }
+        : {}),
       ...(currentState.accumulatedRows === undefined
         ? {}
         : { accumulatedRows: currentState.accumulatedRows }),
       refreshError: detail
     }
+  }
+
+  function retainedSnapshotCanLoadMore(currentState: ContentsBoundaryState): boolean {
+    return (
+      currentState.kind === 'ready' &&
+      (currentState.pending === undefined ||
+        currentState.pending.requestKey === currentState.requestKey)
+    )
   }
 
   function safeContentsResultFailure(result: ContentsReadResult): string {

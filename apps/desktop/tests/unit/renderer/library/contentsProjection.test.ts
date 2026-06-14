@@ -695,6 +695,88 @@ describe('projectContents', () => {
     })
   })
 
+  it('hides stale Audio continuation while an All Files refresh is pending', () => {
+    const contents = projectForSelection(
+      browserState({}),
+      'navigation-row:7',
+      readyContents({
+        rows: [sourceFileRow('old', 'old.wav', 'audio')],
+        profile: { kind: 'audioBrowse' },
+        requestKey: 'source:7:audioBrowse:recursive',
+        pendingRequestKey: 'source:7:sourceFileInventory:audio,video,image,unsupported:recursive',
+        nextCursor: 'old-audio-cursor'
+      })
+    )
+
+    expect(contents.rows.map((row) => row.label)).toEqual(['old.wav'])
+    expect(contents.rows.some((row) => row.kind === 'more')).toBe(false)
+    expect(contents.rows.some((row) => row.action?.kind === 'loadContentsPage')).toBe(false)
+  })
+
+  it('hides stale Audio continuation while an Audio + Video refresh is pending', () => {
+    const contents = projectForSelection(
+      browserState({}),
+      'navigation-row:7',
+      readyContents({
+        rows: [sourceFileRow('old', 'old.wav', 'audio')],
+        profile: { kind: 'audioBrowse' },
+        requestKey: 'source:7:audioBrowse:recursive',
+        pendingRequestKey: 'source:7:playableMediaBrowse:recursive',
+        nextCursor: 'old-audio-cursor'
+      })
+    )
+
+    expect(contents.rows.map((row) => row.label)).toEqual(['old.wav'])
+    expect(contents.rows.some((row) => row.kind === 'more')).toBe(false)
+    expect(contents.rows.some((row) => row.action?.kind === 'loadContentsPage')).toBe(false)
+  })
+
+  it('shows the committed new-profile continuation cursor after refresh commits', () => {
+    const contents = projectForSelection(
+      browserState({}),
+      'navigation-row:7',
+      readyContents({
+        rows: [sourceFileRow('new', 'new.png', 'image')],
+        profile: {
+          kind: 'sourceFileInventory',
+          fileClasses: ['audio', 'video', 'image', 'unsupported']
+        },
+        requestKey: 'source:7:sourceFileInventory:audio,video,image,unsupported:recursive',
+        nextCursor: 'new-profile-cursor'
+      })
+    )
+
+    expect(contents.rows.map((row) => row.label)).toContain('new.png')
+    expect(contents.rows.find((row) => row.kind === 'more')).toMatchObject({
+      action: {
+        kind: 'loadContentsPage',
+        cursor: 'new-profile-cursor'
+      }
+    })
+  })
+
+  it('keeps same-request load-more continuation visible while that request is pending', () => {
+    const requestKey = 'source:7:audioBrowse:recursive'
+    const contents = projectForSelection(
+      browserState({}),
+      'navigation-row:7',
+      readyContents({
+        rows: [sourceFileRow('old', 'old.wav', 'audio')],
+        profile: { kind: 'audioBrowse' },
+        requestKey,
+        pendingRequestKey: requestKey,
+        nextCursor: 'same-profile-cursor'
+      })
+    )
+
+    expect(contents.rows.find((row) => row.kind === 'more')).toMatchObject({
+      action: {
+        kind: 'loadContentsPage',
+        cursor: 'same-profile-cursor'
+      }
+    })
+  })
+
   it('projects zero rows plus nextCursor as continuation instead of empty', () => {
     const contents = projectForSelection(
       browserState({}),
@@ -718,6 +800,30 @@ describe('projectContents', () => {
       }
     })
     expect(contents.rows[0]).not.toMatchObject({ state: 'empty' })
+  })
+
+  it('projects a committed empty All Files result instead of retained old rows', () => {
+    const contents = projectForSelection(
+      browserState({}),
+      'navigation-row:7',
+      readyContents({
+        rows: [],
+        state: 'empty',
+        profile: {
+          kind: 'sourceFileInventory',
+          fileClasses: ['audio', 'video', 'image', 'unsupported']
+        },
+        requestKey: 'source:7:sourceFileInventory:audio,video,image,unsupported:recursive'
+      })
+    )
+
+    expect(contents.rows).toHaveLength(1)
+    expect(contents.rows[0]).toMatchObject({
+      kind: 'state',
+      state: 'empty',
+      label: 'No files in this source inventory view.'
+    })
+    expect(contents.rows.map((row) => row.label)).not.toContain('old.wav')
   })
 
   it('does not render verified-empty policy labels while nextCursor exists', () => {

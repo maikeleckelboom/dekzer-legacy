@@ -774,11 +774,15 @@ function projectContentsState(options: {
     })
   }
 
+  const allowContinuation = retainedSnapshotCanLoadMore(state)
   const projection = projectContentsReadResult({
     projectionId: options.projectionId,
     title: options.title,
     result: state.result,
-    ...(state.nextCursor !== undefined ? { nextCursor: state.nextCursor } : {}),
+    allowContinuation,
+    ...(allowContinuation && state.nextCursor !== undefined
+      ? { nextCursor: state.nextCursor }
+      : {}),
     ...(state.accumulatedRows !== undefined ? { accumulatedRows: state.accumulatedRows } : {})
   })
 
@@ -802,6 +806,13 @@ function projectContentsState(options: {
   return projection
 }
 
+function retainedSnapshotCanLoadMore(state: ContentsBoundaryState): boolean {
+  return (
+    state.kind === 'ready' &&
+    (state.pending === undefined || state.pending.requestKey === state.requestKey)
+  )
+}
+
 function refreshingDetail(prefix: string, detail: string | undefined): string {
   return detail === undefined ? prefix : `${prefix} ${detail}`
 }
@@ -810,6 +821,7 @@ function projectContentsReadResult(options: {
   readonly projectionId: BrowserTreeNodeId
   readonly title: string
   readonly result: ContentsReadResult
+  readonly allowContinuation?: boolean
   readonly nextCursor?: string
   readonly accumulatedRows?: readonly ContentsFileRow[]
 }): ContentProjection {
@@ -828,6 +840,9 @@ function projectContentsReadResult(options: {
     projectionId: options.projectionId,
     title: options.title,
     result: options.result.result,
+    ...(options.allowContinuation === undefined
+      ? {}
+      : { allowContinuation: options.allowContinuation }),
     ...(options.nextCursor !== undefined ? { nextCursor: options.nextCursor } : {}),
     ...(options.accumulatedRows !== undefined ? { accumulatedRows: options.accumulatedRows } : {})
   })
@@ -837,12 +852,14 @@ function projectContentsResult(options: {
   readonly projectionId: BrowserTreeNodeId
   readonly title: string
   readonly result: ContentsResult
+  readonly allowContinuation?: boolean
   readonly nextCursor?: string
   readonly accumulatedRows?: readonly ContentsFileRow[]
 }): ContentProjection {
   const result = options.result
   const rows = (options.accumulatedRows ?? result.rows).map(contentsRow)
-  const nextCursor = options.nextCursor ?? result.nextCursor
+  const nextCursor =
+    options.allowContinuation === false ? undefined : (options.nextCursor ?? result.nextCursor)
   const hasMore = nextCursor !== undefined
 
   if (rows.length === 0 && nextCursor !== undefined) {
