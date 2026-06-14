@@ -31,11 +31,13 @@ export type ScanProgressState =
   | {
       readonly kind: 'failed'
       readonly rootId: string
+      readonly scanRunId?: string
       readonly detail: string | null
     }
   | {
       readonly kind: 'blocked'
       readonly rootId: string
+      readonly scanRunId?: string
       readonly detail: string | null
     }
   | {
@@ -217,12 +219,14 @@ function scanProgressFromEvent(event: AppSourceScanEvent): ScanProgressState {
       return {
         kind: 'failed',
         rootId: event.rootId,
+        scanRunId: event.scanRunId,
         detail: event.detail
       }
     case 'sourceScanBlocked':
       return {
         kind: 'blocked',
         rootId: event.rootId,
+        scanRunId: event.scanRunId,
         detail: event.detail
       }
     case 'sourceScanCancelled':

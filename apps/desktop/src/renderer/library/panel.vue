@@ -8,10 +8,7 @@ import {
   type LibraryBrowseProfile
 } from './libraryBrowseProfile/types'
 import { createLibraryBrowseProfileController } from './libraryBrowseProfile/controller'
-import {
-  useLibraryHierarchyRead,
-  type LibraryBranchWarmupTrace
-} from './boundary/hierarchyRead'
+import { useLibraryHierarchyRead, type LibraryBranchWarmupTrace } from './boundary/hierarchyRead'
 import { useContentsRead } from './boundary/contentsRead'
 import { useLocalRootActions } from './boundary/localRootActions'
 import {
@@ -25,7 +22,7 @@ import {
   addSourceViewOptions,
   type AddSourceView
 } from './addSource/view'
-import { useBoundaryEvents, type ScanProgressState } from './boundary/boundaryEvents'
+import { useBoundaryEvents } from './boundary/boundaryEvents'
 import {
   sourceLifecycleIdsForBrowserContext,
   useSourceLifecycleRead
@@ -146,12 +143,12 @@ const addSourceDisclosureReconciler = createDisclosureReconciler({
   requestNodeChildren: (nodeId) => requestAddSourceNodeChildren(nodeId)
 })
 
-const scanProgressForRegisteredRoot = computed<ScanProgressState | undefined>(() => {
-  const root = rootActions.registeredRoot.value
-  if (root === undefined) {
+const scanProgressForActiveScan = computed(() => {
+  const rootId = rootActions.activeScanRootId.value
+  if (rootId === undefined) {
     return undefined
   }
-  return boundaryEvents.scanProgress.value.get(root.rootId)
+  return boundaryEvents.scanProgress.value.get(rootId)
 })
 
 const libraryBrowseProfileMenuOpen = ref(false)
@@ -177,9 +174,9 @@ const sourceReadinessByNodeId = computed(() =>
     sourceReadStates: hierarchyRead.sourceReadStates.value,
     sourceLifecycleBySourceId: sourceLifecycleRead.sourceLifecycleBySourceId.value,
     scanProgressByRootId: boundaryEvents.scanProgress.value,
-    ...(rootActions.registeredRoot.value === undefined
+    ...(rootActions.activeScanRootId.value === undefined
       ? {}
-      : { currentScanRootId: rootActions.registeredRoot.value.rootId }),
+      : { currentScanRootId: rootActions.activeScanRootId.value }),
     currentScanStatus: rootActions.scanStatus.value
   })
 )
@@ -426,7 +423,7 @@ const sourceStatusView = computed(() => {
       ? {}
       : { sourcePath: selectedStatusSourcePath.value }),
     canAddLocalPath: rootLifecycle.canAddMusicFolder.value,
-    scanStatus: rootActions.scanStatus.value,
+    scanStatus: rootActions.scanStatusForRoot(sourceId),
     removeSourceStatus: rootActions.removeSourceStatus.value,
     refreshStatus: rootLifecycle.refreshStatus.value,
     canScan: sourceId !== undefined && rootLifecycle.canScanSourceRoot(sourceId),
@@ -473,7 +470,7 @@ watch(
           ? {}
           : { sourcePath: selectedStatusSourcePath.value }),
         canAddLocalPath: rootLifecycle.canAddMusicFolder.value,
-        scanStatus: rootActions.scanStatus.value,
+        scanStatus: rootActions.scanStatusForRoot(sourceId),
         removeSourceStatus: rootActions.removeSourceStatus.value,
         refreshStatus: rootLifecycle.refreshStatus.value,
         canScan: sourceId !== undefined && rootLifecycle.canScanSourceRoot(sourceId),
@@ -513,33 +510,9 @@ const sourceAdmissionHandoffView = computed(() =>
   })
 )
 
-watch(scanProgressForRegisteredRoot, (progress) => {
-  if (progress === undefined) {
-    return
-  }
-
-  switch (progress.kind) {
-    case 'completed':
-      rootActions.scanStatus.value = 'scanned'
-      rootActions.scanSummary.value = {
-        rootId: progress.rootId,
-        scanRunId: progress.scanRunId,
-        discoveredFileCount: progress.filesDiscovered,
-        queuedSourceWorkItems: progress.queuedWorkItems
-      }
-      break
-    case 'failed':
-      rootActions.scanStatus.value = 'failed'
-      rootActions.scanFailureMessage.value = progress.detail ?? 'Scan failed.'
-      break
-    case 'blocked':
-      rootActions.scanStatus.value = 'blocked'
-      rootActions.scanFailureMessage.value = progress.detail ?? 'Scan blocked.'
-      break
-    case 'cancelled':
-      rootActions.scanStatus.value = 'canceled'
-      rootActions.scanFailureMessage.value = progress.detail ?? 'Scan canceled.'
-      break
+watch([scanProgressForActiveScan, () => rootActions.activeScanRunId.value], ([progress]) => {
+  if (progress !== undefined) {
+    rootActions.applyScanProgress(progress)
   }
 })
 

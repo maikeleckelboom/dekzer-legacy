@@ -15,6 +15,7 @@ import type {
 } from '../../../shared/library/roots/scan'
 import type { UnregisterLocalRootResult } from '../../../shared/library/roots/unregister'
 import type { RendererApi } from '../../../shared/rendererApi'
+import type { ScanProgressState } from './boundaryEvents'
 
 export type LibraryRootActionsApi = RendererApi['library']['roots']
 
@@ -58,6 +59,8 @@ export type LocalRootActionsController = {
   readonly rootChoiceButtonLabel: ComputedRef<string>
   readonly canChooseLocalRoot: ComputedRef<boolean>
   readonly scanStatus: Ref<LocalRootScanStatus>
+  readonly activeScanRootId: Ref<string | undefined>
+  readonly activeScanRunId: Ref<string | undefined>
   readonly scanSummary: Ref<LocalRootScanSummary | undefined>
   readonly scanFailureMessage: Ref<string | undefined>
   readonly scanFailureDetail: Ref<string | undefined>
@@ -71,6 +74,8 @@ export type LocalRootActionsController = {
   readonly canRunLocalRootScan: (rootId: string | undefined) => rootId is string
   readonly isKnownLocalRootId: (rootId: string | undefined) => rootId is string
   readonly canUnregisterLocalRootId: (rootId: string | undefined) => rootId is string
+  readonly scanStatusForRoot: (rootId: string | undefined) => LocalRootScanStatus
+  readonly applyScanProgress: (progress: ScanProgressState) => boolean
   readonly chooseAndRegisterLocalRoot: () => Promise<boolean>
   readonly registerLocalPath: (requestedPath: string) => Promise<boolean>
   readonly runRegisteredRootScan: () => Promise<boolean>
@@ -100,6 +105,8 @@ export function createLocalRootActionsController(
   const registrationProposal = ref<LocalRootRegistrationProposal>()
   const registrationRejection = ref<LocalRootRegistrationRejection>()
   const scanStatus = ref<LocalRootScanStatus>('idle')
+  const activeScanRootId = ref<string>()
+  const activeScanRunId = ref<string>()
   const scanSummary = ref<LocalRootScanSummary>()
   const scanFailureMessage = ref<string>()
   const scanFailureDetail = ref<string>()
@@ -268,6 +275,8 @@ export function createLocalRootActionsController(
 
     const sequence = ++scanSequence
     scanStatus.value = 'scanning'
+    activeScanRootId.value = rootId
+    activeScanRunId.value = undefined
     scanSummary.value = undefined
     scanFailureMessage.value = undefined
     scanFailureDetail.value = undefined
@@ -283,10 +292,14 @@ export function createLocalRootActionsController(
 
       if (result.state === 'started') {
         scanStatus.value = 'scanning'
+        activeScanRootId.value = rootId
+        activeScanRunId.value = result.scanRunId
         return true
       }
 
       scanStatus.value = 'failed'
+      activeScanRootId.value = undefined
+      activeScanRunId.value = undefined
       const { message, detail } = scanFailureMessageFor(result)
       scanFailureMessage.value = message
       scanFailureDetail.value = detail
@@ -297,6 +310,8 @@ export function createLocalRootActionsController(
       }
 
       scanStatus.value = 'failed'
+      activeScanRootId.value = undefined
+      activeScanRunId.value = undefined
       scanFailureMessage.value = safeRootScanFailure
       return true
     }
@@ -305,13 +320,86 @@ export function createLocalRootActionsController(
   function resetScanState(): void {
     scanSequence += 1
     scanStatus.value = 'idle'
+    activeScanRootId.value = undefined
+    activeScanRunId.value = undefined
     scanSummary.value = undefined
     scanFailureMessage.value = undefined
     scanFailureDetail.value = undefined
   }
 
   function isCurrentScan(rootId: string, sequence: number): boolean {
-    return scanSequence === sequence && isKnownLocalRootId(rootId)
+    return (
+      scanSequence === sequence && activeScanRootId.value === rootId && isKnownLocalRootId(rootId)
+    )
+  }
+
+  function scanStatusForRoot(rootId: string | undefined): LocalRootScanStatus {
+    return rootId !== undefined && rootId === activeScanRootId.value ? scanStatus.value : 'idle'
+  }
+
+  function applyScanProgress(progress: ScanProgressState): boolean {
+    if (!matchesActiveScan(progress)) {
+      return false
+    }
+
+    switch (progress.kind) {
+      case 'scanning':
+        scanStatus.value = 'scanning'
+        activeScanRootId.value = progress.rootId
+        activeScanRunId.value = progress.scanRunId
+        return true
+      case 'completed':
+        scanStatus.value = 'scanned'
+        scanSummary.value = {
+          rootId: progress.rootId,
+          scanRunId: progress.scanRunId,
+          discoveredFileCount: progress.filesDiscovered,
+          queuedSourceWorkItems: progress.queuedWorkItems
+        }
+        clearActiveScan()
+        return true
+      case 'failed':
+        scanStatus.value = 'failed'
+        scanFailureMessage.value = progress.detail ?? 'Scan failed.'
+        clearActiveScan()
+        return true
+      case 'blocked':
+        scanStatus.value = 'blocked'
+        scanFailureMessage.value = progress.detail ?? 'Scan blocked.'
+        clearActiveScan()
+        return true
+      case 'cancelled':
+        scanStatus.value = 'canceled'
+        scanFailureMessage.value = progress.detail ?? 'Scan canceled.'
+        clearActiveScan()
+        return true
+      case 'idle':
+        return false
+    }
+  }
+
+  function matchesActiveScan(progress: ScanProgressState): boolean {
+    if (progress.kind === 'idle') {
+      return false
+    }
+
+    const activeRootId = activeScanRootId.value
+    if (activeRootId === undefined || progress.rootId !== activeRootId) {
+      return false
+    }
+
+    const progressScanRunId = 'scanRunId' in progress ? progress.scanRunId : undefined
+    const activeRunId = activeScanRunId.value
+    if (activeRunId === undefined) {
+      return progressScanRunId === undefined
+    }
+
+    return progressScanRunId === undefined || progressScanRunId === activeRunId
+  }
+
+  function clearActiveScan(): void {
+    activeScanRootId.value = undefined
+    activeScanRunId.value = undefined
   }
 
   async function hydrateLocalRoots(): Promise<boolean> {
@@ -345,6 +433,7 @@ export function createLocalRootActionsController(
   }
 
   function syncRegisteredRootFromReadRoots(roots: readonly LocalRoot[]): boolean {
+    resetScanIfActiveRootMissing(roots)
     const currentRoot = registeredRoot.value
 
     if (currentRoot !== undefined) {
@@ -506,6 +595,13 @@ export function createLocalRootActionsController(
     return readState.roots.find((root) => root.rootId === rootId)?.availability
   }
 
+  function resetScanIfActiveRootMissing(roots: readonly LocalRoot[]): void {
+    const rootId = activeScanRootId.value
+    if (rootId !== undefined && !roots.some((root) => root.rootId === rootId)) {
+      resetScanState()
+    }
+  }
+
   return {
     rootChoiceStatus,
     registeredRoot,
@@ -515,6 +611,8 @@ export function createLocalRootActionsController(
     rootChoiceButtonLabel,
     canChooseLocalRoot,
     scanStatus,
+    activeScanRootId,
+    activeScanRunId,
     scanSummary,
     scanFailureMessage,
     scanFailureDetail,
@@ -528,6 +626,8 @@ export function createLocalRootActionsController(
     canRunLocalRootScan,
     isKnownLocalRootId,
     canUnregisterLocalRootId,
+    scanStatusForRoot,
+    applyScanProgress,
     chooseAndRegisterLocalRoot,
     registerLocalPath,
     runRegisteredRootScan,

@@ -52,6 +52,39 @@ describe('source readiness', () => {
     expect(sourceNode.children.kind).toBe('deferred')
   })
 
+  it('marks only the active scan root as scan starting', () => {
+    const projection = projectTree({
+      navigationReadResult: readyNavigation([sourceNavigationRow('1'), sourceNavigationRow('2')]),
+      sourceReadStates: new Map(),
+      directoryReadStates: new Map()
+    })
+
+    const readiness = projectSourceReadinessByNodeId({
+      projection,
+      localRootsReadState: {
+        kind: 'ready',
+        roots: [
+          { rootId: '1', admittedRootPath: 'C:/Music/One', availability: 'available' },
+          { rootId: '2', admittedRootPath: 'C:/Music/Two', availability: 'available' }
+        ]
+      },
+      sourceReadStates: new Map(),
+      scanProgressByRootId: new Map(),
+      currentScanRootId: '2',
+      currentScanStatus: 'scanning'
+    })
+
+    expect(readiness.get('navigation-row:1')).toMatchObject({
+      kind: 'registered',
+      rootId: '1'
+    })
+    expect(readiness.get('navigation-row:2')).toMatchObject({
+      kind: 'scanning',
+      rootId: '2',
+      detail: 'Scan is starting for this source.'
+    })
+  })
+
   it('completed scan alone is not ready', () => {
     const progress: ScanProgressState = {
       kind: 'completed',
@@ -405,10 +438,10 @@ function readyRoots(availability: 'available' | 'unavailable'): LocalRootsReadSt
   }
 }
 
-function sourceNavigationRow(): NavigationRow {
+function sourceNavigationRow(rootId: string = '7'): NavigationRow {
   return {
-    navigationRowId: '7',
-    stableKey: 'source:7',
+    navigationRowId: rootId,
+    stableKey: `source:${rootId}`,
     parentNavigationRowId: null,
     family: 'sources',
     rowKind: 'source',
@@ -416,7 +449,7 @@ function sourceNavigationRow(): NavigationRow {
     siblingPosition: 0,
     selectable: true,
     selectorKind: 'source',
-    selectorPayload: '7',
+    selectorPayload: rootId,
     updatedAtMs: 100,
     rowVersion: '1'
   }

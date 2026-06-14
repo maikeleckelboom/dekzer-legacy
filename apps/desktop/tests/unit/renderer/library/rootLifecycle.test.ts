@@ -451,6 +451,73 @@ describe('local root scan lifecycle', () => {
     expect(controller.canRunRegisteredRootScan.value).toBe(false)
   })
 
+  it('clears an explicit hydrated root scan only from matching terminal progress', async () => {
+    const controller = createLocalRootActionsController(
+      testRootApi({
+        readLocalRoots: async () => ({
+          state: 'read',
+          roots: [
+            { rootId: 'root-1', admittedRootPath: 'C:/Music/One', availability: 'available' },
+            { rootId: 'root-2', admittedRootPath: 'C:/Music/Two', availability: 'available' }
+          ]
+        }),
+        runScan: async () => startedRootResult('scan-2')
+      })
+    )
+
+    await expect(controller.hydrateLocalRoots()).resolves.toBe(false)
+    await expect(controller.runRootScan('root-2')).resolves.toBe(true)
+
+    expect(controller.activeScanRootId.value).toBe('root-2')
+    expect(controller.activeScanRunId.value).toBe('scan-2')
+    expect(controller.scanStatusForRoot('root-1')).toBe('idle')
+    expect(controller.scanStatusForRoot('root-2')).toBe('scanning')
+
+    expect(
+      controller.applyScanProgress({
+        kind: 'completed',
+        rootId: 'root-1',
+        scanRunId: 'scan-2',
+        filesDiscovered: 99,
+        queuedWorkItems: 1
+      })
+    ).toBe(false)
+    expect(
+      controller.applyScanProgress({
+        kind: 'completed',
+        rootId: 'root-2',
+        scanRunId: 'stale-scan',
+        filesDiscovered: 99,
+        queuedWorkItems: 1
+      })
+    ).toBe(false)
+    expect(controller.scanStatus.value).toBe('scanning')
+    expect(controller.activeScanRootId.value).toBe('root-2')
+
+    expect(
+      controller.applyScanProgress({
+        kind: 'completed',
+        rootId: 'root-2',
+        scanRunId: 'scan-2',
+        filesDiscovered: 7,
+        queuedWorkItems: 3
+      })
+    ).toBe(true)
+
+    expect(controller.scanStatus.value).toBe('scanned')
+    expect(controller.activeScanRootId.value).toBeUndefined()
+    expect(controller.scanStatusForRoot('root-1')).toBe('idle')
+    expect(controller.scanStatusForRoot('root-2')).toBe('idle')
+    expect(controller.canRunLocalRootScan('root-2')).toBe(true)
+    expect(controller.canUnregisterLocalRootId('root-2')).toBe(true)
+    expect(controller.scanSummary.value).toEqual({
+      rootId: 'root-2',
+      scanRunId: 'scan-2',
+      discoveredFileCount: 7,
+      queuedSourceWorkItems: 3
+    })
+  })
+
   it('uses hydrated root availability to enable or disable scan', async () => {
     const available = createLocalRootActionsController(
       testRootApi({

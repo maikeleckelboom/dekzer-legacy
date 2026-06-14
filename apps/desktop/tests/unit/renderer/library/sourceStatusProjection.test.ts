@@ -276,6 +276,22 @@ describe('source status projection', () => {
     })
   })
 
+  it('does not mark a source as indexing from another source scan', () => {
+    const view = registeredView({
+      scanStatus: 'idle',
+      sourceLifecycle: lifecycle({ scanPhase: 'complete' }),
+      sourceIntegrity: integrity({ coverage: 'complete' })
+    })
+
+    expect(view.badge).toBe('Ready')
+    expect(view.actions.find((action) => action.kind === 'scanSource')).toMatchObject({
+      enabled: true
+    })
+    expect(view.actions.find((action) => action.kind === 'removeSource')).toMatchObject({
+      enabled: true
+    })
+  })
+
   it('summarizes maintenance backlog by product categories', () => {
     const view = registeredView({
       sourceMaintenance: maintenance({
@@ -983,9 +999,7 @@ function sourceActivity(
 
   return {
     ...base,
-    ...(overrides.admission === undefined
-      ? {}
-      : { admission: overrides.admission }),
+    ...(overrides.admission === undefined ? {} : { admission: overrides.admission }),
     browse:
       overrides.browse === undefined
         ? base.browse
