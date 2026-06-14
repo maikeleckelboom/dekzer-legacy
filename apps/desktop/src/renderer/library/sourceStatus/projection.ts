@@ -102,6 +102,17 @@ export type StatusAction =
       readonly reason?: string
     }
 
+export type ActiveSourceOperation =
+  | {
+      readonly kind: 'scan'
+      readonly scope: 'source'
+      readonly sourceId: string
+    }
+  | {
+      readonly kind: 'scan' | 'remove'
+      readonly scope: 'global'
+    }
+
 export type StatusView = {
   readonly role: StatusContext['kind']
   readonly title: string
@@ -119,6 +130,7 @@ export type StatusViewInput = {
   readonly sourceActivity?: ProjectedSourceActivity
   readonly sourceIntegrity?: ReadSourceIntegrityReply
   readonly sourceMaintenance?: ReadSourceMaintenanceReply
+  readonly activeSourceOperation?: ActiveSourceOperation
   readonly canAddLocalPath: boolean
   readonly scanStatus: LocalRootScanStatus
   readonly maintenanceRunState?: 'idle' | 'running' | 'completed' | 'failed'
@@ -582,6 +594,8 @@ function scanAction(input: StatusViewInput, sourceId: string): StatusAction | un
   }
 
   const scanRunning = input.scanStatus === 'scanning'
+  const anotherScanRunning = isAnotherSourceScanRunning(input.activeSourceOperation, sourceId)
+  const globalScanRunning = isGlobalSourceOperation(input.activeSourceOperation, 'scan')
   const label: 'Scan source' | 'Rescan source' =
     input.sourceLifecycle?.lastSuccessfulScanAtMs === undefined ? 'Scan source' : 'Rescan source'
 
@@ -589,12 +603,20 @@ function scanAction(input: StatusViewInput, sourceId: string): StatusAction | un
     kind: 'scanSource',
     label,
     sourceId,
-    enabled: !scanRunning && input.refreshStatus !== 'refreshing',
+    enabled:
+      !scanRunning &&
+      !anotherScanRunning &&
+      !globalScanRunning &&
+      input.refreshStatus !== 'refreshing',
     ...(scanRunning
       ? { reason: 'A scan is running.' }
-      : input.refreshStatus === 'refreshing'
-        ? { reason: 'The library view is refreshing.' }
-        : {})
+      : anotherScanRunning
+        ? { reason: 'Another source scan is running.' }
+        : globalScanRunning
+          ? { reason: 'A source scan is already running.' }
+          : input.refreshStatus === 'refreshing'
+            ? { reason: 'The library view is refreshing.' }
+            : {})
   }
 }
 
@@ -633,19 +655,30 @@ function removeAction(input: StatusViewInput, sourceId: string): StatusAction | 
 
   const removing = input.removeSourceStatus === 'removing'
   const scanRunning = input.scanStatus === 'scanning'
+  const anotherScanRunning = isAnotherSourceScanRunning(input.activeSourceOperation, sourceId)
+  const globalScanRunning = isGlobalSourceOperation(input.activeSourceOperation, 'scan')
 
   return {
     kind: 'removeSource',
     label: 'Remove source',
     sourceId,
-    enabled: !removing && !scanRunning && input.refreshStatus !== 'refreshing',
+    enabled:
+      !removing &&
+      !scanRunning &&
+      !anotherScanRunning &&
+      !globalScanRunning &&
+      input.refreshStatus !== 'refreshing',
     ...(removing
       ? { reason: 'A source removal is already in progress.' }
       : scanRunning
         ? { reason: 'A source scan is still running.' }
-        : input.refreshStatus === 'refreshing'
-          ? { reason: 'The library view is refreshing.' }
-          : {})
+        : anotherScanRunning
+          ? { reason: 'Another source scan is running.' }
+          : globalScanRunning
+            ? { reason: 'A source scan is already running.' }
+            : input.refreshStatus === 'refreshing'
+              ? { reason: 'The library view is refreshing.' }
+              : {})
   }
 }
 
@@ -743,8 +776,7 @@ export function sourceStatusDiagnosticTrace(input: StatusViewInput): SourceStatu
     backlogCounts: activityBacklogCounts ?? backlog.categories,
     backlogTotal: activityBacklogTotal ?? backlog.total,
     provenance,
-    ...(activity?.preparation.lastRunStatus === undefined &&
-    backlog.lastRunStatus === undefined
+    ...(activity?.preparation.lastRunStatus === undefined && backlog.lastRunStatus === undefined
       ? {}
       : { lastRunStatus: activity?.preparation.lastRunStatus ?? backlog.lastRunStatus })
   }
@@ -811,4 +843,20 @@ function maintenanceUnavailableReason(
     default:
       return 'Maintenance is unavailable.'
   }
+}
+
+function isAnotherSourceScanRunning(
+  operation: ActiveSourceOperation | undefined,
+  sourceId: string
+): boolean {
+  return (
+    operation?.kind === 'scan' && operation.scope === 'source' && operation.sourceId !== sourceId
+  )
+}
+
+function isGlobalSourceOperation(
+  operation: ActiveSourceOperation | undefined,
+  kind: ActiveSourceOperation['kind']
+): boolean {
+  return operation?.kind === kind && operation.scope === 'global'
 }

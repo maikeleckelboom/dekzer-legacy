@@ -67,6 +67,7 @@ import { projectStatusContext } from './sourceStatus/context'
 import {
   projectStatusView,
   sourceStatusDiagnosticTrace,
+  type ActiveSourceOperation,
   type StatusAction
 } from './sourceStatus/projection'
 import type { BrowserState, RowBinding } from './state'
@@ -401,6 +402,22 @@ const sourceStatusSourceIds = computed(() => {
   return sourceIds
 })
 
+const activeSourceOperation = computed<ActiveSourceOperation | undefined>(() => {
+  if (rootActions.scanStatus.value === 'scanning') {
+    const rootId = rootActions.activeScanRootId.value
+
+    return rootId === undefined
+      ? { kind: 'scan', scope: 'global' }
+      : { kind: 'scan', scope: 'source', sourceId: rootId }
+  }
+
+  if (rootActions.removeSourceStatus.value === 'removing') {
+    return { kind: 'remove', scope: 'global' }
+  }
+
+  return undefined
+})
+
 const sourceStatusView = computed(() => {
   const context = sourceStatusContext.value
   const sourceId = selectedStatusSourceId.value
@@ -432,6 +449,9 @@ const sourceStatusView = computed(() => {
     ...(sourceActivity === undefined ? {} : { sourceActivity }),
     ...(maintenanceRunState === undefined ? {} : { maintenanceRunState }),
     ...(sourceReadiness === undefined ? {} : { sourceReadiness }),
+    ...(activeSourceOperation.value === undefined
+      ? {}
+      : { activeSourceOperation: activeSourceOperation.value }),
     ...(selectedStatusSourcePath.value === undefined
       ? {}
       : { sourcePath: selectedStatusSourcePath.value }),
@@ -479,6 +499,9 @@ watch(
         ...(sourceMaintenance === undefined ? {} : { sourceMaintenance }),
         ...(sourceActivity === undefined ? {} : { sourceActivity }),
         ...(maintenanceRunState === undefined ? {} : { maintenanceRunState }),
+        ...(activeSourceOperation.value === undefined
+          ? {}
+          : { activeSourceOperation: activeSourceOperation.value }),
         ...(selectedStatusSourcePath.value === undefined
           ? {}
           : { sourcePath: selectedStatusSourcePath.value }),

@@ -111,7 +111,11 @@ export function createRootLifecycleController(
   async function scanRoot(rootId?: string): Promise<boolean> {
     const selectedRootId = rootId ?? dependencies.rootActions.registeredRoot.value?.rootId
 
-    if (selectedRootId === undefined || !canScanSourceRoot(selectedRootId)) {
+    if (
+      selectedRootId === undefined ||
+      dependencies.rootActions.scanStatus.value === 'scanning' ||
+      !canScanSourceRoot(selectedRootId)
+    ) {
       return false
     }
 
@@ -130,7 +134,11 @@ export function createRootLifecycleController(
   }
 
   async function removeSource(rootId?: string): Promise<boolean> {
-    if (rootId === undefined ? !canRemoveSource.value : !canRemoveSourceRoot(rootId)) {
+    if (
+      dependencies.rootActions.scanStatus.value === 'scanning' ||
+      dependencies.rootActions.removeSourceStatus.value === 'removing' ||
+      (rootId === undefined ? !canRemoveSource.value : !canRemoveSourceRoot(rootId))
+    ) {
       return false
     }
 

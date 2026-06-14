@@ -269,7 +269,7 @@ export function createLocalRootActionsController(
   }
 
   async function runRootScan(rootId: string): Promise<boolean> {
-    if (!canRunLocalRootScan(rootId)) {
+    if (scanStatus.value === 'scanning' || !canRunLocalRootScan(rootId)) {
       return false
     }
 
@@ -466,16 +466,11 @@ export function createLocalRootActionsController(
   }
 
   function canUnregisterLocalRootId(rootId: string | undefined): rootId is string {
-    return (
-      rootId !== undefined &&
-      removeSourceStatus.value !== 'removing' &&
-      scanStatus.value !== 'scanning' &&
-      isKnownLocalRootId(rootId)
-    )
+    return rootId !== undefined && isKnownLocalRootId(rootId)
   }
 
   function canRunLocalRootScan(rootId: string | undefined): rootId is string {
-    if (rootId === undefined || scanStatus.value === 'scanning') {
+    if (rootId === undefined) {
       return false
     }
 

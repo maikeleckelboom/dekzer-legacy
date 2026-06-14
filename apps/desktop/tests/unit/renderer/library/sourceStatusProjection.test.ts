@@ -292,6 +292,33 @@ describe('source status projection', () => {
     })
   })
 
+  it('blocks scan and remove honestly when another source scan owns the global scan controller', () => {
+    const view = registeredView({
+      activeSourceOperation: {
+        kind: 'scan',
+        scope: 'source',
+        sourceId: '8'
+      },
+      scanStatus: 'idle',
+      sourceLifecycle: lifecycle({ scanPhase: 'complete' }),
+      sourceIntegrity: integrity({ coverage: 'complete' }),
+      sourceMaintenance: maintenance({ remainingHashCandidates: 1 })
+    })
+
+    expect(view.badge).toBe('Preparation pending')
+    expect(view.actions.find((action) => action.kind === 'scanSource')).toMatchObject({
+      enabled: false,
+      reason: 'Another source scan is running.'
+    })
+    expect(view.actions.find((action) => action.kind === 'removeSource')).toMatchObject({
+      enabled: false,
+      reason: 'Another source scan is running.'
+    })
+    expect(view.actions.find((action) => action.kind === 'runMaintenance')).toMatchObject({
+      enabled: true
+    })
+  })
+
   it('summarizes maintenance backlog by product categories', () => {
     const view = registeredView({
       sourceMaintenance: maintenance({

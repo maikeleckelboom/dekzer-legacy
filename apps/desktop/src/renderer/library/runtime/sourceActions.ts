@@ -39,6 +39,7 @@ export type SourceActionModelInput = {
   readonly selectedNodeId: BrowserTreeNodeId | undefined
   readonly localRootsReadState: LocalRootsReadState
   readonly scanStatus: LocalRootScanStatus
+  readonly activeScanRootId?: string
   readonly removeSourceStatus: RemoveSourceStatus
   readonly refreshStatus: RootLifecycleRefreshStatus
 }
@@ -72,7 +73,7 @@ export function deriveSourceActionModel(input: SourceActionModelInput): SourceAc
     removeVisible,
     removeEnabled:
       removeVisible &&
-      input.scanStatus !== 'scanning' &&
+      !sourceScanBlocksSelectedRoot(input.scanStatus) &&
       input.removeSourceStatus !== 'removing' &&
       input.refreshStatus !== 'refreshing',
     ...(reasonUnavailable === undefined ? {} : { reasonUnavailable })
@@ -173,8 +174,14 @@ function removeUnavailableReason(
       return 'A source removal is already in progress.'
     }
 
-    if (input.scanStatus === 'scanning') {
+    if (input.scanStatus === 'scanning' && input.activeScanRootId === input.selectedSourceRootId) {
       return 'A source scan is still running.'
+    }
+
+    if (sourceScanBlocksSelectedRoot(input.scanStatus)) {
+      return input.activeScanRootId === undefined
+        ? 'A source scan is already running.'
+        : 'Another source scan is running.'
     }
 
     if (input.refreshStatus === 'refreshing') {
@@ -215,6 +222,10 @@ function removeUnavailableReason(
   }
 
   return undefined
+}
+
+function sourceScanBlocksSelectedRoot(scanStatus: LocalRootScanStatus): boolean {
+  return scanStatus === 'scanning'
 }
 
 function localRootIdForBinding(binding: RowBinding | undefined): string | undefined {

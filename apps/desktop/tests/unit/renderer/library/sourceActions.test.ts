@@ -45,7 +45,7 @@ describe('deriveSourceActionModel', () => {
     expect(model.removeEnabled).toBe(false)
   })
 
-  it('keeps remove visible but disabled while scan, refresh, or removal is active', () => {
+  it('keeps remove visible but disabled while a global scan, refresh, or removal is active', () => {
     const base = {
       projection: sourceProjection(['root-1']),
       selectedNodeId: 'navigation-row:root-1',
@@ -62,7 +62,7 @@ describe('deriveSourceActionModel', () => {
     ).toMatchObject({
       removeVisible: true,
       removeEnabled: false,
-      reasonUnavailable: 'A source scan is still running.'
+      reasonUnavailable: 'A source scan is already running.'
     })
     expect(
       deriveSourceActionModel({
@@ -87,6 +87,38 @@ describe('deriveSourceActionModel', () => {
       removeVisible: true,
       removeEnabled: false,
       reasonUnavailable: 'The library view is refreshing.'
+    })
+  })
+
+  it('reports same-source and other-source scan locks without conflating the selected source', () => {
+    const base = {
+      projection: sourceProjection(['root-1', 'root-2']),
+      selectedNodeId: 'navigation-row:root-2',
+      localRootsReadState: readyRoots(['root-1', 'root-2']),
+      scanStatus: 'scanning' as const,
+      removeSourceStatus: 'idle' as const,
+      refreshStatus: 'idle' as const
+    }
+
+    expect(
+      deriveSourceActionModel({
+        ...base,
+        activeScanRootId: 'root-2'
+      })
+    ).toMatchObject({
+      removeVisible: true,
+      removeEnabled: false,
+      reasonUnavailable: 'A source scan is still running.'
+    })
+    expect(
+      deriveSourceActionModel({
+        ...base,
+        activeScanRootId: 'root-1'
+      })
+    ).toMatchObject({
+      removeVisible: true,
+      removeEnabled: false,
+      reasonUnavailable: 'Another source scan is running.'
     })
   })
 

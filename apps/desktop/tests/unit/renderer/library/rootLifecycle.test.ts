@@ -552,6 +552,34 @@ describe('local root scan lifecycle', () => {
     })
   })
 
+  it('keeps unrelated root action applicability source-scoped while scan execution remains single-flight', async () => {
+    const runScan = vi.fn(async () => startedRootResult('scan-1'))
+    const controller = createLocalRootActionsController(
+      testRootApi({
+        readLocalRoots: async () => ({
+          state: 'read',
+          roots: [
+            { rootId: 'root-1', admittedRootPath: 'C:/Music/One', availability: 'available' },
+            { rootId: 'root-2', admittedRootPath: 'C:/Music/Two', availability: 'available' }
+          ]
+        }),
+        runScan
+      })
+    )
+
+    await expect(controller.hydrateLocalRoots()).resolves.toBe(false)
+    await expect(controller.runRootScan('root-1')).resolves.toBe(true)
+
+    expect(controller.scanStatusForRoot('root-1')).toBe('scanning')
+    expect(controller.scanStatusForRoot('root-2')).toBe('idle')
+    expect(controller.canRunLocalRootScan('root-2')).toBe(true)
+    expect(controller.canUnregisterLocalRootId('root-2')).toBe(true)
+
+    await expect(controller.runRootScan('root-2')).resolves.toBe(false)
+    expect(runScan).toHaveBeenCalledTimes(1)
+    expect(controller.activeScanRootId.value).toBe('root-1')
+  })
+
   it('uses hydrated root availability to enable or disable scan', async () => {
     const available = createLocalRootActionsController(
       testRootApi({
