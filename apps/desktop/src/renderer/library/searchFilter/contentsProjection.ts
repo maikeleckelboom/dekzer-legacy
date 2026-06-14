@@ -1,6 +1,6 @@
 import type { LibraryBrowseProfile } from '../libraryBrowseProfile/types'
 import type { ContentProjection, ContentRow, ContentRowIcon } from '../contents/projection'
-import type { SearchQueryState } from '../runtime/searchFilterState'
+import type { SearchQueryState, SearchResultIdentity } from '../runtime/searchFilterState'
 import type { SearchFilterResultRow } from '../../../shared/library/searchFilter/read'
 
 export function projectSearchFilterContents(options: {
@@ -11,7 +11,8 @@ export function projectSearchFilterContents(options: {
   const rows = rowsForSearchState(options.state)
   const nextCursor = nextCursorForSearchState(options.state)
   const loadingMore = options.state.kind === 'Accumulating'
-  const detail = searchDetail(options.activeQuery, rows.length, loadingMore)
+  const identity = presentationIdentityForSearchState(options.state)
+  const detail = searchDetail(identity, options.activeQuery, rows.length, loadingMore)
 
   if (rows.length === 0) {
     return {
@@ -20,7 +21,7 @@ export function projectSearchFilterContents(options: {
       kind: searchProjectionKind(options.state),
       title: 'Search results',
       detail,
-      rows: [emptyOrPendingSearchRow(options.state, options.profile)]
+      rows: [emptyOrPendingSearchRow(options.state, options.profile, identity)]
     }
   }
 
@@ -63,6 +64,20 @@ function nextCursorForSearchState(state: SearchQueryState): string | null {
   }
 }
 
+function presentationIdentityForSearchState(
+  state: SearchQueryState
+): SearchResultIdentity | undefined {
+  switch (state.kind) {
+    case 'Retained':
+    case 'Accumulating':
+      return state.identity
+    case 'Pending':
+      return state.priorRetained?.identity ?? state.identity
+    case 'Idle':
+      return undefined
+  }
+}
+
 function searchProjectionKind(state: SearchQueryState): ContentProjection['kind'] {
   if (state.kind === 'Retained' && state.resultState === 'unsupported') {
     return 'unsupported'
@@ -77,14 +92,15 @@ function searchProjectionKind(state: SearchQueryState): ContentProjection['kind'
 
 function emptyOrPendingSearchRow(
   state: SearchQueryState,
-  profile: LibraryBrowseProfile
+  profile: LibraryBrowseProfile,
+  identity: SearchResultIdentity | undefined
 ): ContentRow {
   if (state.kind === 'Retained' && state.resultState === 'unsupported') {
     return stateRow('search-unsupported', 'unsupported', 'Search unavailable', state.resultDetail)
   }
 
   if (state.kind === 'Retained' && state.resultState !== 'partial') {
-    const label = emptySearchLabel(profile)
+    const label = emptySearchLabel(profile, identity)
     return stateRow('search-empty', 'empty', label, label)
   }
 
@@ -97,7 +113,8 @@ function emptyOrPendingSearchRow(
     )
   }
 
-  return stateRow('search-pending', 'loading', 'Searching library', 'Searching library.')
+  const label = pendingSearchLabel(identity)
+  return stateRow('search-pending', 'loading', label, `${label}.`)
 }
 
 function searchResultContentRow(row: SearchFilterResultRow): ContentRow {
@@ -210,24 +227,79 @@ function stateRow(
   }
 }
 
-function emptySearchLabel(profile: LibraryBrowseProfile): string {
+function emptySearchLabel(
+  profile: LibraryBrowseProfile,
+  identity: SearchResultIdentity | undefined
+): string {
+  const scopeSuffix = searchScopeSuffix(identity)
+
   switch (profile) {
     case 'audio':
-      return 'No matching audio tracks.'
+      return `No matching audio tracks${scopeSuffix}.`
     case 'playable':
-      return 'No matching playable media.'
+      return `No matching playable media${scopeSuffix}.`
     case 'allFiles':
-      return 'No matching files.'
+      return `No matching files${scopeSuffix}.`
   }
 }
 
-function searchDetail(activeQuery: string, rowCount: number, loadingMore: boolean): string {
+function searchDetail(
+  identity: SearchResultIdentity | undefined,
+  activeQuery: string,
+  rowCount: number,
+  loadingMore: boolean
+): string {
+  const query = identity?.textQuery ?? activeQuery
+  const scopePhrase = searchScopePhrase(identity)
+
   if (rowCount === 0) {
-    return `Search results for "${activeQuery}".`
+    return `Search results ${scopePhrase} for "${query}".`
   }
 
   const count = rowCount === 1 ? '1 result' : `${rowCount} results`
   return loadingMore
-    ? `${count} for "${activeQuery}". Loading more.`
-    : `${count} for "${activeQuery}".`
+    ? `${count} ${scopePhrase} for "${query}". Loading more.`
+    : `${count} ${scopePhrase} for "${query}".`
+}
+
+function pendingSearchLabel(identity: SearchResultIdentity | undefined): string {
+  switch (identity?.scope.type) {
+    case 'source':
+      return 'Searching selected source'
+    case 'sourceLocation':
+      return 'Searching selected source location'
+    case 'directory':
+      return 'Searching selected folder'
+    case 'library':
+    case undefined:
+      return 'Searching library'
+  }
+}
+
+function searchScopePhrase(identity: SearchResultIdentity | undefined): string {
+  switch (identity?.scope.type) {
+    case 'source':
+      return 'in selected source'
+    case 'sourceLocation':
+      return 'in selected source location'
+    case 'directory':
+      return 'in selected folder'
+    case 'library':
+    case undefined:
+      return 'in library'
+  }
+}
+
+function searchScopeSuffix(identity: SearchResultIdentity | undefined): string {
+  switch (identity?.scope.type) {
+    case 'source':
+      return ' in this source'
+    case 'sourceLocation':
+      return ' in this source location'
+    case 'directory':
+      return ' in this folder'
+    case 'library':
+    case undefined:
+      return ''
+  }
 }

@@ -41,7 +41,10 @@ import {
   type RefreshPlanDeps
 } from './runtime/invalidationRefresh'
 import { createDisclosureReconciler } from './runtime/disclosureReconciliation'
-import { createLibrarySearchController } from './runtime/librarySearch'
+import {
+  createLibrarySearchController,
+  librarySearchScopeForBinding
+} from './runtime/librarySearch'
 import { useSearchFilterRead } from './runtime/searchFilterState'
 import { useRootLifecycle } from './runtime/rootLifecycle'
 import {
@@ -132,10 +135,6 @@ const integrityRead = useIntegrityRead()
 const maintenanceRead = useMaintenanceRead()
 const activityRead = useActivityRead()
 const searchFilterRead = useSearchFilterRead()
-const librarySearch = createLibrarySearchController({
-  profile: libraryBrowseProfile.profile,
-  searchFilterRead
-})
 const disclosureReconciler = createDisclosureReconciler({
   requestNodeChildren: (nodeId) => requestLibraryNodeChildren(nodeId)
 })
@@ -214,6 +213,18 @@ const activeSurfaceTitle = computed(() =>
 )
 
 const libraryBrowseProjection = computed(() => projectState(browserState.value))
+const selectedLibrarySearchScope = computed(() =>
+  librarySearchScopeForBinding(
+    selectedLibraryNodeId.value === undefined
+      ? undefined
+      : libraryBrowseProjection.value?.bindingsById.get(selectedLibraryNodeId.value)
+  )
+)
+const librarySearch = createLibrarySearchController({
+  profile: libraryBrowseProfile.profile,
+  scope: selectedLibrarySearchScope,
+  searchFilterRead
+})
 const addSourceProjection = computed(() =>
   projectAddSourceState({
     addSourceView: addSourceView.view.value,

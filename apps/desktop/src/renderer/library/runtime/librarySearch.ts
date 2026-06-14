@@ -4,8 +4,12 @@ import {
   defaultLibraryBrowseProfile,
   type LibraryBrowseProfile
 } from '../libraryBrowseProfile/types'
+import type { RowBinding } from '../state'
 import type { SearchFilterReadController } from './searchFilterState'
-import type { SearchFilterReadRequest } from '../../../shared/library/searchFilter/read'
+import type {
+  SearchFilterReadRequest,
+  SearchFilterScope
+} from '../../../shared/library/searchFilter/read'
 
 export type LibrarySearchController = {
   readonly query: Ref<string>
@@ -24,6 +28,7 @@ export type LibrarySearchReadPort = Pick<SearchFilterReadController, 'submit' | 
 
 export type LibrarySearchControllerOptions = {
   readonly profile?: Ref<LibraryBrowseProfile>
+  readonly scope?: Ref<SearchFilterScope>
   readonly searchFilterRead: LibrarySearchReadPort
   readonly debounceMs?: number
 }
@@ -35,6 +40,7 @@ export function createLibrarySearchController(
   options: LibrarySearchControllerOptions
 ): LibrarySearchController {
   const profile = options.profile ?? ref<LibraryBrowseProfile>(defaultLibraryBrowseProfile)
+  const scope = options.scope ?? ref<SearchFilterScope>(librarySearchScope())
   const debounceMs = options.debounceMs ?? defaultSearchDebounceMs
   const searchText = ref('')
   const activeQuery = ref('')
@@ -56,7 +62,9 @@ export function createLibrarySearchController(
     }
 
     activeQuery.value = trimmedQuery
-    return options.searchFilterRead.submit(createLibrarySearchRequest(trimmedQuery, profile.value))
+    return options.searchFilterRead.submit(
+      createLibrarySearchRequest(trimmedQuery, profile.value, scope.value)
+    )
   }
 
   function clearSearch(clearOptions: { readonly close?: boolean } = {}): void {
@@ -122,11 +130,15 @@ export function createLibrarySearchController(
 
   const stopSearchWatch = watch(searchText, scheduleSearch, { flush: 'sync' })
   const stopProfileWatch = watch(profile, refreshActiveSearch, { flush: 'sync' })
+  const stopScopeWatch = watch(() => librarySearchScopeKey(scope.value), refreshActiveSearch, {
+    flush: 'sync'
+  })
 
   function dispose(): void {
     clearDebounce()
     stopSearchWatch()
     stopProfileWatch()
+    stopScopeWatch()
   }
 
   return {
@@ -145,16 +157,76 @@ export function createLibrarySearchController(
 
 export function createLibrarySearchRequest(
   query: string,
-  profile: LibraryBrowseProfile
+  profile: LibraryBrowseProfile,
+  scope: SearchFilterScope = librarySearchScope()
 ): SearchFilterReadRequest {
   return {
-    scope: { type: 'library' },
+    scope,
     recursion: 'recursive',
     textQuery: query,
     targetKinds: ['sourceFile'],
     filters: searchFiltersForProfile(profile),
     sort: 'relevance',
     limit: searchLimit
+  }
+}
+
+export function librarySearchScopeForBinding(binding: RowBinding | undefined): SearchFilterScope {
+  if (binding === undefined) {
+    return librarySearchScope()
+  }
+
+  switch (binding.kind) {
+    case 'source':
+      if (binding.target.entryPoint.kind === 'source') {
+        return {
+          type: 'source',
+          payload: {
+            sourceId: binding.target.entryPoint.sourceId
+          }
+        }
+      }
+
+      return {
+        type: 'sourceLocation',
+        payload: {
+          sourceLocationId: binding.target.entryPoint.sourceLocationId
+        }
+      }
+    case 'directory':
+      return {
+        type: 'directory',
+        payload: {
+          sourceId: binding.sourceId,
+          sourceDirectoryId: binding.directoryId
+        }
+      }
+    case 'file':
+    case 'navigation':
+    case 'readState':
+    case 'more':
+    case 'addSourceSection':
+    case 'localBrowseEntryPoint':
+    case 'localBrowseItem':
+    case 'localBrowseMore':
+      return librarySearchScope()
+  }
+}
+
+function librarySearchScope(): Extract<SearchFilterScope, { readonly type: 'library' }> {
+  return { type: 'library' }
+}
+
+function librarySearchScopeKey(scope: SearchFilterScope): string {
+  switch (scope.type) {
+    case 'library':
+      return 'library'
+    case 'source':
+      return `source:${scope.payload.sourceId}`
+    case 'sourceLocation':
+      return `source-location:${scope.payload.sourceLocationId}`
+    case 'directory':
+      return `directory:${scope.payload.sourceId}:${scope.payload.sourceDirectoryId}`
   }
 }
 

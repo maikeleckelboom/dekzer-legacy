@@ -3,10 +3,12 @@ import { ref } from 'vue'
 
 import {
   createLibrarySearchController,
-  createLibrarySearchRequest
+  createLibrarySearchRequest,
+  librarySearchScopeForBinding
 } from '../../../../src/renderer/library/runtime/librarySearch'
 import type { LibraryBrowseProfile } from '../../../../src/renderer/library/libraryBrowseProfile/types'
 import type { SearchFilterReadRequest } from '../../../../src/shared/library/searchFilter/read'
+import type { RowBinding } from '../../../../src/renderer/library/state'
 
 describe('library search controller', () => {
   it('defaults closed and opens the search input state', () => {
@@ -139,6 +141,66 @@ describe('library search controller', () => {
     vi.useRealTimers()
   })
 
+  it('submits source-scoped search from the active browse source', () => {
+    vi.useFakeTimers()
+    const read = searchReadSpy()
+    const scope = ref(librarySearchScopeForBinding(sourceBinding('7')))
+    const search = createLibrarySearchController({
+      searchFilterRead: read,
+      scope,
+      debounceMs: 250
+    })
+
+    search.searchText.value = 'amen'
+    vi.advanceTimersByTime(250)
+
+    expect(read.submitted[0]?.scope).toEqual({
+      type: 'source',
+      payload: { sourceId: '7' }
+    })
+
+    search.dispose()
+    vi.useRealTimers()
+  })
+
+  it('submits folder subtree search from the active browse folder', () => {
+    expect(
+      createLibrarySearchRequest('amen', 'audio', librarySearchScopeForBinding(directoryBinding()))
+    ).toMatchObject({
+      scope: {
+        type: 'directory',
+        payload: {
+          sourceId: '7',
+          sourceDirectoryId: '11'
+        }
+      },
+      recursion: 'recursive'
+    })
+  })
+
+  it('refreshes active search when the browse scope changes', () => {
+    vi.useFakeTimers()
+    const read = searchReadSpy()
+    const scope = ref(librarySearchScopeForBinding(sourceBinding('7')))
+    const search = createLibrarySearchController({
+      searchFilterRead: read,
+      scope,
+      debounceMs: 250
+    })
+
+    search.searchText.value = 'amen'
+    vi.advanceTimersByTime(250)
+    scope.value = librarySearchScopeForBinding(sourceBinding('8'))
+
+    expect(read.submitted.map((request) => request.scope)).toEqual([
+      { type: 'source', payload: { sourceId: '7' } },
+      { type: 'source', payload: { sourceId: '8' } }
+    ])
+
+    search.dispose()
+    vi.useRealTimers()
+  })
+
   it('uses library-wide indexed source-file search and excludes local browse paths', () => {
     expect(createLibrarySearchRequest('amen', 'allFiles')).toEqual({
       scope: { type: 'library' },
@@ -151,6 +213,46 @@ describe('library search controller', () => {
     })
   })
 })
+
+function sourceBinding(sourceId: string): RowBinding {
+  return {
+    kind: 'source',
+    navigationRow: {
+      navigationRowId: sourceId,
+      stableKey: `source:${sourceId}`,
+      parentNavigationRowId: null,
+      rowKind: 'source',
+      rowFamily: 'sources',
+      displayName: `Source ${sourceId}`,
+      sortKey: `source-${sourceId}`,
+      selectorKind: 'source',
+      selectorPayload: sourceId,
+      updatedAtMs: 100,
+      rowVersion: '1'
+    },
+    target: {
+      navigationRowId: sourceId,
+      entryPoint: {
+        kind: 'source',
+        sourceId
+      },
+      label: `Source ${sourceId}`
+    }
+  }
+}
+
+function directoryBinding(): RowBinding {
+  return {
+    kind: 'directory',
+    sourceId: '7',
+    directoryId: '11',
+    entryPoint: {
+      kind: 'source',
+      sourceId: '7'
+    },
+    label: 'Breaks'
+  }
+}
 
 function searchReadSpy(): {
   readonly submitted: SearchFilterReadRequest[]

@@ -362,6 +362,33 @@ describe('createSearchFilterReadController', () => {
     expect(api.requests).toHaveLength(2)
   })
 
+  it('rejects stale scoped pagination after switching to another source', async () => {
+    const sourceARequest = request({
+      scope: { type: 'source', payload: { sourceId: '7' } }
+    })
+    const sourceBRequest = request({
+      scope: { type: 'source', payload: { sourceId: '8' } }
+    })
+    const { controller, api } = await retainedController(
+      [row('source-file:1', 'One.wav')],
+      'c1',
+      '1',
+      sourceARequest
+    )
+
+    const stalePage = controller.loadNext()
+    const currentSubmit = controller.submit(sourceBRequest)
+
+    api.resolveAt(1, readyResult(requestAt(api, 2), [row('source-file:8', 'Eight.wav')]))
+    await expect(currentSubmit).resolves.toBe(true)
+
+    api.resolveAt(0, readyResult(requestAt(api, 1), [row('source-file:2', 'Two.wav')]))
+    await expect(stalePage).resolves.toBe(false)
+    expect(retainedRows(controller.state.value).map((resultRow) => resultRow.displayLabel)).toEqual(
+      ['Eight.wav']
+    )
+  })
+
   it('11. generation mismatch mid-accumulation discards accumulated rows and clears cursor', async () => {
     const { controller, api } = await retainedController(
       [row('source-file:1', 'One.wav')],
@@ -378,6 +405,10 @@ describe('createSearchFilterReadController', () => {
     expect(controller.state.value).toEqual({
       kind: 'Pending',
       queryId: createSearchQueryId(request()),
+      identity: {
+        scope: { type: 'library' },
+        textQuery: 'amen'
+      },
       requestToken: 3
     })
     expect(api.requests).toHaveLength(3)
@@ -452,7 +483,8 @@ describe('createSearchFilterReadController', () => {
 async function retainedController(
   rows: readonly SearchFilterResultRow[],
   nextCursor?: string,
-  indexGeneration = '1'
+  indexGeneration = '1',
+  readRequest: SearchFilterReadRequest = request()
 ): Promise<{
   readonly controller: ReturnType<typeof createSearchFilterReadController>
   readonly api: DeferredSearchApi
@@ -461,7 +493,7 @@ async function retainedController(
   const controller = createSearchFilterReadController(api)
 
   controller.start()
-  const submitted = controller.submit(request())
+  const submitted = controller.submit(readRequest)
   api.resolveNext(readyResult(requestAt(api, 0), rows, nextCursor, 'ready', indexGeneration))
   await submitted
 

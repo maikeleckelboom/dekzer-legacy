@@ -5,6 +5,18 @@ import type { QueryId } from '../../../../src/renderer/library/runtime/searchFil
 import type { SearchFilterResultRow } from '../../../../src/shared/library/searchFilter/read'
 
 const queryId = 'query' as QueryId
+const libraryIdentity = {
+  scope: { type: 'library' },
+  textQuery: 'amen'
+} as const
+const sourceIdentity = {
+  scope: { type: 'source', payload: { sourceId: '7' } },
+  textQuery: 'amen'
+} as const
+const folderIdentity = {
+  scope: { type: 'directory', payload: { sourceId: '7', sourceDirectoryId: '11' } },
+  textQuery: 'break'
+} as const
 
 describe('search/filter contents projection', () => {
   it('projects active search results into contents rows', () => {
@@ -12,6 +24,7 @@ describe('search/filter contents projection', () => {
       state: {
         kind: 'Retained',
         queryId,
+        identity: libraryIdentity,
         rows: [row('1', 'Amen.wav', 'audio'), row('2', 'Clip.mp4', 'video')],
         nextCursor: null,
         indexGeneration: '1',
@@ -34,6 +47,7 @@ describe('search/filter contents projection', () => {
       state: {
         kind: 'Retained',
         queryId,
+        identity: libraryIdentity,
         rows: [row('1', 'Amen.wav', 'audio')],
         nextCursor: 'cursor-1',
         indexGeneration: '1',
@@ -58,9 +72,11 @@ describe('search/filter contents projection', () => {
       state: {
         kind: 'Pending',
         queryId,
+        identity: libraryIdentity,
         requestToken: 2,
         priorRetained: {
           queryId,
+          identity: libraryIdentity,
           rows: [row('1', 'Amen.wav', 'audio')],
           nextCursor: null,
           indexGeneration: '1',
@@ -74,6 +90,30 @@ describe('search/filter contents projection', () => {
     expect(contents.rows.map((projected) => projected.label)).toEqual(['Amen.wav'])
   })
 
+  it('labels retained rows using the accepted result identity while another scope is pending', () => {
+    const contents = projectSearchFilterContents({
+      state: {
+        kind: 'Pending',
+        queryId,
+        identity: folderIdentity,
+        requestToken: 2,
+        priorRetained: {
+          queryId,
+          identity: sourceIdentity,
+          rows: [row('1', 'Amen.wav', 'audio')],
+          nextCursor: null,
+          indexGeneration: '1',
+          resultState: 'ready'
+        }
+      },
+      activeQuery: 'break',
+      profile: 'audio'
+    })
+
+    expect(contents.detail).toBe('1 result in selected source for "amen".')
+    expect(contents.rows.map((projected) => projected.label)).toEqual(['Amen.wav'])
+  })
+
   it('uses profile-aware empty copy for profile-mapped searches', () => {
     for (const [profile, expected] of [
       ['audio', 'No matching audio tracks.'],
@@ -84,6 +124,10 @@ describe('search/filter contents projection', () => {
         state: {
           kind: 'Retained',
           queryId,
+          identity: {
+            scope: { type: 'library' },
+            textQuery: 'missing'
+          },
           rows: [],
           nextCursor: null,
           indexGeneration: '1',
@@ -106,6 +150,7 @@ describe('search/filter contents projection', () => {
       state: {
         kind: 'Accumulating',
         queryId,
+        identity: libraryIdentity,
         accumulated: [row('1', 'Amen.wav', 'audio')],
         nextCursor: 'cursor-1',
         indexGeneration: '1',

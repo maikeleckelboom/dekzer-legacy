@@ -21,9 +21,14 @@ export type SearchCursor = string
 export type IndexGeneration = string
 export type ResultState = SearchFilterState
 export type ResultDetail = string
+export type SearchResultIdentity = {
+  readonly scope: SearchFilterReadRequest['scope']
+  readonly textQuery?: string
+}
 
 export type RetainedSnapshot = {
   readonly queryId: QueryId
+  readonly identity: SearchResultIdentity
   readonly rows: readonly SearchFilterResultRow[]
   readonly nextCursor: SearchCursor | null
   readonly indexGeneration: IndexGeneration
@@ -36,12 +41,14 @@ export type SearchQueryState =
   | {
       readonly kind: 'Pending'
       readonly queryId: QueryId
+      readonly identity: SearchResultIdentity
       readonly requestToken: RequestToken
       readonly priorRetained?: RetainedSnapshot
     }
   | {
       readonly kind: 'Retained'
       readonly queryId: QueryId
+      readonly identity: SearchResultIdentity
       readonly rows: readonly SearchFilterResultRow[]
       readonly nextCursor: SearchCursor | null
       readonly indexGeneration: IndexGeneration
@@ -51,6 +58,7 @@ export type SearchQueryState =
   | {
       readonly kind: 'Accumulating'
       readonly queryId: QueryId
+      readonly identity: SearchResultIdentity
       readonly accumulated: readonly SearchFilterResultRow[]
       readonly nextCursor: SearchCursor
       readonly indexGeneration: IndexGeneration
@@ -141,6 +149,7 @@ export function createSearchFilterReadController(
     state.value = {
       kind: 'Accumulating',
       queryId: currentState.queryId,
+      identity: currentState.identity,
       accumulated: currentState.rows,
       nextCursor: currentState.nextCursor,
       indexGeneration: currentState.indexGeneration,
@@ -166,6 +175,7 @@ export function createSearchFilterReadController(
     state.value = {
       kind: 'Pending',
       queryId: createSearchQueryId(request),
+      identity: searchResultIdentityFromRequest(request),
       requestToken: token,
       ...(priorRetained === undefined ? {} : { priorRetained })
     }
@@ -216,6 +226,7 @@ export function createSearchFilterReadController(
 
       state.value = retainedStateFromResult(
         createSearchQueryIdFromIdentity(result.queryIdentity),
+        searchResultIdentityFromEcho(result.queryIdentity),
         result
       )
       return true
@@ -240,7 +251,12 @@ export function createSearchFilterReadController(
         return true
       }
 
-      state.value = retainedStateFromResult(currentState.queryId, result, currentState.accumulated)
+      state.value = retainedStateFromResult(
+        currentState.queryId,
+        currentState.identity,
+        result,
+        currentState.accumulated
+      )
       return true
     }
 
@@ -264,6 +280,7 @@ export function createSearchFilterReadController(
       state.value = {
         kind: 'Retained',
         queryId: currentState.queryId,
+        identity: currentState.identity,
         rows: currentState.accumulated,
         nextCursor: currentState.nextCursor,
         indexGeneration: currentState.indexGeneration,
@@ -328,14 +345,36 @@ export function queryIdentityMatchesRequest(
   )
 }
 
+export function searchResultIdentityFromRequest(
+  request: SearchFilterReadRequest
+): SearchResultIdentity {
+  const textQuery = normalizeTextQuery(request.textQuery)
+  return {
+    scope: request.scope,
+    ...(textQuery === undefined ? {} : { textQuery })
+  }
+}
+
+export function searchResultIdentityFromEcho(
+  identity: SearchFilterQueryIdentity
+): SearchResultIdentity {
+  const textQuery = normalizeTextQuery(identity.textQuery)
+  return {
+    scope: identity.scope,
+    ...(textQuery === undefined ? {} : { textQuery })
+  }
+}
+
 function retainedStateFromResult(
   queryId: QueryId,
+  identity: SearchResultIdentity,
   result: SearchFilterResult,
   priorRows: readonly SearchFilterResultRow[] = []
 ): SearchQueryState {
   return {
     kind: 'Retained',
     queryId,
+    identity,
     rows: [...priorRows, ...result.rows],
     nextCursor: result.nextCursor ?? null,
     indexGeneration: result.indexGeneration,
@@ -351,6 +390,7 @@ function retainedStateFromSnapshot(
   return {
     kind: 'Retained',
     queryId: snapshot.queryId,
+    identity: snapshot.identity,
     rows: snapshot.rows,
     nextCursor: snapshot.nextCursor,
     indexGeneration: snapshot.indexGeneration,
@@ -366,6 +406,7 @@ function retainedSnapshot(state: SearchQueryState): RetainedSnapshot | undefined
 
   return {
     queryId: state.queryId,
+    identity: state.identity,
     rows: state.rows,
     nextCursor: state.nextCursor,
     indexGeneration: state.indexGeneration,
