@@ -207,12 +207,12 @@ export function createLocalBrowseController(
     switch (binding.kind) {
       case 'localBrowseEntryPoint':
         return readItems(localBrowseRootTarget(binding.target, addSourceView.value), {
-          ownerNodeId: nodeId
+          parentNodeId: nodeId
         })
       case 'localBrowseItem':
         return binding.target === undefined
           ? false
-          : readItems(binding.target, { ownerNodeId: nodeId })
+          : readItems(binding.target, { parentNodeId: nodeId })
       case 'localBrowseMore':
         return readMore(binding.target)
       default:
@@ -244,7 +244,7 @@ export function createLocalBrowseController(
 
     return readMore({
       ...target,
-      ownerNodeId: nodeId,
+      parentNodeId: nodeId,
       offset: state.window.nextOffset,
       limit: state.window.limit
     })
@@ -265,7 +265,7 @@ export function createLocalBrowseController(
 
     for (const { nodeId, target } of targets.values()) {
       refreshedAny = true
-      allSucceeded = (await readItems(target, { ownerNodeId: nodeId })) && allSucceeded
+      allSucceeded = (await readItems(target, { parentNodeId: nodeId })) && allSucceeded
     }
 
     return refreshedAny ? allSucceeded : true
@@ -323,7 +323,7 @@ export function createLocalBrowseController(
 
   async function readItems(
     target: LocalBrowseDirectoryTarget,
-    options: { readonly ownerNodeId?: BrowserTreeNodeId } = {}
+    options: { readonly parentNodeId?: BrowserTreeNodeId } = {}
   ): Promise<boolean> {
     const requestKey = localBrowseWindowKey(target)
     const currentState = itemStates.value.get(requestKey)
@@ -399,10 +399,10 @@ export function createLocalBrowseController(
         kind: 'loaded',
         window
       })
-      if (options.ownerNodeId !== undefined) {
+      if (options.parentNodeId !== undefined) {
         scheduleBranchWarmupFromWindow({
-          anchorNodeId: options.ownerNodeId,
-          parentNodeId: options.ownerNodeId,
+          anchorNodeId: options.parentNodeId,
+          parentNodeId: options.parentNodeId,
           parentTarget: target,
           window,
           remainingDepth: branchWarmupDepth

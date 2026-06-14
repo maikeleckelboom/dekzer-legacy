@@ -278,7 +278,7 @@ export function createLibraryHierarchyReadController(
             ...(binding.label === undefined ? {} : { label: binding.label }),
             directoryId: binding.directoryId
           },
-          { ownerNodeId: nodeId }
+          { parentNodeId: nodeId }
         )
       case 'more':
         return readMore(binding.target)
@@ -306,7 +306,7 @@ export function createLibraryHierarchyReadController(
         ...(binding.label === undefined ? {} : { label: binding.label }),
         directoryId: binding.directoryId
       },
-      { ownerNodeId: nodeId }
+      { parentNodeId: nodeId }
     )
   }
 
@@ -329,7 +329,7 @@ export function createLibraryHierarchyReadController(
 
     for (const { nodeId, target } of targets.directoryTargets.values()) {
       refreshedAny = true
-      allSucceeded = (await readDirectoryWindow(target, { ownerNodeId: nodeId })) && allSucceeded
+      allSucceeded = (await readDirectoryWindow(target, { parentNodeId: nodeId })) && allSucceeded
     }
 
     return refreshedAny ? allSucceeded : true
@@ -532,7 +532,7 @@ export function createLibraryHierarchyReadController(
 
   async function readDirectoryWindow(
     target: DirectoryTarget,
-    options: { readonly ownerNodeId?: BrowserTreeNodeId } = {}
+    options: { readonly parentNodeId?: BrowserTreeNodeId } = {}
   ): Promise<boolean> {
     const requestKey = createDirectoryRequestKey(
       target.entryPoint,
@@ -621,12 +621,12 @@ export function createLibraryHierarchyReadController(
         },
         result.window
       )
-      if (options.ownerNodeId !== undefined) {
+      if (options.parentNodeId !== undefined) {
         scheduleBranchWarmupFromWindow({
-          anchorNodeId: options.ownerNodeId,
+          anchorNodeId: options.parentNodeId,
           parent: {
             kind: 'directory',
-            nodeId: options.ownerNodeId,
+            nodeId: options.parentNodeId,
             directoryId: target.directoryId,
             entryPoint: target.entryPoint
           },
@@ -671,7 +671,7 @@ export function createLibraryHierarchyReadController(
 
   async function readSourceMore(target: MoreTarget): Promise<boolean> {
     const requestKey = createMoreRequestKey(target, profile.value)
-    const currentState = sourceReadStates.value.get(target.ownerNodeId)
+    const currentState = sourceReadStates.value.get(target.parentNodeId)
 
     if (!canReadMore(currentState, target)) {
       return false
@@ -719,14 +719,14 @@ export function createLibraryHierarchyReadController(
         return true
       }
 
-      const state = sourceReadStates.value.get(target.ownerNodeId)
+      const state = sourceReadStates.value.get(target.parentNodeId)
 
       if (!canReadMore(state, target)) {
         return false
       }
 
       setSourceReadState(
-        target.ownerNodeId,
+        target.parentNodeId,
         {
           kind: 'loaded',
           children: appendHierarchyChildrenWindow(state.children, result.window)
@@ -870,13 +870,13 @@ export function createLibraryHierarchyReadController(
   }
 
   function setSourceMoreState(target: MoreTarget, more: MoreState): void {
-    const state = sourceReadStates.value.get(target.ownerNodeId)
+    const state = sourceReadStates.value.get(target.parentNodeId)
 
     if (!canReadMore(state, target)) {
       return
     }
 
-    setSourceReadState(target.ownerNodeId, {
+    setSourceReadState(target.parentNodeId, {
       kind: 'loaded',
       children: withMoreState(state.children, more)
     })
@@ -928,7 +928,7 @@ export function createLibraryHierarchyReadController(
     requestKey: string,
     sequence: number
   ): boolean {
-    const state = resolveSourceState(target.ownerNodeId)
+    const state = resolveSourceState(target.parentNodeId)
     const more = state?.kind === 'loaded' ? state.children.more : undefined
 
     return more?.kind === 'loading' && more.requestKey === requestKey && more.sequence === sequence

@@ -52,7 +52,7 @@ export type LocalBrowseDirectoryTarget = {
 }
 
 export type LocalBrowseMoreTarget = LocalBrowseDirectoryTarget & {
-  readonly ownerNodeId: string
+  readonly parentNodeId: string
   readonly offset: number
   readonly limit: number
 }

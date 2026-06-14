@@ -64,7 +64,7 @@ describe('projectState', () => {
       throw new Error('Expected load-more binding.')
     }
     expect(moreBinding.target).toMatchObject({
-      ownerNodeId: 'navigation-row:7',
+      parentNodeId: 'navigation-row:7',
       entryPoint: sourceEntryPoint(),
       offset: 2,
       limit: 50

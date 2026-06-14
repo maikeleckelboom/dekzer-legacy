@@ -70,7 +70,7 @@ function projectHostStatus(hostStatus: BrowserState['hostStatus']): BrowserProje
 
   if (hostStatus.state === 'stopping' || hostStatus.state === 'stopped') {
     return emptyProjection({
-      ownerId: 'host',
+      parentNodeId: 'host',
       state: 'unavailable',
       label: 'Library engine unavailable',
       detail: 'The library engine is not running.'
@@ -84,7 +84,7 @@ function projectHostFailed(hostStatus: NonNullable<BrowserState['hostStatus']>):
   const lastError = hostStatus.lastError
 
   return emptyProjection({
-    ownerId: 'host',
+    parentNodeId: 'host',
     state: 'error',
     label: 'Library engine failed to start',
     detail: lastError?.message ?? 'No additional detail available.'
@@ -102,7 +102,7 @@ function projectNavigationResult(state: BrowserState): BrowserProjection {
   if (result === undefined) {
     return emptyProjectionWithBindings(
       {
-        ownerId: 'navigation',
+        parentNodeId: 'navigation',
         state: 'loading',
         label: 'Loading library',
         detail: 'Loading your library.'
@@ -114,7 +114,7 @@ function projectNavigationResult(state: BrowserState): BrowserProjection {
   if (result.state !== 'ready') {
     return emptyProjectionWithBindings(
       {
-        ownerId: 'navigation',
+        parentNodeId: 'navigation',
         state: 'error',
         label: 'Library unavailable',
         detail: result.error.message
@@ -128,7 +128,7 @@ function projectNavigationResult(state: BrowserState): BrowserProjection {
   if (visibleRows.length === 0) {
     return emptyProjectionWithBindings(
       {
-        ownerId: 'navigation',
+        parentNodeId: 'navigation',
         state: 'empty',
         label: 'No library sources',
         detail: 'Add a music folder to start building your library.'
@@ -183,7 +183,7 @@ function projectNavigationRow(options: {
       icon: 'source',
       detail: formatNavigationSourceDetail(options.row, sourceReadiness),
       ...projectSourceChildren({
-        ownerId: nodeId,
+        parentNodeId: nodeId,
         target: sourceTarget,
         state: sourceState,
         profile: options.profile,
@@ -209,7 +209,7 @@ function projectNavigationRow(options: {
 }
 
 function projectSourceChildren(options: {
-  readonly ownerId: string
+  readonly parentNodeId: string
   readonly target: SourceTarget
   readonly state: SourceState | undefined
   readonly profile: LibraryBrowseProfile
@@ -224,7 +224,7 @@ function projectSourceChildren(options: {
     return {
       children: deferredChildren(
         {
-          ownerId: options.ownerId,
+          parentNodeId: options.parentNodeId,
           label: 'Source contents not loaded',
           detail
         },
@@ -238,7 +238,7 @@ function projectSourceChildren(options: {
     return {
       children: loadingChildren(
         {
-          ownerId: options.ownerId,
+          parentNodeId: options.parentNodeId,
           label: 'Loading source contents',
           detail: state.detail ?? 'Loading source contents.'
         },
@@ -251,7 +251,7 @@ function projectSourceChildren(options: {
     return {
       children: failedChildren(
         {
-          ownerId: options.ownerId,
+          parentNodeId: options.parentNodeId,
           label: sourceFailedLabel(state.errorCode),
           detail: state.detail
         },
@@ -267,7 +267,7 @@ function projectSourceChildren(options: {
     return {
       children: childrenForProjectedNodes(
         projectLoadedHierarchyChildren({
-          ownerId: options.ownerId,
+          parentNodeId: options.parentNodeId,
           children: state.children,
           profile: options.profile,
           directoryReadStates: options.directoryReadStates,
@@ -284,7 +284,7 @@ function projectSourceChildren(options: {
 }
 
 function projectLoadedHierarchyChildren(options: {
-  readonly ownerId: string
+  readonly parentNodeId: string
   readonly children: LoadedChildren
   readonly profile: LibraryBrowseProfile
   readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
@@ -293,7 +293,7 @@ function projectLoadedHierarchyChildren(options: {
 }): readonly BrowserTreeNode[] {
   if (options.children.rows.length === 0 && options.children.nextOffset === undefined) {
     const stateNode = hierarchyCoverageStateNode(
-      options.ownerId,
+      options.parentNodeId,
       options.children.coverage,
       options.bindingsById
     )
@@ -312,9 +312,9 @@ function projectLoadedHierarchyChildren(options: {
   if (projectedNodes.length === 0 && options.children.nextOffset === undefined) {
     const stateNode =
       options.children.rows.length > 0 && options.suppressFileOnlyTerminalState !== true
-        ? noChildFoldersStateNode(options.ownerId, options.bindingsById)
+        ? noChildFoldersStateNode(options.parentNodeId, options.bindingsById)
         : hierarchyCoverageStateNode(
-            options.ownerId,
+            options.parentNodeId,
             options.children.coverage,
             options.bindingsById
           )
@@ -329,7 +329,7 @@ function projectLoadedHierarchyChildren(options: {
     ...projectedNodes,
     trackedMoreNode(
       {
-        ownerId: options.ownerId,
+        parentNodeId: options.parentNodeId,
         children: options.children
       },
       options.bindingsById
@@ -338,7 +338,7 @@ function projectLoadedHierarchyChildren(options: {
 }
 
 function hierarchyCoverageStateNode(
-  ownerId: string,
+  parentNodeId: string,
   coverage: HierarchyCoverage,
   bindingsById: Map<BrowserTreeNodeId, RowBinding>
 ): BrowserTreeNode | undefined {
@@ -349,7 +349,7 @@ function hierarchyCoverageStateNode(
       }
       return trackedReadStateNode(
         {
-          ownerId,
+          parentNodeId,
           state: 'empty',
           label: 'No matches',
           detail: coverage.detail ?? 'No matching content.'
@@ -360,7 +360,7 @@ function hierarchyCoverageStateNode(
     case 'scanning':
       return trackedReadStateNode(
         {
-          ownerId,
+          parentNodeId,
           state: 'loading',
           label: coverage.state === 'scanning' ? 'Indexing source contents' : 'Indexing pending',
           detail: coverage.detail ?? 'Source contents are still being indexed.'
@@ -371,7 +371,7 @@ function hierarchyCoverageStateNode(
     case 'locationMissing':
       return trackedReadStateNode(
         {
-          ownerId,
+          parentNodeId,
           state: 'unavailable',
           label: coverage.state === 'locationMissing' ? 'Location missing' : 'Source unavailable',
           detail: coverage.detail ?? 'The selected source location is unavailable.'
@@ -382,7 +382,7 @@ function hierarchyCoverageStateNode(
     case 'failed':
       return trackedReadStateNode(
         {
-          ownerId,
+          parentNodeId,
           state: 'error',
           label: coverage.state === 'blocked' ? 'Access blocked' : 'Scan failed',
           detail: coverage.detail ?? 'The selected scope could not be fully scanned.'
@@ -393,12 +393,12 @@ function hierarchyCoverageStateNode(
 }
 
 function noChildFoldersStateNode(
-  ownerId: string,
+  parentNodeId: string,
   bindingsById: Map<BrowserTreeNodeId, RowBinding>
 ): BrowserTreeNode {
   return trackedReadStateNode(
     {
-      ownerId,
+      parentNodeId,
       state: 'empty',
       label: 'No child folders in this view',
       detail: 'This scope has matching files but no child folders in the active view.'
@@ -474,7 +474,7 @@ function projectLiteralDirectoryNode(options: {
       detail,
       children: unknownChildren(
         {
-          ownerId: node.id,
+          parentNodeId: node.id,
           state: readState,
           label: formatUnknownDirectoryChildReadinessLabel(node),
           detail
@@ -491,7 +491,7 @@ function projectLiteralDirectoryNode(options: {
     icon: 'folder',
     detail: formatDirectoryDetail(node.presence),
     ...projectDirectoryChildren({
-      ownerId: node.id,
+      parentNodeId: node.id,
       state: directoryState,
       profile: options.profile,
       directoryReadStates: options.directoryReadStates,
@@ -569,7 +569,7 @@ function childrenForProjectedNodes(nodes: readonly BrowserTreeNode[]): BrowserTr
 
 function unknownChildren(
   options: {
-    readonly ownerId: string
+    readonly parentNodeId: string
     readonly state: BrowserTreeReadState
     readonly label: string
     readonly detail: string
@@ -584,7 +584,7 @@ function unknownChildren(
 
 function deferredChildren(
   options: {
-    readonly ownerId: string
+    readonly parentNodeId: string
     readonly label: string
     readonly detail: string
   },
@@ -604,7 +604,7 @@ function deferredChildren(
 
 function loadingChildren(
   options: {
-    readonly ownerId: string
+    readonly parentNodeId: string
     readonly label: string
     readonly detail: string
   },
@@ -624,7 +624,7 @@ function loadingChildren(
 
 function failedChildren(
   options: {
-    readonly ownerId: string
+    readonly parentNodeId: string
     readonly label: string
     readonly detail: string
   },
@@ -643,7 +643,7 @@ function failedChildren(
 }
 
 function projectDirectoryChildren(options: {
-  readonly ownerId: string
+  readonly parentNodeId: string
   readonly state: DirectoryState | undefined
   readonly profile: LibraryBrowseProfile
   readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
@@ -657,7 +657,7 @@ function projectDirectoryChildren(options: {
     return {
       children: deferredChildren(
         {
-          ownerId: options.ownerId,
+          parentNodeId: options.parentNodeId,
           label: 'Folder contents not loaded',
           detail
         },
@@ -671,7 +671,7 @@ function projectDirectoryChildren(options: {
     return {
       children: loadingChildren(
         {
-          ownerId: options.ownerId,
+          parentNodeId: options.parentNodeId,
           label: 'Loading contents',
           detail: state.detail ?? 'Loading contents.'
         },
@@ -684,7 +684,7 @@ function projectDirectoryChildren(options: {
     return {
       children: failedChildren(
         {
-          ownerId: options.ownerId,
+          parentNodeId: options.parentNodeId,
           label: directoryFailedLabel(state.errorCode),
           detail: state.detail
         },
@@ -700,7 +700,7 @@ function projectDirectoryChildren(options: {
     return {
       children: childrenForProjectedNodes(
         projectLoadedHierarchyChildren({
-          ownerId: options.ownerId,
+          parentNodeId: options.parentNodeId,
           children: state.children,
           profile: options.profile,
           directoryReadStates: options.directoryReadStates,
@@ -717,7 +717,7 @@ function projectDirectoryChildren(options: {
 }
 
 function emptyProjection(options: {
-  readonly ownerId: string
+  readonly parentNodeId: string
   readonly state: BrowserTreeReadState
   readonly label: string
   readonly detail: string
@@ -734,7 +734,7 @@ function emptyProjection(options: {
 
 function emptyProjectionWithBindings(
   options: {
-    readonly ownerId: string
+    readonly parentNodeId: string
     readonly state: BrowserTreeReadState
     readonly label: string
     readonly detail: string
@@ -751,13 +751,13 @@ function emptyProjectionWithBindings(
 }
 
 function readStateNode(options: {
-  readonly ownerId: string
+  readonly parentNodeId: string
   readonly state: BrowserTreeReadState
   readonly label: string
   readonly detail: string
 }): BrowserTreeNode {
   return {
-    id: `read-state:${options.ownerId}`,
+    id: `read-state:${options.parentNodeId}`,
     role: 'state',
     label: options.label,
     detail: options.detail,
@@ -788,7 +788,7 @@ function loadChildrenAction(
 
 function trackedReadStateNode(
   options: {
-    readonly ownerId: string
+    readonly parentNodeId: string
     readonly state: BrowserTreeReadState
     readonly label: string
     readonly detail: string
@@ -800,14 +800,14 @@ function trackedReadStateNode(
   bindingsById.set(node.id, {
     kind: 'readState',
     state: options.state,
-    ownerId: options.ownerId,
+    parentNodeId: options.parentNodeId,
     detail: options.detail
   })
 
   return node
 }
 
-function moreNode(options: { readonly ownerId: string; readonly children: LoadedChildren }): {
+function moreNode(options: { readonly parentNodeId: string; readonly children: LoadedChildren }): {
   readonly node: BrowserTreeNode
   readonly target: MoreTarget
   readonly detail: string
@@ -819,7 +819,7 @@ function moreNode(options: { readonly ownerId: string; readonly children: Loaded
   }
 
   const target = {
-    ownerNodeId: options.ownerId,
+    parentNodeId: options.parentNodeId,
     entryPoint: copyEntryPoint(options.children.entryPoint),
     ...(options.children.parentDirectoryId === undefined
       ? {}
@@ -844,7 +844,7 @@ function moreNode(options: { readonly ownerId: string; readonly children: Loaded
 
   return {
     node: {
-      id: `more:${options.ownerId}:${offset}`,
+      id: `more:${options.parentNodeId}:${offset}`,
       role: 'action',
       label:
         more?.kind === 'failed'
@@ -863,7 +863,7 @@ function moreNode(options: { readonly ownerId: string; readonly children: Loaded
 
 function trackedMoreNode(
   options: {
-    readonly ownerId: string
+    readonly parentNodeId: string
     readonly children: LoadedChildren
   },
   bindingsById: Map<BrowserTreeNodeId, RowBinding>
@@ -874,7 +874,7 @@ function trackedMoreNode(
   bindingsById.set(node.id, {
     kind: 'more',
     state: more?.kind === 'failed' ? 'error' : more?.kind === 'loading' ? 'loading' : 'available',
-    ownerId: options.ownerId,
+    parentNodeId: options.parentNodeId,
     target,
     detail
   })

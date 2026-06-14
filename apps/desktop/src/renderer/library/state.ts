@@ -27,7 +27,7 @@ export type SourceTarget = {
 }
 
 export type MoreTarget = {
-  readonly ownerNodeId: string
+  readonly parentNodeId: string
   readonly entryPoint: EntryPoint
   readonly parentDirectoryId?: string
   readonly label?: string
@@ -143,13 +143,13 @@ export type RowBinding =
   | {
       readonly kind: 'readState'
       readonly state: 'notLoaded' | 'loading' | 'empty' | 'unavailable' | 'error'
-      readonly ownerId: string
+      readonly parentNodeId: string
       readonly detail: string
     }
   | {
       readonly kind: 'more'
       readonly state: 'available' | 'loading' | 'error'
-      readonly ownerId: string
+      readonly parentNodeId: string
       readonly target: MoreTarget
       readonly detail: string
     }
@@ -169,7 +169,7 @@ export type RowBinding =
   | {
       readonly kind: 'localBrowseMore'
       readonly state: 'available' | 'loading' | 'error'
-      readonly ownerId: string
+      readonly parentNodeId: string
       readonly target: LocalBrowseMoreTarget
       readonly detail: string
     }

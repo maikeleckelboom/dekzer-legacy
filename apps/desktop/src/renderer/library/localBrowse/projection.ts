@@ -58,7 +58,7 @@ export function projectAddSourceSection(
     return addSourceSectionNode(
       loadingChildren(
         {
-          ownerId: addSourceSectionNodeId,
+          parentNodeId: addSourceSectionNodeId,
           label: 'Loading suggested folders',
           detail: state.detail ?? 'Loading suggested folders.'
         },
@@ -74,7 +74,7 @@ export function projectAddSourceSection(
     return addSourceSectionNode(
       failedChildren(
         {
-          ownerId: addSourceSectionNodeId,
+          parentNodeId: addSourceSectionNodeId,
           label: 'Suggested folders unavailable',
           detail: state.detail
         },
@@ -172,7 +172,7 @@ function projectEntryPoint(options: {
     icon: entryPointIcon(options.entry),
     detail,
     ...projectEntryPointChildren({
-      ownerId: nodeId,
+      parentNodeId: nodeId,
       entry: options.entry,
       addSourceView: options.addSourceView,
       target,
@@ -183,7 +183,7 @@ function projectEntryPoint(options: {
 }
 
 function projectEntryPointChildren(options: {
-  readonly ownerId: string
+  readonly parentNodeId: string
   readonly entry: LocalBrowseEntryPoint
   readonly addSourceView: AddSourceView
   readonly target: LocalBrowseEntryPointTarget | undefined
@@ -202,7 +202,7 @@ function projectEntryPointChildren(options: {
   const rootTarget = localBrowseRootTarget(target, options.addSourceView)
 
   return projectLocalBrowseChildren({
-    ownerId: options.ownerId,
+    parentNodeId: options.parentNodeId,
     target: rootTarget,
     state: options.itemStates.get(localBrowseWindowKey(rootTarget)),
     itemStates: options.itemStates,
@@ -236,7 +236,7 @@ function projectLocalBrowseItem(options: {
     icon: itemIcon(item),
     detail: formatItemDetail(item),
     ...projectLocalBrowseChildren({
-      ownerId: nodeId,
+      parentNodeId: nodeId,
       target,
       state:
         target === undefined ? undefined : options.itemStates.get(localBrowseWindowKey(target)),
@@ -247,7 +247,7 @@ function projectLocalBrowseItem(options: {
 }
 
 function projectLocalBrowseChildren(options: {
-  readonly ownerId: string
+  readonly parentNodeId: string
   readonly target: LocalBrowseDirectoryTarget | undefined
   readonly state: LocalBrowseItemState | undefined
   readonly itemStates: ReadonlyMap<string, LocalBrowseItemState>
@@ -267,7 +267,7 @@ function projectLocalBrowseChildren(options: {
     return {
       children: deferredChildren(
         {
-          ownerId: options.ownerId,
+          parentNodeId: options.parentNodeId,
           label: 'Local folder contents not loaded',
           detail
         },
@@ -281,7 +281,7 @@ function projectLocalBrowseChildren(options: {
     return {
       children: loadingChildren(
         {
-          ownerId: options.ownerId,
+          parentNodeId: options.parentNodeId,
           label: 'Loading local folder contents',
           detail: state.detail ?? 'Loading local folder contents.'
         },
@@ -294,7 +294,7 @@ function projectLocalBrowseChildren(options: {
     return {
       children: failedChildren(
         {
-          ownerId: options.ownerId,
+          parentNodeId: options.parentNodeId,
           label: 'Local folder unavailable',
           detail: state.detail
         },
@@ -307,7 +307,7 @@ function projectLocalBrowseChildren(options: {
   return {
     children: childrenForProjectedNodes(
       projectLoadedLocalBrowseWindow({
-        ownerId: options.ownerId,
+        parentNodeId: options.parentNodeId,
         window: state.window,
         itemStates: options.itemStates,
         bindingsById: options.bindingsById
@@ -317,14 +317,14 @@ function projectLocalBrowseChildren(options: {
 }
 
 function projectLoadedLocalBrowseWindow(options: {
-  readonly ownerId: string
+  readonly parentNodeId: string
   readonly window: LoadedLocalBrowseItems
   readonly itemStates: ReadonlyMap<string, LocalBrowseItemState>
   readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
 }): readonly BrowserTreeNode[] {
   if (options.window.items.length === 0 && options.window.nextOffset === undefined) {
     return [
-      localBrowseWindowStateNode(options.ownerId, options.window, options.bindingsById)
+      localBrowseWindowStateNode(options.parentNodeId, options.window, options.bindingsById)
     ].filter((node): node is BrowserTreeNode => node !== undefined)
   }
 
@@ -345,7 +345,7 @@ function projectLoadedLocalBrowseWindow(options: {
 }
 
 function localBrowseWindowStateNode(
-  ownerId: string,
+  parentNodeId: string,
   window: LoadedLocalBrowseItems,
   bindingsById: Map<BrowserTreeNodeId, RowBinding>
 ): BrowserTreeNode | undefined {
@@ -353,7 +353,7 @@ function localBrowseWindowStateNode(
     case 'complete':
       return trackedReadStateNode(
         {
-          ownerId,
+          parentNodeId,
           state: 'empty',
           label: 'No local items',
           detail: 'No items are available in this local folder.'
@@ -363,7 +363,7 @@ function localBrowseWindowStateNode(
     case 'partialFailure':
       return trackedReadStateNode(
         {
-          ownerId,
+          parentNodeId,
           state: 'error',
           label: 'Local items partially unavailable',
           detail: window.failure?.detail ?? 'Some local items could not be read.'
@@ -376,7 +376,7 @@ function localBrowseWindowStateNode(
     case 'missing':
       return trackedReadStateNode(
         {
-          ownerId,
+          parentNodeId,
           state: window.status === 'permissionBlocked' ? 'unavailable' : 'error',
           label: localBrowseReadStatusLabel(window.status),
           detail: window.failure?.detail ?? 'Local folder contents could not be read.'
@@ -386,7 +386,7 @@ function localBrowseWindowStateNode(
     case 'unsupportedPlatform':
       return trackedReadStateNode(
         {
-          ownerId,
+          parentNodeId,
           state: 'unavailable',
           label: 'Local browse unsupported',
           detail: window.failure?.detail ?? 'Local browse is not supported on this platform.'
@@ -402,7 +402,7 @@ function childrenForProjectedNodes(nodes: readonly BrowserTreeNode[]): BrowserTr
 
 function deferredChildren(
   options: {
-    readonly ownerId: string
+    readonly parentNodeId: string
     readonly label: string
     readonly detail: string
   },
@@ -422,7 +422,7 @@ function deferredChildren(
 
 function loadingChildren(
   options: {
-    readonly ownerId: string
+    readonly parentNodeId: string
     readonly label: string
     readonly detail: string
   },
@@ -442,7 +442,7 @@ function loadingChildren(
 
 function failedChildren(
   options: {
-    readonly ownerId: string
+    readonly parentNodeId: string
     readonly label: string
     readonly detail: string
   },
@@ -462,7 +462,7 @@ function failedChildren(
 
 function trackedReadStateNode(
   options: {
-    readonly ownerId: string
+    readonly parentNodeId: string
     readonly state: BrowserTreeReadState
     readonly label: string
     readonly detail: string
@@ -470,7 +470,7 @@ function trackedReadStateNode(
   bindingsById: Map<BrowserTreeNodeId, RowBinding>
 ): BrowserTreeNode {
   const node: BrowserTreeNode = {
-    id: `read-state:${options.ownerId}`,
+    id: `read-state:${options.parentNodeId}`,
     role: 'state',
     label: options.label,
     detail: options.detail,
@@ -481,7 +481,7 @@ function trackedReadStateNode(
   bindingsById.set(node.id, {
     kind: 'readState',
     state: options.state,
-    ownerId: options.ownerId,
+    parentNodeId: options.parentNodeId,
     detail: options.detail
   })
 
@@ -510,7 +510,7 @@ function loadChildrenAction(
 
 function trackedMoreNode(
   options: {
-    readonly ownerId: string
+    readonly parentNodeId: string
     readonly window: LoadedLocalBrowseItems
   },
   bindingsById: Map<BrowserTreeNodeId, RowBinding>
@@ -522,7 +522,7 @@ function trackedMoreNode(
   }
 
   const target: LocalBrowseMoreTarget = {
-    ownerNodeId: options.ownerId,
+    parentNodeId: options.parentNodeId,
     addSourceView: options.window.addSourceView,
     entryPointKind: options.window.identity.entryPointKind,
     resolvedRootPath: options.window.identity.resolvedRootPath,
@@ -539,7 +539,7 @@ function trackedMoreNode(
         ? (more.detail ?? 'Loading more local items.')
         : `Items ${offset + 1}-${Math.min(offset + options.window.limit, options.window.totalItems)} of ${options.window.totalItems} are available.`
   const node: BrowserTreeNode = {
-    id: `local-browse-more:${options.ownerId}:${offset}`,
+    id: `local-browse-more:${options.parentNodeId}:${offset}`,
     role: 'action',
     label:
       more?.kind === 'failed'
@@ -564,7 +564,7 @@ function trackedMoreNode(
   bindingsById.set(node.id, {
     kind: 'localBrowseMore',
     state: more?.kind === 'failed' ? 'error' : more?.kind === 'loading' ? 'loading' : 'available',
-    ownerId: options.ownerId,
+    parentNodeId: options.parentNodeId,
     target,
     detail
   })

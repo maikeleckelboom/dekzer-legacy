@@ -483,12 +483,12 @@ function unknownChildReadinessNode(id: BrowserTreeNodeId, label: string): Browse
 }
 
 function stateNode(
-  ownerId: BrowserTreeNodeId,
+  parentNodeId: BrowserTreeNodeId,
   label: string,
   icon: NonNullable<BrowserTreeNode['icon']>
 ): BrowserTreeNode {
   return {
-    id: `read-state:${ownerId}`,
+    id: `read-state:${parentNodeId}`,
     label,
     role: 'state',
     icon,

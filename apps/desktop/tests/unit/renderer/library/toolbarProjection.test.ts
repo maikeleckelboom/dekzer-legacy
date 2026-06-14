@@ -141,7 +141,7 @@ describe('library toolbar projection', () => {
         binding: {
           kind: 'readState',
           state: 'empty',
-          ownerId: 'navigation',
+          parentNodeId: 'navigation',
           detail: 'No sources.'
         }
       })
