@@ -992,6 +992,38 @@ describe('local root remove lifecycle', () => {
     expect(rootActions.removeSourceStatus.value).toBe('removed')
   })
 
+  it('invalidates removed source status even when refresh fails after unregister', async () => {
+    const invalidatedSourceIds: string[] = []
+    const rootActions = createLocalRootActionsController(
+      testRootApi({
+        chooseAndRegisterLocal: async () =>
+          registeredChoice({ rootId: 'root-1', admittedRootPath: 'C:/Music' }),
+        runScan: async () => startedRootResult(),
+        unregisterLocalRoot: async () => ({ state: 'unregistered', unregistered: true })
+      })
+    )
+    const lifecycle = createRootLifecycleController({
+      rootActions,
+      hierarchyRead: { refresh: async () => false },
+      confirmRemoveSource: () => true,
+      isSourceRootVisible: () => true,
+      invalidateSourceStatus: (rootId) => {
+        invalidatedSourceIds.push(rootId)
+      }
+    })
+
+    await expect(rootActions.chooseAndRegisterLocalRoot()).resolves.toBe(true)
+
+    await expect(lifecycle.removeSource('root-1')).resolves.toBe(false)
+
+    expect(invalidatedSourceIds).toEqual(['root-1'])
+    expect(rootActions.registeredRoot.value?.rootId).toBe('root-1')
+    expect(rootActions.removeSourceStatus.value).toBe('failed')
+    expect(rootActions.removeSourceFailureMessage.value).toBe(
+      'The source removal was requested, but the library view did not refresh.'
+    )
+  })
+
   it('lets confirmation and refresh postconditions control removal', async () => {
     const unregisterLocalRoot = vi.fn(async () => ({
       state: 'unregistered' as const,

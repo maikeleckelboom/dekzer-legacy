@@ -160,6 +160,7 @@ export function createRootLifecycleController(
       return false
     }
 
+    dependencies.invalidateSourceStatus?.(rootIdToRemove)
     dependencies.localBrowseRead?.clearItemWindows()
     resetRefreshState()
     const refreshed = await runRefresh()
@@ -178,7 +179,6 @@ export function createRootLifecycleController(
       return false
     }
 
-    dependencies.invalidateSourceStatus?.(rootIdToRemove)
     dependencies.onSourceRemoved?.(rootIdToRemove)
     dependencies.rootActions.completeRemoveSource(rootIdToRemove)
     return true
