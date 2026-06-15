@@ -25,35 +25,11 @@ export function classifyLibraryV0Failure(
   input: LibraryFailureClassifierInput
 ): LibraryFailureClassification {
   const signals = collectSignals(input)
-  const text = JSON.stringify(input.diagnostics).toLowerCase()
   const errorText = formatUnknownError(input.error).toLowerCase()
-  const phase = input.phase.toLowerCase()
+  const diagnosticsText = JSON.stringify(input.diagnostics).toLowerCase()
+  const harnessSignals = collectHarnessUnavailableSignals(input, diagnosticsText, errorText)
 
-  if (phase.includes('fixture') || phase.includes('launch') || phase.includes('teardown')) {
-    return classification(
-      'harness/setup-issue',
-      'high',
-      'The failure happened while preparing, launching, or tearing down the test harness.',
-      signals,
-      'Check fixture paths, built app availability, Electron launch logs, and teardown logs.'
-    )
-  }
-
-  if (
-    text.includes('preload api unavailable') ||
-    text.includes('electron main window is not available') ||
-    text.includes('built electron main entry was not found')
-  ) {
-    return classification(
-      'harness/setup-issue',
-      'high',
-      'The app or preload harness was not available enough to evaluate the product contract.',
-      signals,
-      'Rebuild the desktop app and inspect Electron stdout/stderr plus renderer page errors.'
-    )
-  }
-
-  if (text.includes('ui-runtime-contradiction')) {
+  if (hasUiRuntimeContradiction(input.diagnostics, diagnosticsText)) {
     return classification(
       'product-blocker',
       'high',
@@ -63,7 +39,17 @@ export function classifyLibraryV0Failure(
     )
   }
 
-  if (phase.includes('contract')) {
+  if (harnessSignals.length > 0) {
+    return classification(
+      'harness/setup-issue',
+      'high',
+      'The app or preload harness was not available enough to evaluate the product contract.',
+      [...signals, ...harnessSignals],
+      'Rebuild the desktop app and inspect Electron stdout/stderr plus renderer page errors.'
+    )
+  }
+
+  if (hasUndefinedContractEvidence(input.phase, diagnosticsText, errorText)) {
     return classification(
       'undefined-product-contract',
       'medium',
@@ -73,11 +59,21 @@ export function classifyLibraryV0Failure(
     )
   }
 
+  if (isProductActionOrAssertionPhase(input.phase)) {
+    return classification(
+      'product-blocker',
+      'medium',
+      'The failure happened during a Library V0 product action or assertion.',
+      signals,
+      'Treat the failing assertion as the reproducer unless diagnostics show harness setup was unavailable.'
+    )
+  }
+
   if (
     errorText.includes('timeout') ||
-    text.includes('still indexing') ||
-    text.includes('scanning source') ||
-    text.includes('updating selected contents')
+    diagnosticsText.includes('still indexing') ||
+    diagnosticsText.includes('scanning source') ||
+    diagnosticsText.includes('updating selected contents')
   ) {
     return classification(
       'likely-flake/timing-issue',
@@ -113,11 +109,142 @@ function collectSignals(input: LibraryFailureClassifierInput): readonly string[]
   if (diagnosticsText.includes('probeFailed')) {
     signals.push('runtimeProbe=failed')
   }
-  if (diagnosticsText.includes('ui-runtime-contradiction')) {
+  if (hasUiRuntimeContradiction(input.diagnostics, diagnosticsText.toLowerCase())) {
     signals.push('uiRuntimeContradiction=true')
+  }
+  const preloadApiAvailable = preloadApiAvailability(input.diagnostics)
+  if (preloadApiAvailable !== undefined) {
+    signals.push(`preloadApiAvailable=${String(preloadApiAvailable)}`)
+  }
+  const pageAvailable = pageAvailability(input.diagnostics)
+  if (pageAvailable !== undefined) {
+    signals.push(`pageAvailable=${String(pageAvailable)}`)
   }
 
   return signals
+}
+
+function collectHarnessUnavailableSignals(
+  input: LibraryFailureClassifierInput,
+  diagnosticsText: string,
+  errorText: string
+): readonly string[] {
+  const signals: string[] = []
+  const phase = input.phase.toLowerCase()
+
+  if (hasLaunchEvidence(errorText, diagnosticsText)) {
+    signals.push('harnessEvidence=launch-unavailable')
+  }
+
+  if (
+    preloadApiAvailability(input.diagnostics) === false &&
+    (phase.includes('launch') || hasPreloadEvidence(errorText, diagnosticsText))
+  ) {
+    signals.push('harnessEvidence=preload-unavailable')
+  }
+
+  if (
+    pageAvailability(input.diagnostics) === false &&
+    (phase.includes('launch') || hasPageEvidence(errorText, diagnosticsText))
+  ) {
+    signals.push('harnessEvidence=page-unavailable')
+  }
+
+  if (phase.includes('fixture') && hasFixtureEvidence(errorText)) {
+    signals.push('harnessEvidence=fixture-unavailable')
+  }
+
+  if (phase.includes('teardown') && hasTeardownEvidence(errorText)) {
+    signals.push('harnessEvidence=teardown-unavailable')
+  }
+
+  return signals
+}
+
+function hasLaunchEvidence(errorText: string, diagnosticsText: string): boolean {
+  return (
+    errorText.includes('built electron main entry was not found') ||
+    errorText.includes('electron package did not resolve to an executable path') ||
+    diagnosticsText.includes('packagedbinaryunavailable')
+  )
+}
+
+function hasPreloadEvidence(errorText: string, diagnosticsText: string): boolean {
+  return (
+    errorText.includes('preload') ||
+    errorText.includes('window.dekzer') ||
+    errorText.includes('waitforfunction') ||
+    diagnosticsText.includes('preload api unavailable')
+  )
+}
+
+function hasPageEvidence(errorText: string, diagnosticsText: string): boolean {
+  return (
+    errorText.includes('electron main window is not available') ||
+    errorText.includes('electron app is not running') ||
+    errorText.includes('target page') ||
+    errorText.includes('browser has been closed') ||
+    diagnosticsText.includes('electron main window is not available')
+  )
+}
+
+function hasFixtureEvidence(errorText: string): boolean {
+  return /\b(enoent|eacces|eperm|rename|mkdir|rmdir|unlink|fixture|filesystem)\b/.test(errorText)
+}
+
+function hasTeardownEvidence(errorText: string): boolean {
+  return /close|graceful|timed out|timedout|killed|shutdown|process/.test(errorText)
+}
+
+function hasUiRuntimeContradiction(diagnostics: unknown, diagnosticsText: string): boolean {
+  const record = asRecord(diagnostics)
+  const contradictions = asReadonlyArray(record?.contradictions)
+
+  return (
+    contradictions.some(
+      (contradiction) => asRecord(contradiction)?.code === 'ui-runtime-contradiction'
+    ) || diagnosticsText.includes('ui-runtime-contradiction')
+  )
+}
+
+function hasUndefinedContractEvidence(
+  phase: string,
+  diagnosticsText: string,
+  errorText: string
+): boolean {
+  return (
+    phase.toLowerCase().includes('contract') &&
+    (errorText.includes('contract') || diagnosticsText.includes('product contract decision'))
+  )
+}
+
+function isProductActionOrAssertionPhase(phase: string): boolean {
+  const normalized = phase.toLowerCase()
+  return normalized.startsWith('product-action:') || normalized.startsWith('assertion:')
+}
+
+function preloadApiAvailability(diagnostics: unknown): boolean | undefined {
+  const runtime = asRecord(asRecord(diagnostics)?.runtime)
+  const value = runtime?.preloadApiAvailable
+
+  return typeof value === 'boolean' ? value : undefined
+}
+
+function pageAvailability(diagnostics: unknown): boolean | undefined {
+  const visible = asRecord(asRecord(diagnostics)?.visible)
+  const value = visible?.pageAvailable
+
+  return typeof value === 'boolean' ? value : undefined
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined
+}
+
+function asReadonlyArray(value: unknown): readonly unknown[] {
+  return Array.isArray(value) ? value : []
 }
 
 function classification(

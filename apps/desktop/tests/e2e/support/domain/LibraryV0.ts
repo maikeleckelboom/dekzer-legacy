@@ -98,7 +98,7 @@ export class LibraryV0 {
     sourceA: LibraryV0AdmittedSource<LibraryV0ScopedSearchSourceA>,
     sourceB: LibraryV0AdmittedSource<LibraryV0ScopedSearchSourceB>
   ): Promise<void> {
-    await this.panel.browse.select(sourceA.sourceName)
+    await this.expectSourceReady(sourceA)
 
     await this.panel.search.searchFor('Only Track B')
     await this.panel.contents.expectSearchEmpty('source')

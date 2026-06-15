@@ -1,6 +1,8 @@
 # Library V0 E2E Acceptance
 
 This directory contains the Library V0 product-acceptance E2E lab for the desktop Electron app.
+The Library V0 gate is expected to be green and can replace manual smoke for the covered
+contract listed below.
 
 ## What It Proves
 
@@ -13,9 +15,14 @@ The Library V0 acceptance gate proves the covered contract for generated local l
 - a missing/offline admitted source is presented honestly and can recover after restore;
 - removing and re-adding the exact same path does not leave duplicate active sources.
 
+For these behaviors, the gate is the acceptance signal. Manual smoke can stay focused on areas
+outside this contract instead of repeating the generated-source path.
+
 ## What It Does Not Prove
 
-The gate does not prove waveform, Prepared Room, adapters, playlists, crates, collection authority, or broad source-health cockpit behavior. It does not prove real media compatibility. Fixtures intentionally use generated tiny WAV files and companion text/image files.
+The gate does not prove waveform, Prepared Room, adapters, playlists, crates, collection authority,
+broad source-health cockpit behavior, or real-media compatibility. Fixtures intentionally use
+generated tiny WAV files and companion text/image files.
 
 ## Running Scenarios
 
@@ -38,7 +45,8 @@ pnpm run test:e2e -- --grep @library-v0:missing-source-health
 pnpm run test:e2e -- --grep @library-v0:remove-readd-freshness
 ```
 
-`verify:e2e:library-v0` builds the desktop app and boundary binary before running the acceptance gate. The Library V0 gate is intentionally not part of normal `verify` yet.
+`verify:e2e:library-v0` builds the desktop app and boundary binary before running the acceptance
+gate. The Library V0 gate is intentionally not part of normal `verify`.
 
 ## Scenario Registry
 
@@ -56,11 +64,16 @@ Acceptance specs run through `LibraryV0AcceptanceRun`. On failure it attaches:
 
 - `library-v0-diagnostics.json`;
 - `library-v0-failure-classification.md`;
-- the existing Electron fixture attachments for stdout, stderr, main/renderer console, page errors, window placement, shutdown logs, screenshot, and trace where available.
+- the existing Electron fixture attachments for stdout, stderr, main/renderer console, page errors,
+  window placement, shutdown logs, screenshot, and trace where available.
 
 Diagnostics use public preload APIs and role-based visible surfaces. They do not inspect Vue internals and do not take broad DOM snapshots.
 
-The runtime bundle includes local roots, host status, persisted view state, source lifecycle/integrity/activity/maintenance snapshots for admitted test sources, user-data path, fixture paths, visible Library title, visible contents rows, source status text/actions, and search query when the search field is open.
+The runtime bundle includes local roots, host status, persisted view state,
+source lifecycle/integrity/activity/maintenance snapshots for admitted test sources, user-data path,
+fixture paths, visible Library title, visible contents rows, source status text/actions, search query
+when the search field is open, and the expected Electron fixture attachments that may be present on
+failure.
 
 ## Failure Classification
 
@@ -71,7 +84,11 @@ The runtime bundle includes local roots, host status, persisted view state, sour
 - `undefined-product-contract`;
 - `likely-flake/timing-issue`.
 
-The classifier uses scenario id, last phase, error shape, runtime probe availability, and simple UI/runtime contradiction checks. It is a triage aid, not product truth.
+The classifier uses scenario id, last phase, error shape, runtime probe availability, and simple
+UI/runtime contradiction checks. It does not classify by phase name alone: harness/setup needs
+launch, preload, page, fixture, or teardown evidence, while product actions and assertions default
+to `product-blocker` unless diagnostics show the harness was unavailable. It is a triage aid, not
+product truth.
 
 ## Fixtures
 

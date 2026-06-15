@@ -54,7 +54,7 @@ export type LibraryDiagnosticCapture = {
   readonly visible: LibraryVisibleDiagnosticSnapshot
   readonly contradictions: readonly LibraryDiagnosticContradiction[]
   readonly harnessEvidence: {
-    readonly attachedByElectronFixture: readonly string[]
+    readonly expectedElectronFixtureAttachments: readonly string[]
   }
 }
 
@@ -230,7 +230,7 @@ export class LibraryDiagnostics {
       visible,
       contradictions: findContradictions(visible, sourceSnapshots),
       harnessEvidence: {
-        attachedByElectronFixture: [
+        expectedElectronFixtureAttachments: [
           'electron-stdout.log',
           'electron-stderr.log',
           'electron-main-console.log',
@@ -470,17 +470,14 @@ function findContradictions(
 
     const visibleRows = visible.contents?.rows ?? []
     const expectedRows = source.expectedRows ?? []
-    const visibleExpectedRows = expectedRows.filter((row) =>
-      visibleRows.some((visibleRow) => visibleRow.includes(row))
+    const activeVisibleExpectedRows = expectedRows.filter((row) =>
+      visibleRows.some((visibleRow) => visibleRow.includes(row) && !rowLooksUnavailable(visibleRow))
     )
 
-    if (
-      visibleExpectedRows.length > 0 &&
-      !visibleRows.some((row) => /Missing|Removed|Unavailable/.test(row))
-    ) {
+    if (activeVisibleExpectedRows.length > 0) {
       contradictions.push({
         code: 'ui-runtime-contradiction',
-        detail: `${source.label} is unavailable but visible contents include active-looking rows: ${visibleExpectedRows.join(', ')}.`
+        detail: `${source.label} is unavailable but visible contents include active-looking expected media rows: ${activeVisibleExpectedRows.join(', ')}.`
       })
     }
   }
@@ -546,13 +543,17 @@ function renderClassificationMarkdown(
       ? ['- None detected by the rule-based classifier.']
       : contradictionLines),
     ``,
-    `## Harness Evidence`,
-    ...capture.harnessEvidence.attachedByElectronFixture.map((name) => `- ${name}`)
+    `## Expected Electron Fixture Attachments`,
+    ...capture.harnessEvidence.expectedElectronFixtureAttachments.map((name) => `- ${name}`)
   ].join('\n')
 }
 
 function normalizeText(text: string): string {
   return text.replace(/\s+/g, ' ').trim()
+}
+
+function rowLooksUnavailable(row: string): boolean {
+  return /\b(Missing|Removed|Unavailable|File missing|File removed)\b/i.test(row)
 }
 
 function formatUnknownError(error: unknown): string {
