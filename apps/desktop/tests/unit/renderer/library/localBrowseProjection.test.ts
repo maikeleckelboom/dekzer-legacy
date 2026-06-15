@@ -5,11 +5,18 @@ import {
   projectAddSourceState,
   addSourceSectionNodeId
 } from '../../../../src/renderer/library/localBrowse/projection'
+import type {
+  LoadedLocalBrowseItems,
+  LocalBrowseItemState
+} from '../../../../src/renderer/library/localBrowse/types'
 import {
   projectState,
   type BrowserProjection
 } from '../../../../src/renderer/library/tree/projection'
-import { canRevealBrowserTreeChildren } from '../../../../src/renderer/library/tree/listProjection'
+import {
+  canRevealBrowserTreeChildren,
+  flattenVisibleTree
+} from '../../../../src/renderer/library/tree/listProjection'
 import type {
   LocalBrowseEntryPoint,
   LocalBrowseEntryPointKind
@@ -272,7 +279,8 @@ describe('local browse tree projection', () => {
     })
 
     const trackNode = findNode(projection, 'track.flac')
-    const trackBinding = trackNode === undefined ? undefined : projection.bindingsById.get(trackNode.id)
+    const trackBinding =
+      trackNode === undefined ? undefined : projection.bindingsById.get(trackNode.id)
 
     expect(trackNode).toMatchObject({
       role: 'localBrowseFile',
@@ -285,6 +293,153 @@ describe('local browse tree projection', () => {
       kind: 'localBrowseItem'
     })
     expect(trackBinding).not.toHaveProperty('target')
+  })
+
+  it('renders accepted child windows immediately when a local browse folder is expanded', () => {
+    const projection = projectTree(
+      stateWithMusicWindow([item('directory', 'Albums', 'C:\\Users\\Maikel\\Music\\Albums')], {
+        childStates: new Map([
+          [
+            localBrowseStateKey('C:\\Users\\Maikel\\Music\\Albums'),
+            {
+              kind: 'loaded',
+              window: loadedWindow({
+                label: 'Albums',
+                resolvedParentPath: 'C:\\Users\\Maikel\\Music\\Albums',
+                items: [item('directory', 'Nested', 'C:\\Users\\Maikel\\Music\\Albums\\Nested')]
+              })
+            }
+          ]
+        ])
+      })
+    )
+    const visibleItems = flattenVisibleTree({
+      nodes: projection.nodes,
+      expandedNodeIds: new Set([
+        addSourceSectionNodeId,
+        localBrowseEntryNodeId('C:\\Users\\Maikel\\Music'),
+        localBrowseItemNodeId('C:\\Users\\Maikel\\Music\\Albums')
+      ])
+    })
+
+    expect(
+      childLabelsFor(visibleItems, localBrowseItemNodeId('C:\\Users\\Maikel\\Music\\Albums'))
+    ).toEqual(['Nested'])
+    expect(
+      childItemsFor(visibleItems, localBrowseItemNodeId('C:\\Users\\Maikel\\Music\\Albums')).some(
+        (child) => child.node.icon === 'loading'
+      )
+    ).toBe(false)
+  })
+
+  it('keeps retained child rows visible while the same local browse folder is refreshing', () => {
+    const albumsNodeId = localBrowseItemNodeId('C:\\Users\\Maikel\\Music\\Albums')
+    const projection = projectTree(
+      stateWithMusicWindow([item('directory', 'Albums', 'C:\\Users\\Maikel\\Music\\Albums')], {
+        childStates: new Map([
+          [
+            localBrowseStateKey('C:\\Users\\Maikel\\Music\\Albums'),
+            {
+              kind: 'refreshing',
+              requestKey: localBrowseStateKey('C:\\Users\\Maikel\\Music\\Albums'),
+              sequence: 2,
+              detail: 'Refreshing local browse items.',
+              window: loadedWindow({
+                label: 'Albums',
+                resolvedParentPath: 'C:\\Users\\Maikel\\Music\\Albums',
+                items: [item('directory', 'Retained', 'C:\\Users\\Maikel\\Music\\Albums\\Retained')]
+              })
+            }
+          ]
+        ])
+      })
+    )
+    const visibleItems = flattenVisibleTree({
+      nodes: projection.nodes,
+      expandedNodeIds: new Set([
+        addSourceSectionNodeId,
+        localBrowseEntryNodeId('C:\\Users\\Maikel\\Music'),
+        albumsNodeId
+      ])
+    })
+
+    expect(childLabelsFor(visibleItems, albumsNodeId)).toEqual(['Retained'])
+    expect(childItemsFor(visibleItems, albumsNodeId).map((child) => child.node.icon)).not.toContain(
+      'loading'
+    )
+  })
+
+  it('projects honest loading for a cold expanded local browse folder', () => {
+    const albumsNodeId = localBrowseItemNodeId('C:\\Users\\Maikel\\Music\\Albums')
+    const projection = projectTree(
+      stateWithMusicWindow([item('directory', 'Albums', 'C:\\Users\\Maikel\\Music\\Albums')], {
+        childStates: new Map([
+          [
+            localBrowseStateKey('C:\\Users\\Maikel\\Music\\Albums'),
+            {
+              kind: 'loading',
+              requestKey: localBrowseStateKey('C:\\Users\\Maikel\\Music\\Albums'),
+              sequence: 1,
+              detail: 'Loading local browse items.'
+            }
+          ]
+        ])
+      })
+    )
+    const visibleItems = flattenVisibleTree({
+      nodes: projection.nodes,
+      expandedNodeIds: new Set([
+        addSourceSectionNodeId,
+        localBrowseEntryNodeId('C:\\Users\\Maikel\\Music'),
+        albumsNodeId
+      ])
+    })
+    const childRows = childItemsFor(visibleItems, albumsNodeId)
+
+    expect(childRows).toHaveLength(1)
+    expect(childRows[0]?.node).toMatchObject({
+      role: 'state',
+      icon: 'loading'
+    })
+  })
+
+  it('projects empty only after an accepted local browse read proves empty', () => {
+    const albumsNodeId = localBrowseItemNodeId('C:\\Users\\Maikel\\Music\\Albums')
+    const projection = projectTree(
+      stateWithMusicWindow([item('directory', 'Albums', 'C:\\Users\\Maikel\\Music\\Albums')], {
+        childStates: new Map([
+          [
+            localBrowseStateKey('C:\\Users\\Maikel\\Music\\Albums'),
+            {
+              kind: 'loaded',
+              window: loadedWindow({
+                label: 'Albums',
+                resolvedParentPath: 'C:\\Users\\Maikel\\Music\\Albums',
+                items: []
+              })
+            }
+          ]
+        ])
+      })
+    )
+    const unknownProjection = projectTree(
+      stateWithMusicWindow([item('directory', 'Albums', 'C:\\Users\\Maikel\\Music\\Albums')])
+    )
+    const visibleItems = flattenVisibleTree({
+      nodes: projection.nodes,
+      expandedNodeIds: new Set([
+        addSourceSectionNodeId,
+        localBrowseEntryNodeId('C:\\Users\\Maikel\\Music'),
+        albumsNodeId
+      ])
+    })
+
+    expect(childItemsFor(visibleItems, albumsNodeId)[0]?.node).toMatchObject({
+      role: 'state',
+      label: 'No local items',
+      icon: 'state'
+    })
+    expect(findNode(unknownProjection, 'Albums')?.children.kind).toBe('deferred')
   })
 
   it('does not reuse a loaded window from another Add Source view', () => {
@@ -379,6 +534,52 @@ function browserState(options: {
         failure: null
       }
     }
+  }
+}
+
+function stateWithMusicWindow(
+  items: readonly LocalBrowseItem[],
+  options: {
+    readonly childStates?: ReadonlyMap<string, LocalBrowseItemState>
+  } = {}
+): BrowserState {
+  return {
+    ...browserState({ entries: [musicEntryPoint()] }),
+    localBrowseItemStates: new Map([
+      [
+        localBrowseStateKey('C:\\Users\\Maikel\\Music'),
+        {
+          kind: 'loaded',
+          window: loadedWindow({
+            label: 'Music',
+            resolvedParentPath: 'C:\\Users\\Maikel\\Music',
+            items
+          })
+        }
+      ],
+      ...(options.childStates ?? new Map())
+    ])
+  }
+}
+
+function loadedWindow(options: {
+  readonly label: string
+  readonly resolvedParentPath: string
+  readonly items: readonly LocalBrowseItem[]
+}): LoadedLocalBrowseItems {
+  return {
+    addSourceView: 'preview',
+    identity: {
+      entryPointKind: 'music',
+      resolvedRootPath: 'C:\\Users\\Maikel\\Music',
+      resolvedParentPath: options.resolvedParentPath
+    },
+    label: options.label,
+    items: options.items,
+    totalItems: options.items.length,
+    status: 'complete',
+    failure: null,
+    limit: 50
   }
 }
 
@@ -505,4 +706,32 @@ function findNode(
   }
 
   return undefined
+}
+
+function childItemsFor(
+  visibleItems: ReturnType<typeof flattenVisibleTree>,
+  parentId: string
+): ReturnType<typeof flattenVisibleTree> {
+  return visibleItems.filter((item) => item.parentId === parentId)
+}
+
+function childLabelsFor(
+  visibleItems: ReturnType<typeof flattenVisibleTree>,
+  parentId: string
+): readonly string[] {
+  return childItemsFor(visibleItems, parentId).map((item) => item.node.label)
+}
+
+function localBrowseStateKey(resolvedParentPath: string): string {
+  return `preview:music:C%3A%5CUsers%5CMaikel%5CMusic:${encodeURIComponent(resolvedParentPath)}`
+}
+
+function localBrowseEntryNodeId(resolvedPath: string): string {
+  return `local-browse-entry:music:${encodeURIComponent(resolvedPath)}`
+}
+
+function localBrowseItemNodeId(resolvedItemPath: string): string {
+  return `local-browse-item:music:C%3A%5CUsers%5CMaikel%5CMusic:${encodeURIComponent(
+    resolvedItemPath
+  )}`
 }

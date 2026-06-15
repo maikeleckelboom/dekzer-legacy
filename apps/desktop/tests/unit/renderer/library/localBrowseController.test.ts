@@ -494,6 +494,81 @@ describe('createLocalBrowseController', () => {
     ])
   })
 
+  it('keeps accepted local browse children visible while a same-branch read is pending', async () => {
+    const pendingAlbumsRead =
+      deferred<Awaited<ReturnType<LocalBrowseReadApi['localBrowse']['readItems']>>>()
+    let albumsReadCount = 0
+    const controller = createLocalBrowseController(
+      testLocalBrowseApi({
+        readItems: async (request) => {
+          if (!request.resolvedParentPath.endsWith('Albums')) {
+            return localBrowseItemsResult(request, [directoryItem()])
+          }
+
+          albumsReadCount += 1
+          return albumsReadCount === 1
+            ? localBrowseItemsResult(request, [
+                fileItem('track.flac', 'C:\\Users\\Maikel\\Music\\Albums\\track.flac')
+              ])
+            : pendingAlbumsRead.promise
+        }
+      })
+    )
+    controller.start()
+
+    await controller.refreshEntryPoints()
+    let projection = projectTree({
+      sourceReadStates: new Map(),
+      directoryReadStates: new Map(),
+      localBrowseEntryPointsState: controller.entryPointsState.value,
+      localBrowseItemStates: controller.itemStates.value
+    })
+    const musicNodeId = requiredNodeIdByLabel(projection, 'Music')
+
+    await expect(controller.requestNodeChildren(musicNodeId, projection)).resolves.toBe(true)
+    projection = projectTree({
+      sourceReadStates: new Map(),
+      directoryReadStates: new Map(),
+      localBrowseEntryPointsState: controller.entryPointsState.value,
+      localBrowseItemStates: controller.itemStates.value
+    })
+    const albumsNodeId = requiredNodeIdByLabel(projection, 'Albums')
+
+    await expect(controller.requestNodeChildren(albumsNodeId, projection)).resolves.toBe(true)
+    expect(firstLoadedChildLabels(treeNodes(controller), 'Albums')).toEqual(['track.flac'])
+
+    const refresh = controller.requestNodeChildren(albumsNodeId, projection)
+    await waitForMicrotasks()
+
+    expect(controller.itemStates.value.get(albumsWindowKey())).toMatchObject({
+      kind: 'refreshing',
+      window: {
+        items: [{ displayName: 'track.flac' }]
+      }
+    })
+    expect(firstLoadedChildLabels(treeNodes(controller), 'Albums')).toEqual(['track.flac'])
+    expect(requiredNodeByLabel(projectFromController(controller), 'Albums').children.kind).toBe(
+      'loaded'
+    )
+
+    pendingAlbumsRead.resolve(
+      localBrowseItemsResult(
+        {
+          entryPointKind: 'music',
+          resolvedRootPath: 'C:\\Users\\Maikel\\Music',
+          resolvedParentPath: 'C:\\Users\\Maikel\\Music\\Albums',
+          itemFilter: 'audio',
+          offset: 0,
+          limit: 50
+        },
+        [fileItem('fresh.flac', 'C:\\Users\\Maikel\\Music\\Albums\\fresh.flac')]
+      )
+    )
+    await expect(refresh).resolves.toBe(true)
+
+    expect(firstLoadedChildLabels(treeNodes(controller), 'Albums')).toEqual(['fresh.flac'])
+  })
+
   it('does not warm terminal file rows', async () => {
     const itemRequests: ReadLocalBrowseItemsRequest[] = []
     const controller = createLocalBrowseController(
@@ -747,6 +822,62 @@ function requiredNodeByLabel(
   }
 
   throw new Error(`Expected node labelled ${label}.`)
+}
+
+function projectFromController(
+  controller: ReturnType<typeof createLocalBrowseController>
+): BrowserProjection {
+  return projectTree({
+    sourceReadStates: new Map(),
+    directoryReadStates: new Map(),
+    localBrowseEntryPointsState: controller.entryPointsState.value,
+    localBrowseItemStates: controller.itemStates.value
+  })
+}
+
+function treeNodes(
+  controller: ReturnType<typeof createLocalBrowseController>
+): readonly BrowserProjection['nodes'][number][] {
+  return projectFromController(controller).nodes
+}
+
+function firstLoadedChildLabels(
+  nodes: readonly BrowserProjection['nodes'][number][],
+  label: string
+): readonly string[] {
+  const node = findNodeByLabel(nodes, label)
+  return node?.children.kind === 'loaded' ? node.children.nodes.map((child) => child.label) : []
+}
+
+function findNodeByLabel(
+  nodes: readonly BrowserProjection['nodes'][number][],
+  label: string
+): BrowserProjection['nodes'][number] | undefined {
+  const remaining = [...nodes]
+
+  while (remaining.length > 0) {
+    const node = remaining.shift()
+
+    if (node?.label === label) {
+      return node
+    }
+
+    if (node?.children.kind === 'loaded') {
+      remaining.push(...node.children.nodes)
+    }
+  }
+
+  return undefined
+}
+
+function albumsWindowKey(): string {
+  return localBrowseWindowKey({
+    addSourceView: 'preview',
+    entryPointKind: 'music',
+    resolvedRootPath: 'C:\\Users\\Maikel\\Music',
+    resolvedParentPath: 'C:\\Users\\Maikel\\Music\\Albums',
+    label: 'Albums'
+  })
 }
 
 function deferred<T>(): { readonly promise: Promise<T>; readonly resolve: (value: T) => void } {
