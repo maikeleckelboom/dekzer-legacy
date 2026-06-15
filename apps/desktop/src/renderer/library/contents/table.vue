@@ -256,7 +256,10 @@ function resolveHandoffActionIcon(action: SourceAdmissionHandoffAction): IconRol
   switch (action.kind) {
     case 'viewSource':
       return 'folder.plain'
+    case 'scanSource':
+      return 'action.scan'
     case 'addAnotherSource':
+    case 'keepBrowsing':
       return 'action.more'
   }
 }
@@ -340,6 +343,7 @@ function resolveHandoffActionIcon(action: SourceAdmissionHandoffAction): IconRol
             type="button"
             class="inline-flex min-h-7 shrink-0 items-center justify-center gap-1.5 rounded-sm border border-(--color-border) bg-(--color-background) px-2 py-1 text-xs font-bold text-(--color-text) transition hover:border-(--color-accent) hover:text-(--color-accent) focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background) disabled:cursor-not-allowed disabled:opacity-60"
             :disabled="!action.enabled"
+            :title="action.reason"
             @click="activateSourceAdmissionHandoffAction?.(action)"
           >
             <Icon :role="resolveHandoffActionIcon(action)" size="xs" />

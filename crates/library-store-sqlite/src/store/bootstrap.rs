@@ -130,3 +130,53 @@ fn ensure_wal_mode(connection: &Connection) -> LibrarySqliteResult<()> {
         Err(LibrarySqliteError::JournalMode(journal_mode))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::mpsc;
+    use std::time::{Duration, Instant};
+
+    use tempfile::TempDir;
+
+    use super::open_connection;
+
+    #[test]
+    fn configured_connections_wait_for_transient_write_locks() {
+        let tempdir = TempDir::new().expect("create tempdir");
+        let database_path = tempdir.path().join("library.sqlite3");
+        let mut holder = open_connection(&database_path).expect("open holder connection");
+        holder
+            .execute(
+                "CREATE TABLE busy_timeout_probe (id INTEGER PRIMARY KEY)",
+                [],
+            )
+            .expect("create probe table");
+        let tx = holder.transaction().expect("start holder transaction");
+        tx.execute("INSERT INTO busy_timeout_probe (id) VALUES (1)", [])
+            .expect("hold write lock");
+
+        let database_path_for_writer = database_path.clone();
+        let (started_tx, started_rx) = mpsc::channel();
+        let writer = std::thread::spawn(move || {
+            let writer = open_connection(&database_path_for_writer).expect("open writer");
+            started_tx.send(()).expect("signal writer ready");
+            writer.execute("INSERT INTO busy_timeout_probe (id) VALUES (2)", [])
+        });
+
+        started_rx.recv().expect("writer started");
+        std::thread::sleep(Duration::from_millis(100));
+        assert!(
+            !writer.is_finished(),
+            "configured busy_timeout should wait instead of failing immediately"
+        );
+
+        let released_at = Instant::now();
+        tx.commit().expect("release write lock");
+        let writer_result = writer.join().expect("writer thread");
+        assert_eq!(writer_result.expect("writer insert waits then succeeds"), 1);
+        assert!(
+            released_at.elapsed() < Duration::from_secs(5),
+            "writer should finish after lock release without exhausting busy_timeout"
+        );
+    }
+}

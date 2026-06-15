@@ -35,9 +35,9 @@ import {
 export type StatusBadge =
   | 'Ready'
   | 'Scanning source'
-  | 'Preparing source'
+  | 'Maintenance running'
   | 'Maintenance completed; pending work remains'
-  | 'Preparation complete'
+  | 'Maintenance current'
   | 'Indexing'
   | 'Still indexing'
   | 'No audio tracks in this view'
@@ -45,7 +45,6 @@ export type StatusBadge =
   | 'No files in this source inventory view'
   | 'Needs scan'
   | 'Maintenance needed'
-  | 'Maintenance running'
   | 'Maintenance unavailable'
   | 'Ready to add'
   | 'Restore source'
@@ -435,7 +434,7 @@ function registeredActivityBadge(input: StatusViewInput): StatusBadge | undefine
 
   switch (activity.preparation.state) {
     case 'running':
-      return 'Preparing source'
+      return 'Maintenance running'
     case 'completedWithRemainingWork':
       return 'Maintenance completed; pending work remains'
     case 'idle':
@@ -685,10 +684,10 @@ function refreshAction(input: StatusViewInput, sourceId: string): StatusAction {
 function toneForBadge(badge: StatusBadge): StatusView['tone'] {
   switch (badge) {
     case 'Ready':
-    case 'Preparation complete':
+    case 'Maintenance current':
       return 'ready'
     case 'Scanning source':
-    case 'Preparing source':
+    case 'Maintenance running':
     case 'Indexing':
     case 'Still indexing':
       return 'active'
@@ -707,8 +706,6 @@ function toneForBadge(badge: StatusBadge): StatusView['tone'] {
     case 'No playable media in this view':
     case 'No files in this source inventory view':
       return 'warning'
-    case 'Maintenance running':
-      return 'active'
     case 'Blocked':
     case 'Missing':
     case 'Offline/unavailable':

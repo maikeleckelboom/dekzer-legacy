@@ -265,7 +265,7 @@ describe('Library home projection', () => {
     expect(projection.productState).toBe('maintenanceNeeded')
   })
 
-  it('keeps preparation pending from source activity even when readiness is ready', () => {
+  it('keeps maintenance backlog from source activity even when readiness is ready', () => {
     const projection = projectLibraryHome({
       state: browserState({
         sourceReadinessByNodeId: new Map([

@@ -46,11 +46,41 @@ describe('source admission handoff projection', () => {
         enabled: true
       },
       {
+        kind: 'scanSource',
+        label: 'Scan source',
+        sourceId: '7',
+        enabled: false,
+        reason: 'Scan is unavailable for this source right now.'
+      },
+      {
         kind: 'addAnotherSource',
         label: 'Add another source',
         enabled: true
+      },
+      {
+        kind: 'keepBrowsing',
+        label: 'Keep browsing',
+        enabled: true
       }
     ])
+  })
+
+  it('offers scan when the admitted source can be scanned', () => {
+    const projection = projectSourceAdmissionHandoff({
+      handoff: sourceAdmissionHandoffFromRoot({
+        rootId: '7',
+        admittedRootPath: 'C:/Music'
+      }),
+      projection: sourceProjection('7', 'Music'),
+      canScanSource: true
+    })
+
+    expect(projection?.actions).toContainEqual({
+      kind: 'scanSource',
+      label: 'Scan source',
+      sourceId: '7',
+      enabled: true
+    })
   })
 
   it('uses truthful pending readiness until the admitted source is visible', () => {
@@ -68,7 +98,7 @@ describe('source admission handoff projection', () => {
     })
   })
 
-  it('uses source activity for preparation handoff detail', () => {
+  it('uses source activity for maintenance handoff detail', () => {
     const projection = projectSourceAdmissionHandoff({
       handoff: sourceAdmissionHandoffFromRoot({
         rootId: '7',
@@ -87,7 +117,7 @@ describe('source admission handoff projection', () => {
       ])
     })
 
-    expect(projection?.readinessDetail).toBe('Preparing source.')
+    expect(projection?.readinessDetail).toBe('Maintenance running.')
   })
 })
 

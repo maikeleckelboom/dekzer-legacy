@@ -531,7 +531,7 @@ describe('source status projection', () => {
     )
   })
 
-  it('keeps completed maintenance with remaining activity distinct from complete preparation', () => {
+  it('keeps completed maintenance with remaining activity distinct from current maintenance', () => {
     const view = registeredView({
       sourceActivity: sourceActivity({
         preparation: {
@@ -553,7 +553,7 @@ describe('source status projection', () => {
     expect(view.detail).toContain('Maintenance completed; pending work remains: hash 7.')
   })
 
-  it('source activity complete clears preparation warning state', () => {
+  it('source activity complete clears maintenance warning state', () => {
     const view = registeredView({
       sourceActivity: sourceActivity({
         preparation: {
@@ -564,7 +564,7 @@ describe('source status projection', () => {
 
     expect(view.badge).toBe('Ready')
     expect(view.tone).toBe('ready')
-    expect(view.detail).toBe('Preparation complete.')
+    expect(view.detail).toBe('Maintenance current.')
   })
 
   it('does not let stale integrity attachment counts keep backlog alive after a zero run result', () => {

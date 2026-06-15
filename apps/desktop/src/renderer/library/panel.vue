@@ -156,6 +156,7 @@ const libraryBrowseProfileMenuOpen = ref(false)
 const libraryBrowseProfileMenuRef = ref<HTMLElement>()
 const addSourceViewMenuOpen = ref(false)
 const addSourceViewMenuRef = ref<HTMLElement>()
+const searchOpenButtonRef = ref<HTMLButtonElement>()
 const searchInputRef = ref<HTMLInputElement>()
 let sourceRevealSequence = 0
 let maintenanceRefreshTimer: ReturnType<typeof setTimeout> | undefined
@@ -542,7 +543,11 @@ const sourceAdmissionHandoffView = computed(() =>
       ? {}
       : { projection: libraryBrowseProjection.value }),
     sourceReadinessByNodeId: sourceReadinessByNodeId.value,
-    sourceActivityBySourceId: sourceActivityBySourceId.value
+    sourceActivityBySourceId: sourceActivityBySourceId.value,
+    canScanSource:
+      sourceAdmissionHandoff.value === undefined
+        ? false
+        : rootLifecycle.canScanSourceRoot(sourceAdmissionHandoff.value.sourceId)
   })
 )
 
@@ -879,6 +884,19 @@ function openSearch(): void {
 
 function handleSearchEscape(): void {
   librarySearch.handleEscape()
+  if (!librarySearch.searchOpen.value) {
+    void nextTick(() => {
+      searchOpenButtonRef.value?.focus()
+    })
+  }
+}
+
+function clearSearchAndReturnToScope(): void {
+  librarySearch.clearSearch()
+  requestContentsForCurrentSelection()
+  void nextTick(() => {
+    searchOpenButtonRef.value?.focus()
+  })
 }
 
 function openLibraryBrowseSurface(): void {
@@ -1453,6 +1471,17 @@ function activateSourceAdmissionHandoffAction(action: SourceAdmissionHandoffActi
 
   if (action.kind === 'viewSource') {
     showAdmittedSource(action.sourceId)
+    sourceAdmissionHandoff.value = undefined
+    return
+  }
+
+  if (action.kind === 'scanSource') {
+    void rootLifecycle.scanRoot(action.sourceId)
+    return
+  }
+
+  if (action.kind === 'keepBrowsing') {
+    sourceAdmissionHandoff.value = undefined
     return
   }
 
@@ -1499,6 +1528,7 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
 
         <button
           v-if="toolbarModel.search.visible && !librarySearch.searchOpen.value"
+          ref="searchOpenButtonRef"
           type="button"
           :class="iconButtonClass"
           :aria-label="toolbarModel.search.label"
@@ -1525,7 +1555,7 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
             :class="iconButtonClass"
             aria-label="Clear search"
             title="Clear search"
-            @click="librarySearch.clearSearch()"
+            @click="clearSearchAndReturnToScope"
           >
             <Icon role="action.clear" size="md" />
           </button>

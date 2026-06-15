@@ -106,7 +106,7 @@ describe('source activity projection', () => {
     )
   })
 
-  it('distinguishes completed maintenance with remaining work from complete preparation', () => {
+  it('distinguishes completed maintenance with remaining work from current maintenance', () => {
     expect(
       sourceActivityPreparationSummary(
         sourceActivity({
@@ -134,7 +134,7 @@ describe('source activity projection', () => {
           }
         })
       )
-    ).toBe('Preparation complete.')
+    ).toBe('Maintenance current.')
   })
 
   it('preserves run-result provenance when maintenance just completed', () => {

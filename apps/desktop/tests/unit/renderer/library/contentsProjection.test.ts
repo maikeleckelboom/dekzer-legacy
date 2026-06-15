@@ -1109,6 +1109,10 @@ describe('projectContents', () => {
 
     expect(contents.kind).toBe('ready')
     expect(contents.title).toBe('Source Fixture')
+    expect(contents.header.health).toEqual({ label: 'Loading', tone: 'active' })
+    expect(contents.detail).toBe(
+      'Loading selected contents. Showing previous contents until the selected scope is ready. 1 playable media item loaded.'
+    )
     expect(contents.rows.map((row) => row.label)).toEqual(['old.wav'])
     expect(contents.rows.map((row) => row.label)).not.toContain('Contents pending')
   })
@@ -1136,6 +1140,7 @@ describe('projectContents', () => {
 
     expect(contents.kind).toBe('ready')
     expect(contents.title).toBe('Old Album')
+    expect(contents.header.health).toEqual({ label: 'Loading', tone: 'active' })
     expect(contents.rows.map((row) => row.label)).toEqual(['old.wav'])
     expect(contents.title).not.toBe('New Album')
   })
@@ -1192,7 +1197,10 @@ describe('projectContents', () => {
 
     expect(contents.kind).toBe('ready')
     expect(contents.title).toBe('Source Fixture')
-    expect(contents.detail).toBe('Updating selected contents. 1 playable media item loaded.')
+    expect(contents.detail).toBe(
+      'Loading selected contents. Showing previous contents until the selected scope is ready. 1 playable media item loaded.'
+    )
+    expect(contents.header.health).toEqual({ label: 'Loading', tone: 'active' })
     expect(contents.rows.map((row) => row.label)).toEqual(['old.wav'])
   })
 

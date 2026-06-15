@@ -101,7 +101,7 @@ describe('search/filter contents projection', () => {
     expect(contents.rows.map((projected) => projected.label)).toEqual(['Amen.wav'])
   })
 
-  it('labels retained rows using the accepted result identity while another scope is pending', () => {
+  it('labels retained rows as previous results while another scope is pending', () => {
     const contents = projectSearchFilterContents({
       state: {
         kind: 'Pending',
@@ -121,10 +121,12 @@ describe('search/filter contents projection', () => {
       profile: 'audio'
     })
 
-    expect(contents.detail).toBe('1 result in selected source for "amen".')
+    expect(contents.detail).toBe(
+      'Searching in selected folder for "break". Showing previous results in selected source for "amen".'
+    )
     expect(contents.header).toMatchObject({
-      searchLabel: 'Search: "amen"',
-      searchScopeLabel: 'Inside selected source'
+      searchLabel: 'Search: "break"',
+      searchScopeLabel: 'Inside selected folder'
     })
     expect(contents.rows.map((projected) => projected.label)).toEqual(['Amen.wav'])
   })

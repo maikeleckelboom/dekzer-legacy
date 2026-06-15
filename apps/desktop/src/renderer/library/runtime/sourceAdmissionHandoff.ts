@@ -21,11 +21,26 @@ export type SourceAdmissionHandoffAction =
       readonly label: 'View source'
       readonly sourceId: string
       readonly enabled: true
+      readonly reason?: string
+    }
+  | {
+      readonly kind: 'scanSource'
+      readonly label: 'Scan source'
+      readonly sourceId: string
+      readonly enabled: boolean
+      readonly reason?: string
     }
   | {
       readonly kind: 'addAnotherSource'
       readonly label: 'Add another source'
       readonly enabled: true
+      readonly reason?: string
+    }
+  | {
+      readonly kind: 'keepBrowsing'
+      readonly label: 'Keep browsing'
+      readonly enabled: true
+      readonly reason?: string
     }
 
 export type SourceAdmissionHandoffProjection = {
@@ -52,6 +67,7 @@ export function projectSourceAdmissionHandoff(input: {
   readonly projection?: BrowserProjection
   readonly sourceReadinessByNodeId?: ReadonlyMap<BrowserTreeNodeId, SourceReadiness>
   readonly sourceActivityBySourceId?: ReadonlyMap<string, ProjectedSourceActivity>
+  readonly canScanSource?: boolean
 }): SourceAdmissionHandoffProjection | undefined {
   const handoff = input.handoff
 
@@ -85,8 +101,22 @@ export function projectSourceAdmissionHandoff(input: {
         enabled: true
       },
       {
+        kind: 'scanSource',
+        label: 'Scan source',
+        sourceId: handoff.sourceId,
+        enabled: input.canScanSource ?? false,
+        ...((input.canScanSource ?? false)
+          ? {}
+          : { reason: 'Scan is unavailable for this source right now.' })
+      },
+      {
         kind: 'addAnotherSource',
         label: 'Add another source',
+        enabled: true
+      },
+      {
+        kind: 'keepBrowsing',
+        label: 'Keep browsing',
         enabled: true
       }
     ]
@@ -146,15 +176,12 @@ function readinessDetail(input: {
 }): string {
   const activity = input.sourceActivity
   if (activity !== undefined) {
-    if (
-      activity.scan.state === 'running' ||
-      activity.browse.state === 'indexing'
-    ) {
+    if (activity.scan.state === 'running' || activity.browse.state === 'indexing') {
       return sourceActivityScanSummary(activity) ?? 'Scanning source.'
     }
 
     if (activity.preparation.state === 'running') {
-      return sourceActivityPreparationSummary(activity) ?? 'Preparing source.'
+      return sourceActivityPreparationSummary(activity) ?? 'Maintenance running.'
     }
 
     if (
@@ -162,13 +189,12 @@ function readinessDetail(input: {
       (activity.preparation.state === 'idle' && sourceActivityBacklogTotal(activity) > 0)
     ) {
       return (
-        sourceActivityPreparationSummary(activity) ??
-        'Maintenance completed; pending work remains.'
+        sourceActivityPreparationSummary(activity) ?? 'Maintenance completed; pending work remains.'
       )
     }
 
     if (activity.preparation.state === 'complete') {
-      return activity.browse.state === 'ready' ? 'Ready.' : 'Preparation complete.'
+      return activity.browse.state === 'ready' ? 'Ready.' : 'Maintenance current.'
     }
   }
 

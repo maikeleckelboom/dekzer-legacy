@@ -17,18 +17,23 @@ export function projectSearchFilterContents(options: {
   const rows = rowsForSearchState(options.state)
   const nextCursor = nextCursorForSearchState(options.state)
   const loadingMore = options.state.kind === 'Accumulating'
-  const identity = presentationIdentityForSearchState(options.state)
-  const detail = searchDetail(identity, options.activeQuery, rows.length, loadingMore)
+  const headerIdentity = headerIdentityForSearchState(options.state)
+  const detail = searchDetail(options.state, options.activeQuery, rows.length, loadingMore)
 
   if (rows.length === 0) {
     return {
       surfaceKind: 'indexedContents',
       surfaceLabel: 'Contents',
-      header: searchScopeHeader(options.state, options.activeQuery, options.profile, identity),
+      header: searchScopeHeader(
+        options.state,
+        options.activeQuery,
+        options.profile,
+        headerIdentity
+      ),
       kind: searchProjectionKind(options.state),
       title: 'Search results',
       detail,
-      rows: [emptyOrPendingSearchRow(options.state, options.profile, identity)]
+      rows: [emptyOrPendingSearchRow(options.state, options.profile, headerIdentity)]
     }
   }
 
@@ -36,7 +41,7 @@ export function projectSearchFilterContents(options: {
   return {
     surfaceKind: 'indexedContents',
     surfaceLabel: 'Contents',
-    header: searchScopeHeader(options.state, options.activeQuery, options.profile, identity),
+    header: searchScopeHeader(options.state, options.activeQuery, options.profile, headerIdentity),
     kind: 'ready',
     title: 'Search results',
     detail,
@@ -135,6 +140,10 @@ function presentationIdentityForSearchState(
     case 'Idle':
       return undefined
   }
+}
+
+function headerIdentityForSearchState(state: SearchQueryState): SearchResultIdentity | undefined {
+  return state.kind === 'Pending' ? state.identity : presentationIdentityForSearchState(state)
 }
 
 function searchProjectionKind(state: SearchQueryState): ContentProjection['kind'] {
@@ -303,11 +312,20 @@ function emptySearchLabel(
 }
 
 function searchDetail(
-  identity: SearchResultIdentity | undefined,
+  state: SearchQueryState,
   activeQuery: string,
   rowCount: number,
   loadingMore: boolean
 ): string {
+  if (state.kind === 'Pending' && state.priorRetained !== undefined) {
+    const nextQuery = state.identity.textQuery
+    const nextScope = searchScopePhrase(state.identity)
+    const previousQuery = state.priorRetained.identity.textQuery
+    const previousScope = searchScopePhrase(state.priorRetained.identity)
+    return `Searching ${nextScope} for "${nextQuery}". Showing previous results ${previousScope} for "${previousQuery}".`
+  }
+
+  const identity = presentationIdentityForSearchState(state)
   const query = identity?.textQuery ?? activeQuery
   const scopePhrase = searchScopePhrase(identity)
 

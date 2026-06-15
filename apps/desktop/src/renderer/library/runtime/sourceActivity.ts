@@ -92,7 +92,7 @@ export function sourceActivityPreparationSummary(
 
   switch (preparation.state) {
     case 'running':
-      return 'Preparing source.'
+      return 'Maintenance running.'
     case 'completedWithRemainingWork':
       return categoryDetail.length === 0
         ? 'Maintenance completed; pending work remains. Run maintenance processes a bounded batch.'
@@ -102,7 +102,7 @@ export function sourceActivityPreparationSummary(
         ? undefined
         : `Maintenance needed: ${categoryDetail}. Run maintenance processes a bounded batch.`
     case 'complete':
-      return 'Preparation complete.'
+      return 'Maintenance current.'
     case 'failed':
       return 'Maintenance needed.'
     case 'unavailable':

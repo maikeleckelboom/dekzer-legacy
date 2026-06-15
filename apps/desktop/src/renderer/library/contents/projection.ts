@@ -925,13 +925,19 @@ function projectContentsState(options: {
   })
 
   if (state.pending?.presentation === 'visible') {
-    return {
-      ...projection,
-      detail:
-        state.pending.requestKey === state.requestKey
-          ? refreshingDetail('Refreshing contents.', projection.detail)
-          : refreshingDetail('Updating selected contents.', projection.detail)
-    }
+    return withPendingDetail(
+      projection,
+      state.pending.requestKey === state.requestKey
+        ? 'Refreshing contents.'
+        : 'Loading selected contents. Showing previous contents until the selected scope is ready.'
+    )
+  }
+
+  if (state.pending !== undefined && state.pending.requestKey !== state.requestKey) {
+    return withPendingDetail(
+      projection,
+      'Loading selected contents. Showing previous contents until the selected scope is ready.'
+    )
   }
 
   if (state.refreshError !== undefined) {
@@ -953,6 +959,17 @@ function retainedSnapshotCanLoadMore(state: ContentsBoundaryState): boolean {
 
 function refreshingDetail(prefix: string, detail: string | undefined): string {
   return detail === undefined ? prefix : `${prefix} ${detail}`
+}
+
+function withPendingDetail(projection: ContentProjection, prefix: string): ContentProjection {
+  return {
+    ...projection,
+    detail: refreshingDetail(prefix, projection.detail),
+    header: {
+      ...projection.header,
+      health: { label: 'Loading', tone: 'active' }
+    }
+  }
 }
 
 function withLibraryBrowseHeader(

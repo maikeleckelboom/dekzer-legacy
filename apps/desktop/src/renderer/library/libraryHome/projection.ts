@@ -58,9 +58,9 @@ export type LibrarySourceReadinessBadge =
   | 'Indexing'
   | 'Needs scan'
   | 'Scanning source'
-  | 'Preparing source'
+  | 'Maintenance running'
   | 'Maintenance completed; pending work remains'
-  | 'Preparation complete'
+  | 'Maintenance current'
   | 'Missing'
   | 'Blocked'
   | 'Offline/unavailable'
@@ -362,9 +362,9 @@ function projectLibraryHomeSourceActivity(input: {
     case 'running':
       return {
         productState: 'maintenanceNeeded',
-        badge: 'Preparing source',
+        badge: 'Maintenance running',
         tone: 'active',
-        detail: sourceActivityPreparationSummary(activity) ?? 'Preparing source.'
+        detail: sourceActivityPreparationSummary(activity) ?? 'Maintenance running.'
       }
     case 'completedWithRemainingWork':
       return {
@@ -533,7 +533,7 @@ function dominantLibraryHomeState(
   if (summaries.some((summary) => summary.productState === 'maintenanceNeeded')) {
     return {
       productState: 'maintenanceNeeded',
-      title: 'Library preparation pending',
+      title: 'Library maintenance pending',
       detail: 'Run maintenance processes a bounded batch.'
     }
   }
