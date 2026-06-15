@@ -1,4 +1,4 @@
-import { test } from '../fixtures/libraryFixture'
+import { expect, test } from '../fixtures/libraryFixture'
 import { expectContentsPanelVisible } from '../assertions/contentsAssertions'
 import {
   expectAddSourceEntryReachable,
@@ -19,6 +19,10 @@ test.describe('Library V0 launch smoke', () => {
     await libraryPanel.openAddSourceIfNeeded()
     await expectAddSourceSurfaceVisible(libraryPanel)
 
-    await electronApp.close()
+    await expect(electronApp.close()).resolves.toMatchObject({
+      graceful: true,
+      killed: false,
+      timedOut: false
+    })
   })
 })
