@@ -143,6 +143,13 @@ export function useTreeController(options: UseTreeControllerOptions): TreeContex
         }
         return
 
+      case 'unmaterialized':
+        expandNode(item)
+        if (item.canActivateAction) {
+          options.activateAction(nodeId)
+        }
+        return
+
       case 'loading':
         expandNode(item)
         return

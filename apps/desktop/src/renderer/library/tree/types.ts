@@ -13,6 +13,9 @@ export type BrowserTreeChildren =
       readonly stateNode: BrowserTreeNode
     }
   | {
+      readonly kind: 'unmaterialized'
+    }
+  | {
       readonly kind: 'loading'
       readonly stateNode: BrowserTreeNode
     }

@@ -222,28 +222,17 @@ function projectSourceChildren(options: {
     const detail = state?.detail ?? 'Contents not loaded yet.'
 
     return {
-      children: deferredChildren(
-        {
-          parentNodeId: options.parentNodeId,
-          label: 'Source contents not loaded',
-          detail
-        },
-        options.bindingsById
-      ),
+      children: unmaterializedChildren(),
       action: loadChildrenAction('idle', detail)
     }
   }
 
   if (state.kind === 'loading') {
+    const detail = state.detail ?? 'Loading source contents.'
+
     return {
-      children: loadingChildren(
-        {
-          parentNodeId: options.parentNodeId,
-          label: 'Loading source contents',
-          detail: state.detail ?? 'Loading source contents.'
-        },
-        options.bindingsById
-      )
+      children: unmaterializedChildren(),
+      action: loadChildrenAction('loading', detail)
     }
   }
 
@@ -358,15 +347,7 @@ function hierarchyCoverageStateNode(
       )
     case 'pending':
     case 'scanning':
-      return trackedReadStateNode(
-        {
-          parentNodeId,
-          state: 'loading',
-          label: coverage.state === 'scanning' ? 'Indexing source contents' : 'Indexing pending',
-          detail: coverage.detail ?? 'Source contents are still being indexed.'
-        },
-        bindingsById
-      )
+      return undefined
     case 'sourceUnavailable':
     case 'locationMissing':
       return trackedReadStateNode(
@@ -464,6 +445,17 @@ function projectLiteralDirectoryNode(options: {
   }
 
   if (isUnknownDirectoryChildReadiness(node)) {
+    if (isPendingDirectoryChildReadiness(node)) {
+      return {
+        id: node.id,
+        role: 'literalDirectory',
+        label: node.label,
+        icon: 'folder',
+        detail: formatDirectoryDetail(node.presence),
+        children: { kind: 'none' }
+      }
+    }
+
     const readState = unknownDirectoryChildReadinessState(node)
     const detail = formatUnknownDirectoryChildReadinessDetail(node)
     return {
@@ -516,6 +508,12 @@ export function isUnknownDirectoryChildReadiness(
   node: Extract<ChildRow, { readonly kind: 'directory' }>
 ): boolean {
   return node.navigableChildScopeState === 'unknown'
+}
+
+function isPendingDirectoryChildReadiness(
+  node: Extract<ChildRow, { readonly kind: 'directory' }>
+): boolean {
+  return node.directoryScanState === 'pending' || node.directoryScanState === 'scanning'
 }
 
 const sourceUnavailableErrorCodes = new Set([
@@ -582,44 +580,8 @@ function unknownChildren(
   }
 }
 
-function deferredChildren(
-  options: {
-    readonly parentNodeId: string
-    readonly label: string
-    readonly detail: string
-  },
-  bindingsById: Map<BrowserTreeNodeId, RowBinding>
-): BrowserTreeChildren {
-  return {
-    kind: 'deferred',
-    stateNode: trackedReadStateNode(
-      {
-        ...options,
-        state: 'notLoaded'
-      },
-      bindingsById
-    )
-  }
-}
-
-function loadingChildren(
-  options: {
-    readonly parentNodeId: string
-    readonly label: string
-    readonly detail: string
-  },
-  bindingsById: Map<BrowserTreeNodeId, RowBinding>
-): BrowserTreeChildren {
-  return {
-    kind: 'loading',
-    stateNode: trackedReadStateNode(
-      {
-        ...options,
-        state: 'loading'
-      },
-      bindingsById
-    )
-  }
+function unmaterializedChildren(): BrowserTreeChildren {
+  return { kind: 'unmaterialized' }
 }
 
 function failedChildren(
@@ -655,28 +617,17 @@ function projectDirectoryChildren(options: {
     const detail = state?.detail ?? 'Contents not loaded yet.'
 
     return {
-      children: deferredChildren(
-        {
-          parentNodeId: options.parentNodeId,
-          label: 'Folder contents not loaded',
-          detail
-        },
-        options.bindingsById
-      ),
+      children: unmaterializedChildren(),
       action: loadChildrenAction('idle', detail)
     }
   }
 
   if (state.kind === 'loading') {
+    const detail = state.detail ?? 'Loading contents.'
+
     return {
-      children: loadingChildren(
-        {
-          parentNodeId: options.parentNodeId,
-          label: 'Loading contents',
-          detail: state.detail ?? 'Loading contents.'
-        },
-        options.bindingsById
-      )
+      children: unmaterializedChildren(),
+      action: loadChildrenAction('loading', detail)
     }
   }
 

@@ -9,8 +9,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use library_boundary_protocol as protocol;
 use library_store_sqlite::{
     LibraryStoreContext, LocalRootAdmissionVisibility, LocalRootAvailability, ReadLocalRootsResult,
-    RegisterLocalRootInput, RegisterLocalRootResult, RootNavigationWindowEstablishment,
-    RootNavigationWindowEstablishmentState, RootScanObservation,
+    RegisterLocalRootInput, RegisterLocalRootResult, RootScanObservation,
     SourceFileBlake3HashAdmissionScope, SourceRegistrationRootClass, SqliteDurableStore,
     UnregisterLocalRootInput,
 };
@@ -533,15 +532,6 @@ impl LibraryBoundaryService {
         &self,
         request: protocol::ReadLibraryTreeChildrenRequest,
     ) -> protocol::ProtocolResult<protocol::ReadLibraryTreeChildrenReply> {
-        self.refresh_root_availability_for_tree_entry_point(&request.entry_point)?;
-        let root_navigation_window_establishment =
-            root_navigation_window_establishment_target(&request)
-                .map(|source_id| {
-                    self.durable_store
-                        .establish_root_navigation_window(source_id)
-                })
-                .transpose()
-                .map_err(map_store_error)?;
         let window = self
             .durable_store
             .read_literal_hierarchy_children(
@@ -552,11 +542,7 @@ impl LibraryBoundaryService {
                 library_tree_row_policy_filter(request.row_policy),
             )
             .map_err(map_store_error)?;
-        let mut reply = map_read_library_tree_children_reply(window).map_err(map_store_error)?;
-        if let Some(establishment) = root_navigation_window_establishment {
-            apply_root_navigation_window_establishment(&mut reply, &establishment);
-        }
-        Ok(reply)
+        map_read_library_tree_children_reply(window).map_err(map_store_error)
     }
 
     pub fn read_source_lifecycle(
@@ -1031,20 +1017,6 @@ impl LibraryBoundaryService {
         self.publish_root_availability_change(changed)
     }
 
-    fn refresh_root_availability_for_tree_entry_point(
-        &self,
-        entry_point: &protocol::LibraryTreeEntryPoint,
-    ) -> protocol::ProtocolResult<()> {
-        match entry_point {
-            protocol::LibraryTreeEntryPoint::Source { source_id } => {
-                self.refresh_root_availability(*source_id)
-            }
-            protocol::LibraryTreeEntryPoint::SourceLocation { .. } => {
-                self.refresh_all_root_availability()
-            }
-        }
-    }
-
     fn refresh_root_availability_for_contents_scope(
         &self,
         scope: &protocol::ContentsScope,
@@ -1273,86 +1245,6 @@ fn map_local_browse_entry_point_failure(
         code: failure.code,
         detail: failure.detail,
     }
-}
-
-fn root_navigation_window_establishment_target(
-    request: &protocol::ReadLibraryTreeChildrenRequest,
-) -> Option<i64> {
-    if request.parent_source_directory_id.is_some() {
-        return None;
-    }
-
-    match &request.entry_point {
-        protocol::LibraryTreeEntryPoint::Source { source_id } => Some(*source_id),
-        protocol::LibraryTreeEntryPoint::SourceLocation { .. } => None,
-    }
-}
-
-fn apply_root_navigation_window_establishment(
-    reply: &mut protocol::ReadLibraryTreeChildrenReply,
-    establishment: &RootNavigationWindowEstablishment,
-) {
-    let Some(window) = reply.window.as_mut() else {
-        return;
-    };
-
-    match establishment.state {
-        RootNavigationWindowEstablishmentState::NotRequired => {}
-        RootNavigationWindowEstablishmentState::Established => {
-            window.coverage.empty_result_authoritative = false;
-        }
-        RootNavigationWindowEstablishmentState::Empty => {
-            window.coverage.empty_result_authoritative = true;
-            if window.coverage.detail.is_none() {
-                window.coverage.detail =
-                    Some("The immediate source root child-directory window is empty.".to_string());
-            }
-        }
-        RootNavigationWindowEstablishmentState::Missing => {
-            apply_root_navigation_window_terminal_coverage(
-                window,
-                protocol::LibraryTreeCoverageState::LocationMissing,
-                establishment
-                    .detail
-                    .clone()
-                    .unwrap_or_else(|| "The selected source root is missing.".to_string()),
-            );
-        }
-        RootNavigationWindowEstablishmentState::Blocked => {
-            apply_root_navigation_window_terminal_coverage(
-                window,
-                protocol::LibraryTreeCoverageState::Blocked,
-                establishment
-                    .detail
-                    .clone()
-                    .unwrap_or_else(|| "The selected source root is blocked.".to_string()),
-            );
-        }
-        RootNavigationWindowEstablishmentState::Failed => {
-            apply_root_navigation_window_terminal_coverage(
-                window,
-                protocol::LibraryTreeCoverageState::Failed,
-                establishment.detail.clone().unwrap_or_else(|| {
-                    "The source root child-directory window read failed.".to_string()
-                }),
-            );
-        }
-    }
-}
-
-fn apply_root_navigation_window_terminal_coverage(
-    window: &mut protocol::LibraryTreeWindow,
-    state: protocol::LibraryTreeCoverageState,
-    detail: String,
-) {
-    window.rows.clear();
-    window.total_rows = 0;
-    window.coverage = protocol::LibraryTreeCoverage {
-        state,
-        subtree_coverage_complete: false,
-        empty_result_authoritative: false,
-        detail: Some(detail),
-    };
 }
 
 impl Drop for LibraryBoundaryService {

@@ -45,6 +45,9 @@ test.describe(libraryV0ScenarioTitle(scenario), () => {
       await run.step('assertion:source-ready', async () => {
         await libraryV0.expectSourceReady(admittedSource)
       })
+      await run.step('assertion:persisted-hierarchy-disclosure', async () => {
+        await libraryV0.expectPersistedHierarchyDisclosure(admittedSource)
+      })
       await run.step('assertion:folder-browse', async () => {
         await libraryV0.expectFolderScopedBrowsing(admittedSource)
       })

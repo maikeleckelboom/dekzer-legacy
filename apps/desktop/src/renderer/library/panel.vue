@@ -8,7 +8,7 @@ import {
   type LibraryBrowseProfile
 } from './libraryBrowseProfile/types'
 import { createLibraryBrowseProfileController } from './libraryBrowseProfile/controller'
-import { useLibraryHierarchyRead, type LibraryBranchWarmupTrace } from './boundary/hierarchyRead'
+import { useLibraryHierarchyRead } from './boundary/hierarchyRead'
 import { useContentsRead } from './boundary/contentsRead'
 import { useLocalRootActions } from './boundary/localRootActions'
 import {
@@ -113,12 +113,7 @@ const sourceRevealRequest = ref<{
   readonly sequence: number
 }>()
 const hierarchyRead = useLibraryHierarchyRead(undefined, {
-  profile: libraryBrowseProfile.profile,
-  warmup: {
-    shouldContinue: (nodeId) =>
-      activeSurface.value === 'libraryBrowse' && expandedLibraryNodeIds.value.has(nodeId),
-    trace: traceLibraryBranchWarmup
-  }
+  profile: libraryBrowseProfile.profile
 })
 const localBrowse = useLocalBrowseController(undefined, {
   addSourceView: addSourceView.view,
@@ -517,14 +512,6 @@ watch(
     )
   }
 )
-
-function traceLibraryBranchWarmup(trace: LibraryBranchWarmupTrace): void {
-  if (!import.meta.env.DEV) {
-    return
-  }
-
-  console.debug('[dekzer:library:branch-warmup]', trace)
-}
 
 function traceLocalBrowseBranchWarmup(trace: LocalBrowseBranchWarmupTrace): void {
   if (!import.meta.env.DEV) {

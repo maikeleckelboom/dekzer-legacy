@@ -49,7 +49,7 @@ describe('source readiness', () => {
 
     const projection = projectTree(withReadiness(state, readyRoots('available'), progress))
     const sourceNode = requiredNode(projection.nodes, 'navigation-row:7')
-    expect(sourceNode.children.kind).toBe('deferred')
+    expect(sourceNode.children.kind).toBe('unmaterialized')
   })
 
   it('marks only the active scan root as scan starting', () => {

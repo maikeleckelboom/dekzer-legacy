@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { ref } from 'vue'
 
 import {
   createLibraryHierarchyReadController,
@@ -14,7 +13,6 @@ import type {
   ReadResult
 } from '../../../../src/shared/library/hierarchy/read'
 import type { NavigationReadRowsResult } from '../../../../src/shared/library/navigation/read'
-import type { LibraryBrowseProfile } from '../../../../src/renderer/library/libraryBrowseProfile/types'
 
 describe('createLibraryHierarchyReadController', () => {
   it('refreshes navigation, reads the first source, and loads directory children', async () => {
@@ -59,7 +57,7 @@ describe('createLibraryHierarchyReadController', () => {
     expect(controller.directoryReadStates.value.get('12')?.kind).toBe('unloaded')
 
     expect(firstProjectedDirectoryStateKind(treeNodes(controller), 'source-directory:12')).toBe(
-      'deferred'
+      'unmaterialized'
     )
 
     await expect(controller.requestDirectoryChildren('source-directory:12')).resolves.toBe(true)
@@ -82,8 +80,7 @@ describe('createLibraryHierarchyReadController', () => {
     })
   })
 
-  it('warms expandable child directory windows with bounded concurrency and skips files', async () => {
-    const pendingWarmReads = new Map<string, ReturnType<typeof deferred<ReadResult>>>()
+  it('does not warm registered child directory windows after loading a source', async () => {
     const readRequests: ReadRequest[] = []
     const controller = createLibraryHierarchyReadController(
       testLibraryApi({
@@ -100,85 +97,31 @@ describe('createLibraryHierarchyReadController', () => {
             ])
           }
 
-          const read = deferred<ReadResult>()
-          pendingWarmReads.set(request.parentDirectoryId, read)
-          return read.promise
-        }
-      }),
-      { warmup: { enabled: true } }
-    )
-
-    await expect(controller.refresh()).resolves.toBe(true)
-
-    expect(readRequests.map((request) => request.parentDirectoryId ?? 'root')).toEqual([
-      'root',
-      '1',
-      '2'
-    ])
-
-    pendingWarmReads.get('1')?.resolve(emptyDirectoryReadResult('1'))
-    await waitForMicrotasks()
-
-    expect(readRequests.map((request) => request.parentDirectoryId ?? 'root')).toEqual([
-      'root',
-      '1',
-      '2',
-      '3'
-    ])
-    expect(pendingWarmReads.has('file-1')).toBe(false)
-  })
-
-  it('respects branch warmup breadth and depth limits', async () => {
-    const readRequests: ReadRequest[] = []
-    const controller = createLibraryHierarchyReadController(
-      testLibraryApi({
-        readRows: async () => navigationSourceReadRowsResult(),
-        readChildren: async (request) => {
-          readRequests.push(structuredClone(request))
-
-          if (request.parentDirectoryId === undefined) {
-            return hierarchyReadResultWithRows(
-              Array.from({ length: 30 }, (_, index) =>
-                directoryNode(String(index + 1), `Directory ${index + 1}`)
-              )
-            )
-          }
-
-          if (request.parentDirectoryId === '1') {
-            return hierarchyReadResultWithRows([directoryNode('101', 'Grandchild', '1')], {
-              parentDirectoryId: '1'
-            })
-          }
-
-          if (request.parentDirectoryId === '101') {
-            return hierarchyReadResultWithRows([directoryNode('1001', 'Too Deep', '101')], {
-              parentDirectoryId: '101'
-            })
-          }
-
           return emptyDirectoryReadResult(request.parentDirectoryId)
         }
-      }),
-      { warmup: { enabled: true } }
+      })
     )
 
     await expect(controller.refresh()).resolves.toBe(true)
-    await waitForWarmupQueue()
+    await waitForMicrotasks()
 
-    const warmedParentIds = readRequests
-      .slice(1)
-      .map((request) => request.parentDirectoryId)
-      .filter((id): id is string => id !== undefined)
-
-    expect(warmedParentIds.filter((id) => Number(id) >= 1 && Number(id) <= 30)).toEqual(
-      Array.from({ length: 24 }, (_, index) => String(index + 1))
+    expect(readRequests.map((request) => request.parentDirectoryId ?? 'root')).toEqual(['root'])
+    expect(firstProjectedDirectoryStateKind(treeNodes(controller), 'source-directory:1')).toBe(
+      'unmaterialized'
     )
-    expect(warmedParentIds).toContain('101')
-    expect(warmedParentIds).not.toContain('1001')
+    expect(firstProjectedDirectoryStateKind(treeNodes(controller), 'source-directory:2')).toBe(
+      'unmaterialized'
+    )
+
+    await expect(controller.requestDirectoryChildren('source-directory:2')).resolves.toBe(true)
+    expect(readRequests.map((request) => request.parentDirectoryId ?? 'root')).toEqual([
+      'root',
+      '2'
+    ])
   })
 
-  it('coalesces explicit child directory opens with active warm reads', async () => {
-    const warmRead = deferred<ReadResult>()
+  it('uses a single explicit read for a registered child directory expansion', async () => {
+    const directoryRead = deferred<ReadResult>()
     const readRequests: ReadRequest[] = []
     const controller = createLibraryHierarchyReadController(
       testLibraryApi({
@@ -190,10 +133,9 @@ describe('createLibraryHierarchyReadController', () => {
             return hierarchyReadResultWithRows([directoryNode('12', 'Album')])
           }
 
-          return warmRead.promise
+          return directoryRead.promise
         }
-      }),
-      { warmup: { enabled: true } }
+      })
     )
 
     await expect(controller.refresh()).resolves.toBe(true)
@@ -205,12 +147,12 @@ describe('createLibraryHierarchyReadController', () => {
       'root',
       '12'
     ])
-    expect(controller.directoryReadStates.value.get('12')?.kind).toBe('unloaded')
+    expect(controller.directoryReadStates.value.get('12')?.kind).toBe('loading')
     expect(firstProjectedDirectoryStateKind(treeNodes(controller), 'source-directory:12')).toBe(
-      'deferred'
+      'unmaterialized'
     )
 
-    warmRead.resolve(
+    directoryRead.resolve(
       hierarchyReadResultWithRows([terminalDirectoryNode('20', 'Warm Child', '12')], {
         parentDirectoryId: '12'
       })
@@ -224,78 +166,6 @@ describe('createLibraryHierarchyReadController', () => {
     expect(firstLoadedChildIds(treeNodes(controller), 'source-directory:12')).toEqual([
       'source-directory:20'
     ])
-  })
-
-  it('does not commit stale active warm reads after the browse profile changes', async () => {
-    const warmRead = deferred<ReadResult>()
-    const profile = ref<LibraryBrowseProfile>('audio')
-    const controller = createLibraryHierarchyReadController(
-      testLibraryApi({
-        readRows: async () => navigationSourceReadRowsResult(),
-        readChildren: async (request) =>
-          request.parentDirectoryId === undefined
-            ? hierarchyReadResultWithRows([directoryNode('12', 'Album')])
-            : warmRead.promise
-      }),
-      { profile, warmup: { enabled: true } }
-    )
-
-    await expect(controller.refresh()).resolves.toBe(true)
-
-    profile.value = 'allFiles'
-    warmRead.resolve(loadedDirectoryReadResult('12'))
-    await waitForMicrotasks()
-
-    expect(controller.directoryReadStates.value.get('12')?.kind).toBe('unloaded')
-    expect(firstProjectedDirectoryStateKind(treeNodes(controller), 'source-directory:12')).toBe(
-      'deferred'
-    )
-  })
-
-  it('falls back to explicit directory read when an adopted warm read is not ready', async () => {
-    const warmRead = deferred<ReadResult>()
-    const readRequests: ReadRequest[] = []
-    let directoryReadCount = 0
-    const controller = createLibraryHierarchyReadController(
-      testLibraryApi({
-        readRows: async () => navigationSourceReadRowsResult(),
-        readChildren: async (request) => {
-          readRequests.push(structuredClone(request))
-
-          if (request.parentDirectoryId === undefined) {
-            return hierarchyReadResultWithRows([directoryNode('12', 'Album')])
-          }
-
-          directoryReadCount += 1
-          return directoryReadCount === 1
-            ? warmRead.promise
-            : hierarchyReadResultWithRows([terminalDirectoryNode('20', 'Recovered Child', '12')], {
-                parentDirectoryId: '12'
-              })
-        }
-      }),
-      { warmup: { enabled: true } }
-    )
-
-    await expect(controller.refresh()).resolves.toBe(true)
-
-    const explicitPromise = controller.requestDirectoryChildren('source-directory:12')
-    await waitForMicrotasks()
-
-    expect(readRequests.map((request) => request.parentDirectoryId ?? 'root')).toEqual([
-      'root',
-      '12'
-    ])
-
-    warmRead.resolve(hierarchyReadError('readFailed', 'readFailed', 'Warm read failed.'))
-    await expect(explicitPromise).resolves.toBe(true)
-
-    expect(readRequests.map((request) => request.parentDirectoryId ?? 'root')).toEqual([
-      'root',
-      '12',
-      '12'
-    ])
-    expect(controller.directoryReadStates.value.get('12')).toMatchObject({ kind: 'loaded' })
   })
 
   it('loads source and directory continuation windows and retries failed directory continuations', async () => {
@@ -972,7 +842,7 @@ describe('createLibraryHierarchyReadController', () => {
     expect(controller.sourceReadStates.value.get('navigation-row:9')?.kind).toBe('loaded')
   })
 
-  it('state placeholder node ID remains stable across state transitions', async () => {
+  it('keeps registered hierarchy expansion materialization-free until children are loaded', async () => {
     const deferredDirRead = deferred<Extract<ReadResult, { state: 'ready' }>>()
     let readCount = 0
     const controller = createLibraryHierarchyReadController(
@@ -996,20 +866,15 @@ describe('createLibraryHierarchyReadController', () => {
 
     await expect(controller.refresh()).resolves.toBe(true)
 
-    const deferredNode = findProjectedNode(treeNodes(controller), 'source-directory:12')
-    expect(deferredNode?.children.kind).toBe('deferred')
-    if (deferredNode?.children.kind === 'deferred') {
-      expect(deferredNode.children.stateNode.id).toBe('read-state:source-directory:12')
-    }
+    const unmaterializedNode = findProjectedNode(treeNodes(controller), 'source-directory:12')
+    expect(unmaterializedNode?.children.kind).toBe('unmaterialized')
 
     const readPromise = controller.requestDirectoryChildren('source-directory:12')
     await waitForMicrotasks()
 
     const loadingNode = findProjectedNode(treeNodes(controller), 'source-directory:12')
-    expect(loadingNode?.children.kind).toBe('loading')
-    if (loadingNode?.children.kind === 'loading') {
-      expect(loadingNode.children.stateNode.id).toBe('read-state:source-directory:12')
-    }
+    expect(loadingNode?.children.kind).toBe('unmaterialized')
+    expect(controller.directoryReadStates.value.get('12')?.kind).toBe('loading')
 
     deferredDirRead.resolve(
       loadedDirectoryReadResult('12') as Extract<ReadResult, { state: 'ready' }>
@@ -1421,12 +1286,6 @@ function deferred<T>(): { readonly promise: Promise<T>; readonly resolve: (value
 async function waitForMicrotasks(): Promise<void> {
   await Promise.resolve()
   await Promise.resolve()
-}
-
-async function waitForWarmupQueue(): Promise<void> {
-  for (let index = 0; index < 80; index += 1) {
-    await waitForMicrotasks()
-  }
 }
 
 function treeNodes(

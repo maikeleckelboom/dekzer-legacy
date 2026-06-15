@@ -203,7 +203,7 @@ describe('projectState', () => {
     expect(stoppedProjection.bindingsById.has('navigation-row:7')).toBe(false)
   })
 
-  it('unloaded directory with known child scopes is a deferred branch', () => {
+  it('unloaded directory with known child scopes is an unmaterialized branch', () => {
     const projection = projectTree(
       browserState({
         sourceChildren: loadedChildren([
@@ -219,16 +219,13 @@ describe('projectState', () => {
     )
     const node = requiredNode(projection.nodes, 'source-directory:12')
 
-    expect(node.children.kind).toBe('deferred')
-    expect(node.children.kind === 'deferred' ? node.children.stateNode.role : undefined).toBe(
-      'state'
-    )
+    expect(node.children.kind).toBe('unmaterialized')
     expect(node.action).toMatchObject({ kind: 'loadChildren', state: { kind: 'idle' } })
     expect(isBrowserTreeBranch(node)).toBe(true)
     expect(canRevealBrowserTreeChildren(node)).toBe(true)
   })
 
-  it('deferred directory expansion preserves state node', () => {
+  it('unmaterialized directory expansion shows no pending child row', () => {
     const projection = projectTree(
       browserState({
         sourceChildren: loadedChildren([
@@ -247,9 +244,7 @@ describe('projectState', () => {
       expandedNodeIds: new Set(['navigation-row:7', 'source-directory:12'])
     })
 
-    expect(
-      childItemsFor(visibleItems, 'source-directory:12').map((item) => item.node.role)
-    ).toEqual(['state'])
+    expect(childItemsFor(visibleItems, 'source-directory:12')).toEqual([])
   })
 
   it('loading directory with known child scopes remains a branch', () => {
@@ -271,7 +266,7 @@ describe('projectState', () => {
               kind: 'loading',
               requestKey: 'source:7/directory:12',
               sequence: 1,
-              detail: 'Loading children.'
+              detail: 'Reading persisted folder rows.'
             }
           ]
         ])
@@ -279,12 +274,13 @@ describe('projectState', () => {
     )
     const node = requiredNode(projection.nodes, 'source-directory:12')
 
-    expect(node.children.kind).toBe('loading')
+    expect(node.children.kind).toBe('unmaterialized')
+    expect(node.action).toMatchObject({ kind: 'loadChildren', state: { kind: 'loading' } })
     expect(isBrowserTreeBranch(node)).toBe(true)
     expect(canRevealBrowserTreeChildren(node)).toBe(true)
   })
 
-  it('loading directory exposes state node when expanded', () => {
+  it('loading directory expansion shows no pending child row', () => {
     const projection = projectTree(
       browserState({
         sourceChildren: loadedChildren([directoryNode('12', 'Album')]),
@@ -295,7 +291,7 @@ describe('projectState', () => {
               kind: 'loading',
               requestKey: 'source:7/directory:12',
               sequence: 1,
-              detail: 'Loading children.'
+              detail: 'Reading persisted folder rows.'
             }
           ]
         ])
@@ -307,11 +303,7 @@ describe('projectState', () => {
     })
     const childRows = childItemsFor(visibleItems, 'source-directory:12')
 
-    expect(childRows).toHaveLength(1)
-    expect(childRows[0]?.node).toMatchObject({
-      role: 'state',
-      icon: 'loading'
-    })
+    expect(childRows).toEqual([])
   })
 
   it('failed directory exposes error state node when expanded', () => {
@@ -786,68 +778,46 @@ describe('projectState', () => {
     expect(canRevealBrowserTreeChildren(node)).toBe(false)
   })
 
-  it('unknown navigable child scope state is neither leaf nor expandable', () => {
-    const projection = projectTree(
-      browserState({
-        sourceChildren: loadedChildren([
-          directoryNode('12', 'Pending Scan', {
-            hasChildDirectories: false,
-            directoryPlayableMediaState: { kind: 'unknown' },
-            directoryImageMediaState: { kind: 'unknown' },
-            directoryScanState: 'pending',
-            navigableChildScopeState: 'unknown'
-          })
-        ])
-      })
-    )
-    const node = requiredNode(projection.nodes, 'source-directory:12')
+  it.each(['pending', 'scanning'] as const)(
+    '%s unknown child scope state has no pending row or readiness badge',
+    (directoryScanState) => {
+      const projection = projectTree(
+        browserState({
+          sourceChildren: loadedChildren([
+            directoryNode('12', 'Pending Scan', {
+              hasChildDirectories: false,
+              directoryPlayableMediaState: { kind: 'unknown' },
+              directoryImageMediaState: { kind: 'unknown' },
+              directoryScanState,
+              navigableChildScopeState: 'unknown'
+            })
+          ])
+        })
+      )
+      const node = requiredNode(projection.nodes, 'source-directory:12')
 
-    expect(node.children.kind).toBe('unknown')
-    expect(isBrowserTreeBranch(node)).toBe(false)
-    expect(isBrowserTreeLeaf(node)).toBe(false)
-    expect(canRevealBrowserTreeChildren(node)).toBe(false)
-    if (node.children.kind === 'unknown') {
-      expect(node.children.stateNode).toMatchObject({
-        role: 'state',
-        label: 'Folder child scopes pending',
-        detail: 'Folder child scopes have not been proven yet.'
+      expect(node.children.kind).toBe('none')
+      expect(isBrowserTreeBranch(node)).toBe(false)
+      expect(isBrowserTreeLeaf(node)).toBe(true)
+      expect(canRevealBrowserTreeChildren(node)).toBe(false)
+
+      const visibleItems = flattenVisibleTree({
+        nodes: projection.nodes,
+        expandedNodeIds: new Set(['navigation-row:7', 'source-directory:12'])
       })
+      const visibleUnknown = visibleItems.find((item) => item.id === 'source-directory:12')
+
+      expect(visibleUnknown).toMatchObject({
+        isBranch: false,
+        canRevealChildren: false,
+        isExpanded: false
+      })
+      expect(visibleUnknown?.childReadinessNode).toBeUndefined()
+      expect(childItemsFor(visibleItems, 'source-directory:12')).toEqual([])
     }
-
-    const visibleItems = flattenVisibleTree({
-      nodes: projection.nodes,
-      expandedNodeIds: new Set(['navigation-row:7', 'source-directory:12'])
-    })
-    const visibleUnknown = visibleItems.find((item) => item.id === 'source-directory:12')
-
-    expect(visibleUnknown).toMatchObject({
-      isBranch: false,
-      canRevealChildren: false,
-      isExpanded: false
-    })
-    expect(visibleUnknown?.childReadinessNode).toMatchObject({
-      role: 'state',
-      icon: 'loading',
-      label: 'Folder child scopes pending'
-    })
-    expect(childItemsFor(visibleItems, 'source-directory:12')).toEqual([])
-  })
+  )
 
   it.each([
-    {
-      scanState: 'pending',
-      label: 'Folder child scopes pending',
-      detail: 'Folder child scopes have not been proven yet.',
-      bindingState: 'loading',
-      icon: 'loading'
-    },
-    {
-      scanState: 'scanning',
-      label: 'Probing folder child scopes',
-      detail: 'Folder child scopes are being probed.',
-      bindingState: 'loading',
-      icon: 'loading'
-    },
     {
       scanState: 'blocked',
       label: 'Folder child scopes blocked',
@@ -870,7 +840,7 @@ describe('projectState', () => {
       icon: 'warning'
     }
   ] as const)(
-    'projects unknown child-readiness with $scanState state visibly and without expansion',
+    'projects unresolved $scanState child-readiness visibly and without expansion',
     ({ scanState, label, detail, bindingState, icon }) => {
       const projection = projectTree(
         browserState({
@@ -915,7 +885,7 @@ describe('projectState', () => {
     }
   )
 
-  it('folder with unknown scope state ignores cached children without becoming leaf', () => {
+  it('folder with pending unknown scope state ignores cached children without pending disclosure', () => {
     const projection = projectTree(
       browserState({
         sourceChildren: loadedChildren([
@@ -942,9 +912,9 @@ describe('projectState', () => {
     )
     const node = requiredNode(projection.nodes, 'source-directory:12')
 
-    expect(node.children.kind).toBe('unknown')
+    expect(node.children.kind).toBe('none')
     expect(isBrowserTreeBranch(node)).toBe(false)
-    expect(isBrowserTreeLeaf(node)).toBe(false)
+    expect(isBrowserTreeLeaf(node)).toBe(true)
     expect(canRevealBrowserTreeChildren(node)).toBe(false)
     expect(projection.bindingsById.has('source-file:15')).toBe(false)
 
@@ -955,7 +925,7 @@ describe('projectState', () => {
 
     expect(childItemsFor(visibleItems, 'source-directory:12')).toEqual([])
     expect(visibleItems.find((item) => item.id === 'source-directory:12')?.childReadinessNode).toBe(
-      node.children.kind === 'unknown' ? node.children.stateNode : undefined
+      undefined
     )
   })
 
@@ -1199,10 +1169,10 @@ describe('projectState', () => {
       })
     )
     const unknownNode = requiredNode(unknownProjection.nodes, 'source-directory:12')
-    expect(unknownNode.children.kind).toBe('unknown')
+    expect(unknownNode.children.kind).toBe('none')
     expect(canRevealBrowserTreeChildren(unknownNode)).toBe(false)
     expect(isBrowserTreeBranch(unknownNode)).toBe(false)
-    expect(isBrowserTreeLeaf(unknownNode)).toBe(false)
+    expect(isBrowserTreeLeaf(unknownNode)).toBe(true)
 
     const branchProjection = projectTree(
       browserState({
@@ -1218,7 +1188,7 @@ describe('projectState', () => {
       })
     )
     const branchNode = requiredNode(branchProjection.nodes, 'source-directory:12')
-    expect(branchNode.children.kind).toBe('deferred')
+    expect(branchNode.children.kind).toBe('unmaterialized')
     expect(canRevealBrowserTreeChildren(branchNode)).toBe(true)
     expect(isBrowserTreeBranch(branchNode)).toBe(true)
 
@@ -1242,7 +1212,7 @@ describe('projectState', () => {
     )
     const node = requiredNode(projection.nodes, 'source-directory:12')
 
-    expect(node.children.kind).toBe('deferred')
+    expect(node.children.kind).toBe('unmaterialized')
     expect(canRevealBrowserTreeChildren(node)).toBe(true)
     expect(isBrowserTreeBranch(node)).toBe(true)
   })

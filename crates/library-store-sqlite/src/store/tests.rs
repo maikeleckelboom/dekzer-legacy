@@ -1467,6 +1467,93 @@ fn register_local_root_establishes_immediate_root_child_directories_before_scan(
 }
 
 #[test]
+fn scanned_literal_hierarchy_reads_persisted_children_without_filesystem_access() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let db_path = tempdir.path().join("library.sqlite3");
+    let root_path = tempdir.path().join("scanned-root");
+    fs::create_dir_all(root_path.join("artists").join("alpha")).expect("create nested folders");
+    fs::write(
+        root_path.join("artists").join("alpha").join("track.wav"),
+        b"not-real-wav",
+    )
+    .expect("write track");
+
+    let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
+    let root = expect_registered_root(
+        durable_store
+            .register_local_root(RegisterLocalRootInput {
+                requested_path: root_path.clone(),
+            })
+            .expect("register local root"),
+    );
+    let scan_started_at_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("current time after epoch")
+        .as_millis()
+        .try_into()
+        .expect("current time fits i64");
+    durable_store
+        .run_root_scan(root.root_id, scan_started_at_ms)
+        .expect("run real root scan");
+
+    fs::remove_dir_all(&root_path).expect("remove source folder after scan");
+
+    let root_window = durable_store
+        .read_literal_hierarchy_children(
+            StoreLiteralHierarchyEntryPoint::Source {
+                source_id: root.root_id,
+            },
+            None,
+            0,
+            50,
+            SourceFileClassFilter::PlayableMediaDirectories,
+        )
+        .expect("read persisted root hierarchy")
+        .expect("root hierarchy window");
+    assert_eq!(
+        root_window.coverage.state,
+        StoreLiteralHierarchyCoverageState::Complete
+    );
+    let artists = root_window
+        .rows
+        .iter()
+        .find(|row| row.display_name == "artists")
+        .expect("persisted root child directory");
+    assert_eq!(artists.node_kind, "directory");
+    assert_eq!(artists.parent_source_directory_id, None);
+    assert_eq!(artists.dir_scan_state.as_deref(), Some("complete"));
+    assert_eq!(artists.has_navigable_child_directories, Some(true));
+    let artists_id = artists
+        .source_directory_id
+        .expect("persisted source directory id");
+
+    let artists_window = durable_store
+        .read_literal_hierarchy_children(
+            StoreLiteralHierarchyEntryPoint::Source {
+                source_id: root.root_id,
+            },
+            Some(artists_id),
+            0,
+            50,
+            SourceFileClassFilter::PlayableMediaDirectories,
+        )
+        .expect("read persisted child hierarchy")
+        .expect("artists hierarchy window");
+    assert_eq!(
+        artists_window.coverage.state,
+        StoreLiteralHierarchyCoverageState::Complete
+    );
+    assert_eq!(
+        artists_window
+            .rows
+            .iter()
+            .map(|row| row.display_name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["alpha"]
+    );
+}
+
+#[test]
 fn empty_registration_writes_empty_root_navigation_state_without_marker_rows() {
     let tempdir = TempDir::new().expect("create tempdir");
     let db_path = tempdir.path().join("library.sqlite3");

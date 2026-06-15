@@ -319,7 +319,14 @@ fn repeated_empty_root_reads_do_not_refresh_established_navigation_window() {
         .as_ref()
         .expect("registered source root resolves to a hierarchy window");
     assert_eq!(first_window.total_rows, 0);
-    assert!(first_window.coverage.empty_result_authoritative);
+    assert_eq!(
+        first_window.coverage.state,
+        LibraryTreeCoverageState::Pending
+    );
+    assert!(
+        !first_window.coverage.empty_result_authoritative,
+        "registered tree reads do not promote pre-scan empty roots into authoritative scan coverage"
+    );
 
     fs::create_dir_all(empty_root.join("late-child")).expect("create child after establishment");
 
@@ -335,13 +342,13 @@ fn repeated_empty_root_reads_do_not_refresh_established_navigation_window() {
     );
     assert!(second_window.rows.is_empty());
     assert!(
-        second_window.coverage.empty_result_authoritative,
-        "empty remains authoritative for the already-established immediate window only"
+        !second_window.coverage.empty_result_authoritative,
+        "empty remains a persisted zero-row skeleton until scanner coverage completes"
     );
 }
 
 #[test]
-fn empty_registered_source_root_is_authoritative_empty_for_immediate_window_only() {
+fn empty_registered_source_root_is_pending_empty_until_scan_coverage_completes() {
     let tempdir = TempDir::new().expect("create tempdir");
     let empty_root = tempdir.path().join("empty-root");
     fs::create_dir_all(&empty_root).expect("create empty root");
@@ -366,13 +373,13 @@ fn empty_registered_source_root_is_authoritative_empty_for_immediate_window_only
         "an empty immediate root window must not claim recursive subtree completion"
     );
     assert!(
-        root_window.coverage.empty_result_authoritative,
-        "empty is authoritative only after the immediate root directory read succeeds"
+        !root_window.coverage.empty_result_authoritative,
+        "registered hierarchy disclosure must not synthesize authoritative empty coverage before scan"
     );
 }
 
 #[test]
-fn missing_registered_source_root_is_not_authoritative_empty() {
+fn unestablished_missing_registered_source_root_is_not_probed_by_tree_read() {
     let tempdir = TempDir::new().expect("create tempdir");
     let root_path = tempdir.path().join("missing-after-register");
     fs::create_dir_all(&root_path).expect("create root before registration");
@@ -390,7 +397,7 @@ fn missing_registered_source_root_is_not_authoritative_empty() {
 
     assert_eq!(
         root_window.coverage.state,
-        LibraryTreeCoverageState::LocationMissing
+        LibraryTreeCoverageState::Pending
     );
     assert!(!root_window.coverage.subtree_coverage_complete);
     assert!(!root_window.coverage.empty_result_authoritative);
@@ -398,7 +405,7 @@ fn missing_registered_source_root_is_not_authoritative_empty() {
 }
 
 #[test]
-fn blocked_registered_source_root_is_not_authoritative_empty() {
+fn unestablished_blocked_registered_source_root_is_not_probed_by_tree_read() {
     let tempdir = TempDir::new().expect("create tempdir");
     let root_path = tempdir.path().join("blocked-after-register");
     fs::create_dir_all(&root_path).expect("create root before registration");
@@ -417,7 +424,7 @@ fn blocked_registered_source_root_is_not_authoritative_empty() {
 
     assert_eq!(
         root_window.coverage.state,
-        LibraryTreeCoverageState::Blocked
+        LibraryTreeCoverageState::Pending
     );
     assert!(!root_window.coverage.subtree_coverage_complete);
     assert!(!root_window.coverage.empty_result_authoritative);
@@ -729,6 +736,75 @@ fn scanned_literal_hierarchy_survives_service_reopen() {
             "post-scan scope coverage must be complete",
         );
     }
+}
+
+#[test]
+fn registered_tree_children_are_served_from_persisted_scan_after_source_path_disappears() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let music_root = tempdir.path().join("music-root");
+    write_file(
+        &music_root
+            .join("artists")
+            .join("alpha")
+            .join("track_one.wav"),
+        b"not-real-wav",
+    );
+
+    let service = open_service(&tempdir);
+    let registered = register_root(&service, &music_root);
+    let scanned = start_scan(&service, registered.root_id);
+    assert!(scanned.scan_run_id > 0);
+
+    let completed = wait_for_scan_completion(&service, registered.root_id);
+    assert!(completed, "scan should complete on a small directory");
+
+    fs::remove_dir_all(&music_root).expect("remove source folder after scan");
+
+    let root_reply = read_library_tree(&service, registered.root_id, None);
+    let root_window = root_reply
+        .window
+        .as_ref()
+        .expect("registered source tree uses persisted root window");
+    assert_eq!(
+        root_window.coverage.state,
+        LibraryTreeCoverageState::Complete
+    );
+    let artists_dir = root_window
+        .rows
+        .iter()
+        .find(|row| row.display_name == "artists")
+        .expect("persisted root child directory");
+    assert_eq!(artists_dir.node_kind, LibraryTreeNodeKind::Directory);
+    assert_eq!(artists_dir.parent_source_directory_id, None);
+    assert_eq!(
+        artists_dir.directory_scan_state,
+        Some(DirectoryScanState::Complete)
+    );
+    assert_eq!(
+        artists_dir.navigable_child_scope_state,
+        Some(NavigableChildScopeState::HasNavigableChildScopes)
+    );
+    let artists_dir_id = artists_dir
+        .source_directory_id
+        .expect("artists directory has persisted id");
+
+    let artists_reply = read_library_tree(&service, registered.root_id, Some(artists_dir_id));
+    let artists_window = artists_reply
+        .window
+        .as_ref()
+        .expect("registered child folder tree uses persisted window");
+    assert_eq!(
+        artists_window.coverage.state,
+        LibraryTreeCoverageState::Complete
+    );
+    assert_eq!(
+        artists_window
+            .rows
+            .iter()
+            .map(|row| row.display_name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["alpha"]
+    );
 }
 
 #[test]

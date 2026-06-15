@@ -51,6 +51,7 @@ export function canRevealBrowserTreeChildren(node: BrowserTreeNode): boolean {
     case 'none':
     case 'unknown':
       return false
+    case 'unmaterialized':
     case 'deferred':
     case 'loading':
     case 'failed':
@@ -64,6 +65,7 @@ export function getBrowserTreeChildRows(node: BrowserTreeNode): readonly Browser
   switch (node.children.kind) {
     case 'none':
     case 'unknown':
+    case 'unmaterialized':
       return []
     case 'deferred':
     case 'loading':

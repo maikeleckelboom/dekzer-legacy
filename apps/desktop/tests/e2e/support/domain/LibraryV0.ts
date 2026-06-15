@@ -133,6 +133,18 @@ export class LibraryV0 {
     await this.panel.contents.expectRowsHidden([source.rootTrack, source.nestedTrack])
   }
 
+  async expectPersistedHierarchyDisclosure(source: LibraryV0GoldenSource): Promise<void> {
+    await this.panel.openLibraryBrowseIfNeeded()
+    await this.panel.browse.expand(source.sourceName)
+    await this.panel.browse.expectNoRegisteredHierarchyPendingRows()
+    await expect(this.panel.browse.item(/nested\b/i)).toBeVisible()
+    await expect(this.panel.browse.item(/descendants-only\b/i)).toBeVisible()
+
+    await this.panel.browse.expand(/descendants-only\b/i)
+    await this.panel.browse.expectNoRegisteredHierarchyPendingRows()
+    await expect(this.panel.browse.item(/deeper\b/i)).toBeVisible()
+  }
+
   async expectNestedFolderContents(source: LibraryV0GoldenSource): Promise<void> {
     await this.panel.openLibraryBrowseIfNeeded()
     await this.panel.browse.expand(source.sourceName)

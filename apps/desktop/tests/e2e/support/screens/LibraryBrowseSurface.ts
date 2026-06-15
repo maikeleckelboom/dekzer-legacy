@@ -26,6 +26,15 @@ export class LibraryBrowseSurface {
     await expect(this.item(sourceName)).toHaveCount(0)
   }
 
+  async expectNoRegisteredHierarchyPendingRows(): Promise<void> {
+    await expect(
+      this.root.getByRole('treeitem').filter({
+        hasText:
+          /Loading children|Loading literal hierarchy children|Contents pending|Folder child scopes pending|Probing folder child scopes/i
+      })
+    ).toHaveCount(0)
+  }
+
   async select(name: string | RegExp): Promise<void> {
     await this.item(name).click()
   }
