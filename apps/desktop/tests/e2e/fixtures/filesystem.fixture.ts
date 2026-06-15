@@ -2,12 +2,23 @@ import { test as base, expect } from '@playwright/test'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 
+export type LibrarySourceAFixture = {
+  readonly rootPath: string
+  readonly rootTrackPath: string
+  readonly nestedTrackPath: string
+  readonly descendantOnlyTrackPath: string
+  readonly coverPath: string
+  readonly readmePath: string
+  readonly emptyPath: string
+}
+
 export type LibraryFilesystem = {
   readonly rootDir: string
   readonly userDataPath: string
   readonly mediaRootPath: string
   readonly albumPath: string
   readonly audioFilePath: string
+  readonly sourceA: LibrarySourceAFixture
   readonly createTinyWav: (path: string) => Promise<void>
 }
 
@@ -24,10 +35,12 @@ export const test = base.extend<FilesystemFixtures>({
     const mediaRootPath = join(rootDir, 'media')
     const albumPath = join(mediaRootPath, 'Album A')
     const audioFilePath = join(albumPath, '01-tone.wav')
+    const sourceA = sourceAFixture(mediaRootPath)
 
     await rm(rootDir, { recursive: true, force: true })
     await mkdir(albumPath, { recursive: true })
     await createTinyWav(audioFilePath)
+    await createSourceAFixture(sourceA)
 
     await use({
       rootDir,
@@ -35,6 +48,7 @@ export const test = base.extend<FilesystemFixtures>({
       mediaRootPath,
       albumPath,
       audioFilePath,
+      sourceA,
       createTinyWav
     })
   }
@@ -45,6 +59,30 @@ export { expect }
 async function createTinyWav(path: string): Promise<void> {
   await mkdir(dirname(path), { recursive: true })
   await writeFile(path, tinyWavBuffer())
+}
+
+async function createSourceAFixture(sourceA: LibrarySourceAFixture): Promise<void> {
+  await createTinyWav(sourceA.rootTrackPath)
+  await createTinyWav(sourceA.nestedTrackPath)
+  await createTinyWav(sourceA.descendantOnlyTrackPath)
+  await mkdir(dirname(sourceA.coverPath), { recursive: true })
+  await writeFile(sourceA.coverPath, tinyJpegBuffer())
+  await writeFile(sourceA.readmePath, 'Generated Library V0 smoke fixture.\n')
+  await mkdir(sourceA.emptyPath, { recursive: true })
+}
+
+function sourceAFixture(mediaRootPath: string): LibrarySourceAFixture {
+  const rootPath = join(mediaRootPath, 'source-a')
+
+  return {
+    rootPath,
+    rootTrackPath: join(rootPath, 'Root Track A.wav'),
+    nestedTrackPath: join(rootPath, 'nested', 'Nested Track A.wav'),
+    descendantOnlyTrackPath: join(rootPath, 'descendants-only', 'deeper', 'Descendant Only A.wav'),
+    coverPath: join(rootPath, 'mixed', 'cover.jpg'),
+    readmePath: join(rootPath, 'mixed', 'readme.txt'),
+    emptyPath: join(rootPath, 'empty')
+  }
 }
 
 function tinyWavBuffer(): Buffer {
@@ -77,4 +115,19 @@ function tinyWavBuffer(): Buffer {
   }
 
   return buffer
+}
+
+function tinyJpegBuffer(): Buffer {
+  return Buffer.from([
+    0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x01, 0x00, 0x48,
+    0x00, 0x48, 0x00, 0x00, 0xff, 0xdb, 0x00, 0x43, 0x00, 0x03, 0x02, 0x02, 0x03, 0x02, 0x02, 0x03,
+    0x03, 0x03, 0x03, 0x04, 0x03, 0x03, 0x04, 0x05, 0x08, 0x05, 0x05, 0x04, 0x04, 0x05, 0x0a, 0x07,
+    0x07, 0x06, 0x08, 0x0c, 0x0a, 0x0c, 0x0c, 0x0b, 0x0a, 0x0b, 0x0b, 0x0d, 0x0e, 0x12, 0x10, 0x0d,
+    0x0e, 0x11, 0x0e, 0x0b, 0x0b, 0x10, 0x16, 0x10, 0x11, 0x13, 0x14, 0x15, 0x15, 0x15, 0x0c, 0x0f,
+    0x17, 0x18, 0x16, 0x14, 0x18, 0x12, 0x14, 0x15, 0x14, 0xff, 0xc0, 0x00, 0x0b, 0x08, 0x00, 0x01,
+    0x00, 0x01, 0x01, 0x01, 0x11, 0x00, 0xff, 0xc4, 0x00, 0x14, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07, 0xff, 0xc4, 0x00, 0x14,
+    0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0xff, 0xda, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3f, 0x00, 0x7f, 0xff, 0xd9
+  ])
 }

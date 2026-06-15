@@ -12,4 +12,18 @@ export class LibraryTree {
   item(name: string | RegExp): Locator {
     return this.root.getByRole('treeitem', { name })
   }
+
+  async select(name: string | RegExp): Promise<void> {
+    await this.item(name).click()
+  }
+
+  async expand(name: string | RegExp): Promise<void> {
+    const item = this.item(name)
+
+    if ((await item.getAttribute('aria-expanded')) === 'true') {
+      return
+    }
+
+    await item.getByRole('button', { name: 'Expand' }).click()
+  }
 }

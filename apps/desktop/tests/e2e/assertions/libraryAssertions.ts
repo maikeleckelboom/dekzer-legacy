@@ -21,3 +21,23 @@ export async function expectAddSourceSurfaceVisible(libraryPanel: LibraryPanel):
     libraryPanel.root.getByRole('button', { name: 'Add music folder' }).first()
   ).toBeVisible()
 }
+
+export async function expectLibraryBrowseSurfaceVisible(libraryPanel: LibraryPanel): Promise<void> {
+  await expect(libraryPanel.title).toHaveText('Library Browse')
+  await expect(libraryPanel.tree.root).toBeVisible()
+}
+
+export async function expectAdmittedSourceVisible(
+  libraryPanel: LibraryPanel,
+  sourceName: string | RegExp
+): Promise<void> {
+  await expectLibraryBrowseSurfaceVisible(libraryPanel)
+  await expect(libraryPanel.tree.item(sourceName)).toBeVisible()
+}
+
+export async function expectAdmittedSourceHidden(
+  libraryPanel: LibraryPanel,
+  sourceName: string | RegExp
+): Promise<void> {
+  await expect(libraryPanel.tree.item(sourceName)).toHaveCount(0)
+}
