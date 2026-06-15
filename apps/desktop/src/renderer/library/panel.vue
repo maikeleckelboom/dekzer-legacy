@@ -1458,7 +1458,8 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
 <template>
   <section
     class="flex h-[80svh] min-h-0 flex-col overflow-hidden border border-(--color-border) bg-(--color-surface)"
-    aria-labelledby="library-hierarchy-title"
+    role="region"
+    aria-label="Library panel"
   >
     <header class="flex shrink-0 items-center justify-between gap-4">
       <h2 id="library-hierarchy-title" class="text-xl font-bold leading-none text-(--color-text)">

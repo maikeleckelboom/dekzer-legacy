@@ -1,0 +1,22 @@
+import { defineConfig } from '@playwright/test'
+
+export default defineConfig({
+  testDir: './tests/e2e/specs',
+  outputDir: './.tmp-tests/e2e-output',
+  timeout: 60_000,
+  fullyParallel: false,
+  workers: 1,
+  retries: process.env.CI ? 1 : 0,
+  reporter: process.env.CI
+    ? [['list'], ['html', { outputFolder: './.tmp-tests/playwright-report', open: 'never' }]]
+    : [['list']],
+  use: {
+    actionTimeout: 10_000,
+    navigationTimeout: 30_000,
+    screenshot: 'only-on-failure',
+    trace: 'on-first-retry'
+  },
+  expect: {
+    timeout: 10_000
+  }
+})
