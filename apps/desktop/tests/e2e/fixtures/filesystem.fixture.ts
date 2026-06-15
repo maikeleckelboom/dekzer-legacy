@@ -1,5 +1,5 @@
 import { test as base, expect } from '@playwright/test'
-import { mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 
 export type LibrarySourceAFixture = {
@@ -26,6 +26,8 @@ export type LibraryFilesystem = {
   readonly sourceA: LibrarySourceAFixture
   readonly sourceB: LibrarySourceBFixture
   readonly createTinyWav: (path: string) => Promise<void>
+  readonly moveSourceOffline: (sourceRootPath: string) => Promise<string>
+  readonly restoreOfflineSource: (sourceRootPath: string, offlinePath: string) => Promise<void>
 }
 
 export type FilesystemFixtures = {
@@ -58,7 +60,9 @@ export const test = base.extend<FilesystemFixtures>({
       audioFilePath,
       sourceA,
       sourceB,
-      createTinyWav
+      createTinyWav,
+      moveSourceOffline,
+      restoreOfflineSource
     })
   }
 })
@@ -82,6 +86,22 @@ async function createSourceAFixture(sourceA: LibrarySourceAFixture): Promise<voi
 
 async function createSourceBFixture(sourceB: LibrarySourceBFixture): Promise<void> {
   await createTinyWav(sourceB.rootTrackPath)
+}
+
+async function moveSourceOffline(sourceRootPath: string): Promise<string> {
+  const offlinePath = `${sourceRootPath}.offline`
+
+  await rm(offlinePath, { recursive: true, force: true })
+  await mkdir(dirname(offlinePath), { recursive: true })
+  await rename(sourceRootPath, offlinePath)
+
+  return offlinePath
+}
+
+async function restoreOfflineSource(sourceRootPath: string, offlinePath: string): Promise<void> {
+  await rm(sourceRootPath, { recursive: true, force: true })
+  await mkdir(dirname(sourceRootPath), { recursive: true })
+  await rename(offlinePath, sourceRootPath)
 }
 
 function sourceAFixture(mediaRootPath: string): LibrarySourceAFixture {

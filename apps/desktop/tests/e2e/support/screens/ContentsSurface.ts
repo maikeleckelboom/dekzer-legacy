@@ -43,6 +43,20 @@ export class ContentsSurface {
     }
   }
 
+  async expectRowsAbsentOrMarkedUnavailable(names: readonly (string | RegExp)[]): Promise<void> {
+    for (const name of names) {
+      const row = this.row(name)
+
+      if ((await row.count()) === 0 || !(await row.first().isVisible())) {
+        continue
+      }
+
+      await expect(row.first()).toContainText(
+        /Missing|Removed|Unavailable|File missing|File removed/
+      )
+    }
+  }
+
   async expectAuthoritativeEmpty(): Promise<void> {
     await expect(
       this.row(

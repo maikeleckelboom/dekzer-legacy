@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test'
+import { expect, type Page } from '@playwright/test'
 
 import type { DialogHelpers } from '../../fixtures/dialogs.fixture'
 import type { ElectronAppHarness } from '../../fixtures/electronApp.fixture'
@@ -34,6 +34,12 @@ export class LibraryV0 {
     await this.panel.contents.expectVisible()
   }
 
+  async expectLibraryReady(): Promise<void> {
+    await this.probe.waitForPreloadApi()
+    await this.panel.expectVisible()
+    await this.panel.contents.expectVisible()
+  }
+
   async openAddSource(): Promise<void> {
     await this.panel.openAddSourceIfNeeded()
     await this.panel.expectAddSourceSurfaceVisible()
@@ -51,6 +57,21 @@ export class LibraryV0 {
     await this.panel.browse.expectSourceVisible(source.sourceName)
 
     return { ...source, sourceId }
+  }
+
+  async expectAdmittedSourcePresent<Source extends LibraryV0Source>(
+    source: Source
+  ): Promise<LibraryV0AdmittedSource<Source>> {
+    const sourceId = await this.probe.waitForAdmittedPath(source.rootPath)
+
+    await this.panel.openLibraryBrowseIfNeeded()
+    await this.panel.browse.expectSourceVisible(source.sourceName)
+
+    return { ...source, sourceId }
+  }
+
+  async expectSingleAdmittedPath(source: LibraryV0Source): Promise<void> {
+    await this.probe.waitForSingleAdmittedPath(source.rootPath)
   }
 
   async expectSourceReady(source: LibraryV0AdmittedSource<LibraryV0Source>): Promise<void> {
@@ -112,6 +133,15 @@ export class LibraryV0 {
     await this.panel.contents.expectRowsHidden([source.rootTrack, source.nestedTrack])
   }
 
+  async expectNestedFolderContents(source: LibraryV0GoldenSource): Promise<void> {
+    await this.panel.openLibraryBrowseIfNeeded()
+    await this.panel.browse.expand(source.sourceName)
+    await this.panel.browse.select(/nested\b/i)
+    await this.panel.contents.expectTitle(/nested\b/i)
+    await this.panel.contents.expectRowsVisible([source.nestedTrack])
+    await this.panel.contents.expectRowsHidden([source.rootTrack, source.descendantOnlyTrack])
+  }
+
   async expectBrowseProfileFiltering(source: LibraryV0GoldenSource): Promise<void> {
     await this.panel.browse.select(source.sourceName)
 
@@ -125,6 +155,36 @@ export class LibraryV0 {
       source.coverImage,
       source.readmeText
     ])
+  }
+
+  async selectSource(source: LibraryV0Source): Promise<void> {
+    await this.panel.openLibraryBrowseIfNeeded()
+    await this.panel.browse.select(source.sourceName)
+  }
+
+  async expandSource(source: LibraryV0Source): Promise<void> {
+    await this.panel.openLibraryBrowseIfNeeded()
+    await this.panel.browse.expand(source.sourceName)
+  }
+
+  async selectNestedFolder(source: LibraryV0GoldenSource): Promise<void> {
+    await this.expandSource(source)
+    await this.panel.browse.select(/nested\b/i)
+  }
+
+  async selectAllFilesProfile(): Promise<void> {
+    await this.panel.selectBrowseProfile('All Files')
+  }
+
+  async expectAllFilesProfileSelected(): Promise<void> {
+    await this.panel.profileMenu.expectSelected('All Files')
+  }
+
+  async expectRestoredNestedFolderState(source: LibraryV0GoldenSource): Promise<void> {
+    await this.panel.openLibraryBrowseIfNeeded()
+    await this.panel.contents.expectTitle(/nested\b/i)
+    await this.panel.contents.expectRowsVisible([source.nestedTrack])
+    await this.expectAllFilesProfileSelected()
   }
 
   async expectEmptyFolderState(source: LibraryV0GoldenSource): Promise<void> {
@@ -146,8 +206,44 @@ export class LibraryV0 {
     await this.panel.expectAddSourceSurfaceVisible()
     await this.panel.contents.expectRowsVisible([/Suggested folders/])
 
-    await this.panel.openLibraryBrowseIfNeeded()
+    await expect(this.panel.libraryBrowseButton).toHaveCount(0)
     await this.panel.browse.expectSourceHidden(source.sourceName)
+  }
+
+  async expectRemovedSourceContentsInactive(source: LibraryV0GoldenSource): Promise<void> {
+    await this.panel.contents.expectRowsHidden([
+      source.rootTrack,
+      source.nestedTrack,
+      source.descendantOnlyTrack,
+      source.coverImage,
+      source.readmeText
+    ])
+  }
+
+  async expectSourceHealthUnavailable(
+    source: LibraryV0AdmittedSource<LibraryV0Source>
+  ): Promise<void> {
+    await this.panel.openLibraryBrowseIfNeeded()
+    await this.panel.browse.select(source.sourceName)
+    await this.probe.waitForUnavailableSource(source.sourceId)
+    await this.panel.sourceStatus.expectVisible()
+    await this.panel.sourceStatus.expectMissingOrUnavailable()
+    await this.panel.sourceStatus.expectActionEnabled('Refresh status')
+    await this.panel.sourceStatus.expectActionHiddenOrDisabled(/^(Scan source|Rescan source)$/)
+  }
+
+  async expectUnavailableSourceDoesNotShowFalseCompleteRows(
+    source: LibraryV0AdmittedSource<LibraryV0Source>
+  ): Promise<void> {
+    await this.panel.contents.expectRowsAbsentOrMarkedUnavailable(source.audioRows)
+  }
+
+  async refreshSelectedSourceStatus(): Promise<void> {
+    await this.panel.sourceStatus.refreshStatus()
+  }
+
+  async runSelectedSourceScanIfAvailable(): Promise<void> {
+    await this.panel.sourceStatus.runScanIfAvailable()
   }
 
   async expectSourceAbsentAfterRelaunch(source: LibraryV0GoldenSource): Promise<void> {
@@ -156,6 +252,18 @@ export class LibraryV0 {
     await this.probe.waitForSourcePathForgotten(source.rootPath)
     await this.panel.openLibraryBrowseIfNeeded()
     await this.panel.browse.expectSourceHidden(source.sourceName)
+  }
+
+  async closeGracefully(): Promise<void> {
+    await expect(this.options.electronApp.close()).resolves.toMatchObject({
+      graceful: true,
+      killed: false,
+      timedOut: false
+    })
+  }
+
+  async relaunch(): Promise<void> {
+    this.bindPage(await this.options.electronApp.relaunch())
   }
 
   private bindPage(page: Page): void {

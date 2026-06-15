@@ -37,6 +37,34 @@ export class SourceStatusSurface {
     await expect(this.root).not.toContainText(/Scanning source|Indexing|Still indexing|Needs scan/)
   }
 
+  async expectBadge(name: string | RegExp): Promise<void> {
+    await expect(this.root.getByText(name, { exact: typeof name === 'string' })).toBeVisible()
+  }
+
+  async expectNoReadyBadge(): Promise<void> {
+    await expect(this.root.getByText('Ready', { exact: true })).toHaveCount(0)
+  }
+
+  async expectMissingOrUnavailable(): Promise<void> {
+    await expect(this.root.getByText(/Missing|Offline\/unavailable|Blocked|Partial/)).toBeVisible()
+    await this.expectNoReadyBadge()
+  }
+
+  async expectActionEnabled(name: string | RegExp): Promise<void> {
+    await expect(this.action(name).first()).toBeVisible()
+    await expect(this.action(name).first()).toBeEnabled()
+  }
+
+  async expectActionHiddenOrDisabled(name: string | RegExp): Promise<void> {
+    const action = this.action(name)
+
+    if ((await action.count()) === 0 || !(await action.first().isVisible())) {
+      return
+    }
+
+    await expect(action.first()).toBeDisabled()
+  }
+
   async runScanIfAvailable(): Promise<void> {
     const scan = this.action(/^(Scan source|Rescan source)$/)
 
@@ -49,6 +77,11 @@ export class SourceStatusSurface {
     }
 
     await scan.first().click()
+  }
+
+  async refreshStatus(): Promise<void> {
+    await this.expectActionEnabled('Refresh status')
+    await this.action('Refresh status').click()
   }
 
   async removeSourceWithConfirmation(): Promise<void> {

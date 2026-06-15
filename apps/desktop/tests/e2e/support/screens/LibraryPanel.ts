@@ -27,7 +27,7 @@ export class LibraryPanel {
   constructor(page: Page) {
     this.root = region(page, 'Library panel')
     this.title = this.root.getByRole('heading', { level: 2 })
-    this.addSourceButton = button(this.root, 'Add Source')
+    this.addSourceButton = button(this.root, 'Add Source').first()
     this.libraryBrowseButton = button(this.root, 'Library Browse')
     this.indexedContentsViewButton = button(this.root, 'Indexed contents view')
     this.addSource = new AddSourceSurface(this.root)
@@ -76,7 +76,18 @@ export class LibraryPanel {
 
   async openLibraryBrowseIfNeeded(): Promise<void> {
     if (await this.libraryBrowseButton.isVisible()) {
-      await this.libraryBrowseButton.click()
+      await this.libraryBrowseButton.click({ timeout: 5_000 }).catch(async (error: unknown) => {
+        if ((await this.title.textContent().catch(() => undefined)) === 'Library Browse') {
+          return
+        }
+
+        if (await this.libraryBrowseButton.isVisible()) {
+          await this.libraryBrowseButton.click({ timeout: 5_000 })
+          return
+        }
+
+        throw error
+      })
     }
   }
 
