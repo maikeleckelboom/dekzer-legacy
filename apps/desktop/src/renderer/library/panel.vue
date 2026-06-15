@@ -1281,14 +1281,33 @@ async function refreshSelectedSourceStatus(): Promise<boolean> {
 }
 
 async function refreshSourceStatus(sourceId: string): Promise<boolean> {
-  const [lifecycle, integrity, maintenance, activity] = await Promise.all([
+  const [localRoots, lifecycle, integrity, maintenance, activity] = await Promise.all([
+    refreshLocalRootAvailabilityForSourceStatus(sourceId),
     sourceLifecycleRead.readSourceLifecycle(sourceId, { force: true }),
     integrityRead.read(sourceId, { force: true }),
     maintenanceRead.read(sourceId, { force: true }),
     activityRead.read(sourceId, { force: true })
   ])
 
-  return lifecycle && integrity && maintenance && activity
+  const statusRefreshed = localRoots && lifecycle && integrity && maintenance && activity
+  if (statusRefreshed && selectedStatusSourceId.value === sourceId) {
+    await refreshContentsForCurrentSelection()
+  }
+
+  return statusRefreshed
+}
+
+async function refreshLocalRootAvailabilityForSourceStatus(sourceId: string): Promise<boolean> {
+  const matchedCurrentRoot = await rootLifecycle.hydrateLocalRoots().catch(() => false)
+  if (matchedCurrentRoot) {
+    return true
+  }
+
+  const localRootsReadState = rootActions.localRootsReadState.value
+  return (
+    localRootsReadState.kind === 'ready' &&
+    localRootsReadState.roots.some((root) => root.rootId === sourceId)
+  )
 }
 
 function invalidateSourceStatus(sourceId: string): void {

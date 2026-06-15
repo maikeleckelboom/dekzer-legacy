@@ -624,8 +624,7 @@ impl SqliteDurableStore {
         self.sync_root_projection_state(root_ids)
     }
 
-    #[allow(dead_code)]
-    pub(crate) fn refresh_root_availability_from_filesystem(&self) -> LibrarySqliteResult<()> {
+    pub fn refresh_root_availability_from_filesystem(&self) -> LibrarySqliteResult<bool> {
         let connection = open_connection(&self.path)?;
         let mut statement = connection.prepare(
             "SELECT source_id
@@ -636,16 +635,56 @@ impl SqliteDurableStore {
         let root_ids = statement
             .query_map([], |row| row.get::<_, i64>(0))?
             .collect::<Result<Vec<_>, _>>()?;
-        let refreshed_at_ms = unix_time_ms()?;
 
+        self.refresh_absolute_path_root_ids_from_filesystem(&root_ids)
+    }
+
+    pub fn refresh_root_availability_from_filesystem_for_root(
+        &self,
+        root_id: i64,
+    ) -> LibrarySqliteResult<bool> {
+        let connection = open_connection(&self.path)?;
+        let absolute_path_root_id = connection
+            .query_row(
+                "SELECT source_id
+                 FROM source_locators
+                 WHERE source_id = ?1
+                   AND locator_kind = 'absolute_path'",
+                [root_id],
+                |row| row.get::<_, i64>(0),
+            )
+            .optional()?;
+        let Some(root_id) = absolute_path_root_id else {
+            return Ok(false);
+        };
+
+        self.refresh_absolute_path_root_ids_from_filesystem(&[root_id])
+    }
+
+    fn refresh_absolute_path_root_ids_from_filesystem(
+        &self,
+        root_ids: &[i64],
+    ) -> LibrarySqliteResult<bool> {
+        let root_ids = dedup_ids(root_ids);
+        if root_ids.is_empty() {
+            return Ok(false);
+        }
+
+        let refreshed_at_ms = unix_time_ms()?;
+        let mut changed = false;
         self.with_source_lifecycle_tx(|tx| {
             for root_id in &root_ids {
-                tx.refresh_absolute_path_root(*root_id, refreshed_at_ms)?;
+                changed |= tx.refresh_absolute_path_root(*root_id, refreshed_at_ms)?;
             }
 
             Ok(())
         })?;
-        self.sync_root_projection_state(&root_ids)
+
+        if changed {
+            self.sync_root_projection_state(&root_ids)?;
+        }
+
+        Ok(changed)
     }
 
     pub fn establish_root_navigation_window(

@@ -599,30 +599,12 @@ pub(crate) fn read_contents(
     };
 
     if let Some((state, coverage_state, detail)) = source_unavailable_state(&source_readiness) {
-        let rows = read_rows(
-            connection,
-            &resolved_scope,
-            &policy,
-            scope_depth,
-            limit,
-            cursor_position.as_ref(),
-        )?;
-        let next_cursor = if rows.len() > limit {
-            build_next_cursor(&rows[..limit], &scope, &policy, scope_depth)
-        } else {
-            None
-        };
-        let rows = if rows.len() > limit {
-            rows[..limit].to_vec()
-        } else {
-            rows
-        };
         return Ok(StoreContentsResult {
             state,
             scope,
             policy,
             scope_depth,
-            rows,
+            rows: Vec::new(),
             scope_coverage: StoreContentsScopeCoverage {
                 state: coverage_state,
                 subtree_coverage_complete: false,
@@ -630,7 +612,7 @@ pub(crate) fn read_contents(
                 detail: Some(detail.to_string()),
             },
             has_policy_omitted_rows: false,
-            next_cursor,
+            next_cursor: None,
             detail: Some(detail.to_string()),
         });
     }
@@ -2989,6 +2971,46 @@ mod tests {
             StoreContentsScopeCoverageState::LocationMissing
         );
         assert!(result.rows.is_empty());
+        assert!(!result.scope_coverage.empty_result_authoritative);
+    }
+
+    #[test]
+    fn missing_source_root_suppresses_retained_media_rows() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        insert_promoted_media_file(
+            &connection,
+            1,
+            20,
+            1,
+            10,
+            "Music/Root Track.wav",
+            "audio",
+            "Root",
+        );
+        set_source_access(&connection, 1, "missing", Some("missing"));
+
+        let result = read_contents(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            audio_browse_policy(),
+            StoreContentsScopeDepth::Recursive,
+            10,
+            None,
+        )
+        .expect("read missing source contents");
+
+        assert_eq!(result.state, StoreContentsState::LocationMissing);
+        assert_eq!(
+            result.scope_coverage.state,
+            StoreContentsScopeCoverageState::LocationMissing
+        );
+        assert!(
+            result.rows.is_empty(),
+            "missing source contents must not expose retained media rows as browseable"
+        );
+        assert_eq!(result.next_cursor, None);
         assert!(!result.scope_coverage.empty_result_authoritative);
     }
 

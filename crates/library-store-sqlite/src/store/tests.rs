@@ -1,9 +1,9 @@
 use super::discovery::{RootScanHierarchyObservationReason, RootScanObservation};
 use super::{
     DurableStoreBootstrapStatus, DurableStoreSchemaCompatibilityState, LocalRoot,
-    LocalRootAdmissionVisibility, RegisterLocalRootInput, RegisterLocalRootResult,
-    RootNavigationWindowEstablishmentState, SourceRegistrationRootClass, SqliteDurableStore,
-    UnregisterLocalRootInput,
+    LocalRootAdmissionVisibility, LocalRootAvailability, RegisterLocalRootInput,
+    RegisterLocalRootResult, RootNavigationWindowEstablishmentState, SourceRegistrationRootClass,
+    SqliteDurableStore, UnregisterLocalRootInput,
 };
 use crate::authority::ingest::{DiscoveredFileInput, DiscoveryBatch};
 use crate::authority::roots::{
@@ -1061,6 +1061,68 @@ fn register_local_root_initializes_lifecycle_side_rows() {
         SourceAccessState::Accessible.as_str()
     );
     assert_eq!(lifecycle.scan_phase, SourceScanPhase::Idle.as_str());
+}
+
+#[test]
+fn root_availability_refresh_marks_missing_and_restored_paths_without_removing_source() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let db_path = tempdir.path().join("library.sqlite3");
+    let source_root = tempdir.path().join("music-root");
+    fs::create_dir_all(&source_root).expect("create source root");
+
+    let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
+    let registered = expect_registered_root(
+        durable_store
+            .register_local_root(RegisterLocalRootInput {
+                requested_path: source_root.clone(),
+            })
+            .expect("register local root"),
+    );
+
+    fs::remove_dir_all(&source_root).expect("move source root offline");
+    assert!(
+        durable_store
+            .refresh_root_availability_from_filesystem()
+            .expect("refresh missing source availability"),
+        "missing source refresh should change stored availability"
+    );
+
+    let offline_roots = durable_store
+        .read_local_roots()
+        .expect("read offline local roots");
+    assert_eq!(offline_roots.roots.len(), 1);
+    assert_eq!(offline_roots.roots[0].root_id, registered.root_id);
+    assert_eq!(
+        offline_roots.roots[0].availability,
+        LocalRootAvailability::Unavailable
+    );
+    let offline_lifecycle = durable_store
+        .read_source_lifecycle(registered.root_id)
+        .expect("read offline source lifecycle")
+        .expect("offline source remains known");
+    assert_eq!(offline_lifecycle.access_state, "missing");
+
+    fs::create_dir_all(&source_root).expect("restore source root");
+    assert!(
+        durable_store
+            .refresh_root_availability_from_filesystem_for_root(registered.root_id)
+            .expect("refresh restored source availability"),
+        "restored source refresh should change stored availability"
+    );
+
+    let restored_roots = durable_store
+        .read_local_roots()
+        .expect("read restored local roots");
+    assert_eq!(restored_roots.roots.len(), 1);
+    assert_eq!(
+        restored_roots.roots[0].availability,
+        LocalRootAvailability::Available
+    );
+    let restored_lifecycle = durable_store
+        .read_source_lifecycle(registered.root_id)
+        .expect("read restored source lifecycle")
+        .expect("restored source remains known");
+    assert_eq!(restored_lifecycle.access_state, "accessible");
 }
 
 #[test]

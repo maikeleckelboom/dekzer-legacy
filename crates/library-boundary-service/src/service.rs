@@ -141,6 +141,9 @@ impl LibraryBoundaryService {
         local_browse_entry_point_resolver: Arc<dyn LocalBrowseEntryPointResolver>,
         local_browse_item_reader: Arc<dyn LocalBrowseItemReader>,
     ) -> protocol::ProtocolResult<Self> {
+        durable_store
+            .refresh_root_availability_from_filesystem()
+            .map_err(map_store_error)?;
         let initial_revisions = durable_store
             .read_maintained_read_model_revisions()
             .map_err(map_store_error)?;
@@ -291,6 +294,7 @@ impl LibraryBoundaryService {
         request: protocol::StartRootScanRequest,
     ) -> protocol::ProtocolResult<protocol::StartRootScanReply> {
         let root_id = require_positive_i64(request.root_id, "rootId")?;
+        self.refresh_root_availability(root_id)?;
         let scan_started_at_ms = unix_time_ms()?;
 
         let mut registry = self.scan_registry.lock().expect("scan registry poisoned");
@@ -495,6 +499,7 @@ impl LibraryBoundaryService {
         &self,
         request: protocol::ReadNavigationRowsRequest,
     ) -> protocol::ProtocolResult<protocol::ReadNavigationRowsReply> {
+        self.refresh_all_root_availability()?;
         let rows = self
             .durable_store
             .read_navigation_rows(request.parent_navigation_row_id)
@@ -528,6 +533,7 @@ impl LibraryBoundaryService {
         &self,
         request: protocol::ReadLibraryTreeChildrenRequest,
     ) -> protocol::ProtocolResult<protocol::ReadLibraryTreeChildrenReply> {
+        self.refresh_root_availability_for_tree_entry_point(&request.entry_point)?;
         let root_navigation_window_establishment =
             root_navigation_window_establishment_target(&request)
                 .map(|source_id| {
@@ -558,6 +564,7 @@ impl LibraryBoundaryService {
         request: protocol::ReadSourceLifecycleRequest,
     ) -> protocol::ProtocolResult<protocol::ReadSourceLifecycleReply> {
         let source_id = require_positive_i64(request.source_id, "sourceId")?;
+        self.refresh_root_availability(source_id)?;
         let lifecycle = self
             .durable_store
             .read_source_lifecycle(source_id)
@@ -570,6 +577,7 @@ impl LibraryBoundaryService {
         request: protocol::ReadSourceIntegrityRequest,
     ) -> protocol::ProtocolResult<protocol::ReadSourceIntegrityReply> {
         let source_id = require_positive_i64(request.source_id, "sourceId")?;
+        self.refresh_root_availability(source_id)?;
         let source_integrity = self
             .durable_store
             .read_source_integrity(source_id)
@@ -658,6 +666,7 @@ impl LibraryBoundaryService {
     ) -> protocol::ProtocolResult<protocol::ContentsReadReply> {
         validate_contents_scope(&request.scope)?;
         validate_contents_policy(&request.policy)?;
+        self.refresh_root_availability_for_contents_scope(&request.scope)?;
         let limit = request.limit.unwrap_or(100);
         validate_contents_limit(limit)?;
         let result = self
@@ -818,6 +827,7 @@ impl LibraryBoundaryService {
         request: protocol::ReadSourceActivityRequest,
     ) -> protocol::ProtocolResult<protocol::ReadSourceActivityReply> {
         let source_id = require_positive_i64(request.source_id, "sourceId")?;
+        self.refresh_root_availability(source_id)?;
         let source_integrity = self
             .durable_store
             .read_source_integrity(source_id)
@@ -843,6 +853,7 @@ impl LibraryBoundaryService {
     }
 
     pub fn read_local_roots(&self) -> protocol::ProtocolResult<protocol::ReadLocalRootsReply> {
+        self.refresh_all_root_availability()?;
         let ReadLocalRootsResult { roots } = self
             .durable_store
             .read_local_roots()
@@ -995,6 +1006,82 @@ impl LibraryBoundaryService {
             .publish_revisions(map_maintained_read_model_revisions(revisions));
         Ok(())
     }
+
+    fn refresh_all_root_availability(&self) -> protocol::ProtocolResult<()> {
+        if self.has_active_scan() {
+            return Ok(());
+        }
+
+        let changed = self
+            .durable_store
+            .refresh_root_availability_from_filesystem()
+            .map_err(map_store_error)?;
+        self.publish_root_availability_change(changed)
+    }
+
+    fn refresh_root_availability(&self, source_id: i64) -> protocol::ProtocolResult<()> {
+        if self.root_scan_is_active(source_id) {
+            return Ok(());
+        }
+
+        let changed = self
+            .durable_store
+            .refresh_root_availability_from_filesystem_for_root(source_id)
+            .map_err(map_store_error)?;
+        self.publish_root_availability_change(changed)
+    }
+
+    fn refresh_root_availability_for_tree_entry_point(
+        &self,
+        entry_point: &protocol::LibraryTreeEntryPoint,
+    ) -> protocol::ProtocolResult<()> {
+        match entry_point {
+            protocol::LibraryTreeEntryPoint::Source { source_id } => {
+                self.refresh_root_availability(*source_id)
+            }
+            protocol::LibraryTreeEntryPoint::SourceLocation { .. } => {
+                self.refresh_all_root_availability()
+            }
+        }
+    }
+
+    fn refresh_root_availability_for_contents_scope(
+        &self,
+        scope: &protocol::ContentsScope,
+    ) -> protocol::ProtocolResult<()> {
+        match scope {
+            protocol::ContentsScope::Source { source_id }
+            | protocol::ContentsScope::Directory { source_id, .. } => {
+                self.refresh_root_availability(*source_id)
+            }
+            protocol::ContentsScope::SourceLocation { .. } => self.refresh_all_root_availability(),
+        }
+    }
+
+    fn publish_root_availability_change(&self, changed: bool) -> protocol::ProtocolResult<()> {
+        if changed {
+            self.publish_maintained_snapshot_invalidations()?;
+        }
+
+        Ok(())
+    }
+
+    fn has_active_scan(&self) -> bool {
+        let registry = self.scan_registry.lock().expect("scan registry poisoned");
+        registry.jobs.values().any(active_scan_job_is_running)
+    }
+
+    fn root_scan_is_active(&self, root_id: i64) -> bool {
+        let registry = self.scan_registry.lock().expect("scan registry poisoned");
+        registry
+            .jobs
+            .get(&root_id)
+            .is_some_and(active_scan_job_is_running)
+    }
+}
+
+fn active_scan_job_is_running(job: &ActiveScanJob) -> bool {
+    !job.terminal_publication_complete.load(Ordering::Acquire)
 }
 
 fn library_tree_row_policy_filter(
@@ -1667,15 +1754,16 @@ mod tests {
         HashSourceFilesBlake3SourceFailure, LibraryBoundaryEvent,
         LibraryBoundaryEventStreamCommand, LibraryBoundaryEventStreamReply, LibraryRootCommand,
         LibraryRootReply, LibraryTreeEntryPoint, LibraryTreeNodeKind, LibraryTreePresenceState,
-        MaintainedSnapshotScope, ProtocolError, ReadAttachmentSourceFilesReply,
-        ReadAttachmentSourceFilesRequest, ReadLibraryBoundaryEventsAfterReply,
-        ReadLibraryBoundaryEventsAfterRequest, ReadLibraryTreeChildrenRequest,
-        ReadSourceAttachmentSummaryReply, ReadSourceAttachmentSummaryRequest,
-        ReadSourceFileAttachmentReply, ReadSourceFileAttachmentRequest, ReadSourceIntegrityReply,
-        ReadSourceIntegrityRequest, ReadSourceLifecycleReply, ReadSourceLifecycleRequest,
-        ReadSourceMaintenanceReply, ReadSourceMaintenanceRequest,
-        ReadTrackIdentityReviewCandidatesRequest, RegisterLocalRootReply, RegisterLocalRootRequest,
-        RegisteredLocalRoot, RejectTrackIdentityCandidateRequest, RunSourceMaintenanceReply,
+        LocalRootAvailability, MaintainedSnapshotScope, ProtocolError,
+        ReadAttachmentSourceFilesReply, ReadAttachmentSourceFilesRequest,
+        ReadLibraryBoundaryEventsAfterReply, ReadLibraryBoundaryEventsAfterRequest,
+        ReadLibraryTreeChildrenRequest, ReadSourceAttachmentSummaryReply,
+        ReadSourceAttachmentSummaryRequest, ReadSourceFileAttachmentReply,
+        ReadSourceFileAttachmentRequest, ReadSourceIntegrityReply, ReadSourceIntegrityRequest,
+        ReadSourceLifecycleReply, ReadSourceLifecycleRequest, ReadSourceMaintenanceReply,
+        ReadSourceMaintenanceRequest, ReadTrackIdentityReviewCandidatesRequest,
+        RegisterLocalRootReply, RegisterLocalRootRequest, RegisteredLocalRoot,
+        RejectTrackIdentityCandidateRequest, RunSourceMaintenanceReply,
         RunSourceMaintenanceRequest, SearchFilterAuthorityLayer, SearchFilterFileClass,
         SearchFilterReadReply, SearchFilterReadRequest, SearchFilterRecursion,
         SearchFilterResultKind, SearchFilterScope, SearchFilterSet, SearchFilterSort,
@@ -4598,6 +4686,49 @@ mod tests {
                 library_boundary_protocol::LocalRootAvailability::Available
             ),
             "registered root must be available"
+        );
+    }
+
+    #[test]
+    fn read_local_roots_refreshes_missing_and_restored_root_without_forgetting_source() {
+        let (tempdir, _context, service) = open_service_with_context();
+        let source_root = tempdir.path().join("music-root");
+        std::fs::create_dir_all(&source_root).expect("create source root");
+
+        let (_json, registered) =
+            register_local_root(&service, source_root.to_string_lossy().into_owned());
+        std::fs::remove_dir_all(&source_root).expect("move source root offline");
+
+        let offline = expect_read_local_roots_reply(expect_success(service.handle_command(
+            CommandRequest::LibraryRoots(LibraryRootCommand::ReadLocalRoots(
+                library_boundary_protocol::ReadLocalRootsRequest,
+            )),
+        )));
+        assert_eq!(offline.roots.len(), 1);
+        assert_eq!(offline.roots[0].root_id, registered.root_id);
+        assert_eq!(
+            offline.roots[0].availability,
+            LocalRootAvailability::Unavailable
+        );
+        let offline_lifecycle = read_source_lifecycle(&service, registered.root_id)
+            .lifecycle
+            .expect("missing source remains known");
+        assert_eq!(
+            offline_lifecycle.access_state,
+            library_boundary_protocol::SourceAccessState::Missing
+        );
+
+        std::fs::create_dir_all(&source_root).expect("restore source root");
+        let restored = expect_read_local_roots_reply(expect_success(service.handle_command(
+            CommandRequest::LibraryRoots(LibraryRootCommand::ReadLocalRoots(
+                library_boundary_protocol::ReadLocalRootsRequest,
+            )),
+        )));
+        assert_eq!(restored.roots.len(), 1);
+        assert_eq!(restored.roots[0].root_id, registered.root_id);
+        assert_eq!(
+            restored.roots[0].availability,
+            LocalRootAvailability::Available
         );
     }
 
