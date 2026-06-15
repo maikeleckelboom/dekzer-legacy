@@ -6,7 +6,7 @@ export class ContentsPanel {
   readonly table: Locator
 
   constructor(libraryRoot: Locator) {
-    this.root = libraryRoot.locator('section[aria-labelledby="library-contents-title"]')
+    this.root = libraryRoot.getByRole('region', { name: /Library contents/i })
     this.title = this.root.getByRole('heading', { level: 3 })
     this.table = this.root.getByRole('table')
   }

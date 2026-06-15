@@ -192,10 +192,12 @@ function resolveHandoffActionIcon(action: SourceAdmissionHandoffAction): IconRol
 <template>
   <section
     class="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-sm border border-(--color-border) bg-(--color-background)"
-    aria-labelledby="library-contents-title"
+    role="region"
+    aria-labelledby="library-contents-region-label library-contents-title"
     aria-live="polite"
   >
     <header class="shrink-0 border-b border-(--color-border) px-4 py-3">
+      <span id="library-contents-region-label" class="sr-only">Library contents</span>
       <p class="text-xs font-bold uppercase tracking-normal text-(--color-text-muted)">
         {{ projection.surfaceLabel }}
       </p>
@@ -240,6 +242,7 @@ function resolveHandoffActionIcon(action: SourceAdmissionHandoffAction): IconRol
       <div
         v-if="statusView !== undefined && statusView.badge !== undefined"
         class="mt-2 flex min-w-0 flex-wrap items-center gap-2"
+        role="group"
         aria-label="Source status"
       >
         <span

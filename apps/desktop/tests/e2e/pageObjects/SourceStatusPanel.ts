@@ -7,7 +7,7 @@ export class SourceStatusPanel {
 
   constructor(libraryRoot: Locator, page: Page) {
     this.page = page
-    this.root = libraryRoot.getByLabel('Source status')
+    this.root = libraryRoot.getByRole('group', { name: 'Source status' })
   }
 
   action(name: string | RegExp): Locator {

@@ -10,6 +10,7 @@ import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 import { test as base, expect } from './filesystem.fixture'
+import { applyE2EWindowPlacement } from '../support/windowPlacement'
 
 export type ElectronAppCloseOptions = {
   readonly allowKillFallback?: boolean
@@ -47,6 +48,7 @@ type CapturedLogs = {
   readonly mainConsole: string[]
   readonly rendererConsole: string[]
   readonly pageErrors: string[]
+  readonly windowPlacement: string[]
   readonly shutdown: string[]
 }
 
@@ -73,6 +75,7 @@ export const test = base.extend<ElectronAppFixtures>({
       mainConsole: [],
       rendererConsole: [],
       pageErrors: [],
+      windowPlacement: [],
       shutdown: []
     }
     const trackedPageSet = new WeakSet<Page>()
@@ -100,6 +103,9 @@ export const test = base.extend<ElectronAppFixtures>({
         launchIndex: launchCount
       }
       currentWindow = await app.firstWindow({ timeout: 30_000 })
+      await applyE2EWindowPlacement(app, (line) =>
+        logs.windowPlacement.push(`[app:${launchCount}] ${line}`)
+      )
       trackPage(currentWindow, trackedPageSet, logs, launchCount)
       return currentWindow
     }
@@ -604,6 +610,7 @@ async function attachFailureLogs(
   await attachText(testInfo, 'electron-main-console.log', logs.mainConsole)
   await attachText(testInfo, 'renderer-console.log', logs.rendererConsole)
   await attachText(testInfo, 'renderer-page-errors.log', logs.pageErrors)
+  await attachText(testInfo, 'electron-window-placement.log', logs.windowPlacement)
   await attachText(testInfo, 'electron-shutdown.log', logs.shutdown)
 }
 

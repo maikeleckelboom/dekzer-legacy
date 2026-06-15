@@ -1,4 +1,6 @@
-import { test as base, expect } from './electronApp.fixture'
+import type { ElectronApplication } from '@playwright/test'
+
+import { test as base, expect, type ElectronAppHarness } from './electronApp.fixture'
 
 export type DialogHelpers = {
   readonly selectDirectory: (directoryPath: string) => Promise<void>
@@ -45,7 +47,13 @@ export const test = base.extend<DialogFixtures>({
         })
       },
       restoreDirectorySelection: async () => {
-        await electronApp.app().evaluate(({ dialog }) => {
+        const app = safeRunningElectronApp(electronApp)
+
+        if (app === undefined) {
+          return
+        }
+
+        await app.evaluate(({ dialog }) => {
           const globalState = globalThis as typeof globalThis & {
             __dekzerE2EOriginalShowOpenDialog?: typeof dialog.showOpenDialog
           }
@@ -65,3 +73,15 @@ export const test = base.extend<DialogFixtures>({
 })
 
 export { expect }
+
+function safeRunningElectronApp(electronApp: ElectronAppHarness): ElectronApplication | undefined {
+  try {
+    return electronApp.app()
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Electron app is not running.') {
+      return undefined
+    }
+
+    throw error
+  }
+}
