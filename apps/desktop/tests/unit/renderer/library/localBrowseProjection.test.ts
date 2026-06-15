@@ -403,6 +403,69 @@ describe('local browse tree projection', () => {
     })
   })
 
+  it('keeps available local browse directory disclosure stable across read states', () => {
+    const albums = item('directory', 'Albums', 'C:\\Users\\Maikel\\Music\\Albums')
+    const albumsNodeId = localBrowseItemNodeId(albums.identity.resolvedItemPath)
+    const parentExpandedIds = new Set([
+      addSourceSectionNodeId,
+      localBrowseEntryNodeId('C:\\Users\\Maikel\\Music')
+    ])
+    const beforeProjection = projectTree(stateWithMusicWindow([albums]))
+    const loadingProjection = projectTree(
+      stateWithMusicWindow([albums], {
+        childStates: new Map([
+          [
+            localBrowseStateKey(albums.identity.resolvedItemPath),
+            {
+              kind: 'loading',
+              requestKey: localBrowseStateKey(albums.identity.resolvedItemPath),
+              sequence: 1,
+              detail: 'Loading local browse items.'
+            }
+          ]
+        ])
+      })
+    )
+    const loadedProjection = projectTree(
+      stateWithMusicWindow([albums], {
+        childStates: new Map([
+          [
+            localBrowseStateKey(albums.identity.resolvedItemPath),
+            {
+              kind: 'loaded',
+              window: loadedWindow({
+                label: 'Albums',
+                resolvedParentPath: albums.identity.resolvedItemPath,
+                items: [item('directory', 'Nested', 'C:\\Users\\Maikel\\Music\\Albums\\Nested')]
+              })
+            }
+          ]
+        ])
+      })
+    )
+
+    expect(visibleItemFor(beforeProjection, albumsNodeId, parentExpandedIds)).toMatchObject({
+      canRevealChildren: true,
+      isBranch: true
+    })
+    expect(findNode(beforeProjection, 'Albums')).toMatchObject({
+      children: { kind: 'deferred' },
+      action: { kind: 'loadChildren' }
+    })
+
+    expect(visibleItemFor(loadingProjection, albumsNodeId, parentExpandedIds)).toMatchObject({
+      canRevealChildren: true,
+      isBranch: true
+    })
+    expect(findNode(loadingProjection, 'Albums')?.children.kind).toBe('loading')
+
+    expect(visibleItemFor(loadedProjection, albumsNodeId, parentExpandedIds)).toMatchObject({
+      canRevealChildren: true,
+      isBranch: true
+    })
+    expect(firstLoadedChildLabels(findNode(loadedProjection, 'Albums'))).toEqual(['Nested'])
+  })
+
   it('projects empty only after an accepted local browse read proves empty', () => {
     const albumsNodeId = localBrowseItemNodeId('C:\\Users\\Maikel\\Music\\Albums')
     const projection = projectTree(
@@ -440,6 +503,144 @@ describe('local browse tree projection', () => {
       icon: 'state'
     })
     expect(findNode(unknownProjection, 'Albums')?.children.kind).toBe('deferred')
+  })
+
+  it('keeps warmed empty local browse folders as stable collapsed branches', () => {
+    const albums = item('directory', 'Albums', 'C:\\Users\\Maikel\\Music\\Albums')
+    const albumsNodeId = localBrowseItemNodeId(albums.identity.resolvedItemPath)
+    const projection = projectTree(
+      stateWithMusicWindow([albums], {
+        childStates: new Map([
+          [
+            localBrowseStateKey(albums.identity.resolvedItemPath),
+            {
+              kind: 'loaded',
+              window: loadedWindow({
+                label: 'Albums',
+                resolvedParentPath: albums.identity.resolvedItemPath,
+                items: []
+              })
+            }
+          ]
+        ])
+      })
+    )
+    const parentExpandedIds = new Set([
+      addSourceSectionNodeId,
+      localBrowseEntryNodeId('C:\\Users\\Maikel\\Music')
+    ])
+    const expandedIds = new Set([...parentExpandedIds, albumsNodeId])
+
+    expect(visibleItemFor(projection, albumsNodeId, parentExpandedIds)).toMatchObject({
+      canRevealChildren: true,
+      isBranch: true,
+      isExpanded: false
+    })
+    expect(
+      childItemsFor(visibleItemsFor(projection, expandedIds), albumsNodeId)[0]?.node
+    ).toMatchObject({
+      role: 'state',
+      label: 'No local items'
+    })
+  })
+
+  it('keeps retryable failed local browse reads as failed disclosure branches', () => {
+    const albums = item('directory', 'Albums', 'C:\\Users\\Maikel\\Music\\Albums')
+    const albumsNodeId = localBrowseItemNodeId(albums.identity.resolvedItemPath)
+    const projection = projectTree(
+      stateWithMusicWindow([albums], {
+        childStates: new Map([
+          [
+            localBrowseStateKey(albums.identity.resolvedItemPath),
+            {
+              kind: 'failed',
+              detail: 'Unable to read local browse items.',
+              errorCode: 'readFailed'
+            }
+          ]
+        ])
+      })
+    )
+    const visible = visibleItemFor(
+      projection,
+      albumsNodeId,
+      new Set([addSourceSectionNodeId, localBrowseEntryNodeId('C:\\Users\\Maikel\\Music')])
+    )
+
+    expect(visible).toMatchObject({
+      canRevealChildren: true,
+      canActivateAction: true,
+      isBranch: true
+    })
+    expect(findNode(projection, 'Albums')).toMatchObject({
+      children: { kind: 'failed' },
+      action: { kind: 'loadChildren', state: { kind: 'failed' } }
+    })
+  })
+
+  it('does not expose disclosure for unavailable local browse item rows', () => {
+    const rows = [
+      item('directory', 'Rejected', 'C:\\Users\\Maikel\\Music\\Rejected', { status: 'rejected' }),
+      item('directory', 'Blocked', 'C:\\Users\\Maikel\\Music\\Blocked', {
+        status: 'permissionBlocked'
+      }),
+      item('directory', 'Admitted', 'C:\\Users\\Maikel\\Music\\Admitted', {
+        status: 'duplicateOfAdmittedSource',
+        matchedSourceId: '7'
+      }),
+      item('directory', 'Removed', 'C:\\Users\\Maikel\\Music\\Removed', {
+        status: 'restorableSource',
+        matchedSourceId: '7'
+      }),
+      item('rejectedRoot', 'Protected Root', 'C:\\Users\\Maikel\\Music\\Protected Root', {
+        status: 'rejected',
+        availableOperations: [{ kind: 'browseChildren' }]
+      })
+    ]
+    const projection = projectTree(stateWithMusicWindow(rows))
+    const visibleItems = visibleItemsFor(
+      projection,
+      new Set([addSourceSectionNodeId, localBrowseEntryNodeId('C:\\Users\\Maikel\\Music')])
+    )
+
+    for (const row of rows) {
+      const nodeId = localBrowseItemNodeId(row.identity.resolvedItemPath)
+      const binding = projection.bindingsById.get(nodeId)
+
+      expect(visibleItems.find((visible) => visible.id === nodeId)).toMatchObject({
+        canRevealChildren: false,
+        isBranch: false
+      })
+      expect(findNode(projection, row.displayName)).toMatchObject({
+        children: { kind: 'none' }
+      })
+      expect(binding).toMatchObject({ kind: 'localBrowseItem' })
+      expect(binding).not.toHaveProperty('target')
+    }
+  })
+
+  it('does not expose disclosure for unavailable local browse entry points', () => {
+    const projection = projectTree(
+      browserState({
+        entries: [
+          musicEntryPoint({
+            status: 'duplicateOfAdmittedSource',
+            availableOperations: [{ kind: 'browseChildren' }, { kind: 'chooseDescendant' }]
+          })
+        ]
+      })
+    )
+    const musicNodeId = localBrowseEntryNodeId('C:\\Users\\Maikel\\Music')
+
+    expect(
+      visibleItemFor(projection, musicNodeId, new Set([addSourceSectionNodeId]))
+    ).toMatchObject({
+      canRevealChildren: false,
+      isBranch: false
+    })
+    expect(findNode(projection, 'Music')).toMatchObject({
+      children: { kind: 'none' }
+    })
   })
 
   it('does not reuse a loaded window from another Add Source view', () => {
@@ -720,6 +921,33 @@ function childLabelsFor(
   parentId: string
 ): readonly string[] {
   return childItemsFor(visibleItems, parentId).map((item) => item.node.label)
+}
+
+function visibleItemsFor(
+  projection: BrowserProjection,
+  expandedNodeIds: ReadonlySet<string>
+): ReturnType<typeof flattenVisibleTree> {
+  return flattenVisibleTree({
+    nodes: projection.nodes,
+    expandedNodeIds
+  })
+}
+
+function visibleItemFor(
+  projection: BrowserProjection,
+  nodeId: string,
+  expandedNodeIds: ReadonlySet<string>
+): ReturnType<typeof flattenVisibleTree>[number] {
+  const visibleItem = visibleItemsFor(projection, expandedNodeIds).find(
+    (item) => item.id === nodeId
+  )
+
+  expect(visibleItem).toBeDefined()
+  if (visibleItem === undefined) {
+    throw new Error(`Expected visible item ${nodeId}.`)
+  }
+
+  return visibleItem
 }
 
 function localBrowseStateKey(resolvedParentPath: string): string {

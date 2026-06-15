@@ -155,8 +155,13 @@ function appendVisibleNodes(options: {
     const children = getBrowserTreeChildRows(node)
     const hasExpandedTerminalState =
       options.expandedNodeIds.has(node.id) && hasOnlyStateChildren(node)
-    const isBranch = isBrowserTreeBranch(node) || hasExpandedTerminalState
-    const canReveal = canRevealBrowserTreeChildren(node) || hasExpandedTerminalState
+    const hasStableLocalBrowseTerminalState = hasLocalBrowseTerminalState(node)
+    const isBranch =
+      isBrowserTreeBranch(node) || hasExpandedTerminalState || hasStableLocalBrowseTerminalState
+    const canReveal =
+      canRevealBrowserTreeChildren(node) ||
+      hasExpandedTerminalState ||
+      hasStableLocalBrowseTerminalState
     const canActivate = canActivateBrowserTreeAction(node)
     const isActionLoading = isBrowserTreeActionLoading(node)
     const isExpanded = isBranch && options.expandedNodeIds.has(node.id)
@@ -212,6 +217,19 @@ function isDisclosureTerminalOwner(node: BrowserTreeNode): boolean {
     node.id.startsWith('local-browse-entry:') ||
     node.id.startsWith('local-browse-item:')
   )
+}
+
+function hasLocalBrowseTerminalState(node: BrowserTreeNode): boolean {
+  return (
+    isStableLocalBrowseTerminalOwner(node) &&
+    node.children.kind === 'loaded' &&
+    node.children.nodes.length > 0 &&
+    node.children.nodes.every((child) => child.role === 'state')
+  )
+}
+
+function isStableLocalBrowseTerminalOwner(node: BrowserTreeNode): boolean {
+  return node.id.startsWith('local-browse-entry:') || node.id.startsWith('local-browse-item:')
 }
 
 function getVisibleItemIndex(

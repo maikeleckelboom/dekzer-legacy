@@ -10,6 +10,7 @@ import type { RendererApi } from '../../../shared/rendererApi'
 import type { BrowserProjection } from '../tree/projection'
 import type { BrowserTreeNodeId } from '../tree/types'
 import type { RowBinding } from '../state'
+import { isWarmableLocalBrowseItem } from './projection'
 import {
   localBrowseRootTarget,
   localBrowseItemFilterForTarget,
@@ -274,10 +275,12 @@ export function createLocalBrowseController(
   function browserWindowRefreshTargets(
     expandedNodeIds: ReadonlySet<BrowserTreeNodeId>,
     projection: BrowserProjection | undefined
-  ): ReadonlyMap<
-    string,
-    { readonly nodeId: BrowserTreeNodeId; readonly target: LocalBrowseDirectoryTarget }
-  > | undefined {
+  ):
+    | ReadonlyMap<
+        string,
+        { readonly nodeId: BrowserTreeNodeId; readonly target: LocalBrowseDirectoryTarget }
+      >
+    | undefined {
     if (projection?.kind !== 'tree') {
       return undefined
     }
@@ -804,8 +807,7 @@ export function createLocalBrowseController(
 
     return (
       state === undefined ||
-      ((state.kind === 'loading' || state.kind === 'refreshing') &&
-        state.requestKey === requestKey)
+      ((state.kind === 'loading' || state.kind === 'refreshing') && state.requestKey === requestKey)
     )
   }
 
@@ -1028,14 +1030,6 @@ type LocalBrowseWarmReadOutcome =
 type LocalBrowseActiveWarmRead = {
   readonly task: LocalBrowseBranchWarmupTask
   readonly promise: Promise<LocalBrowseWarmReadOutcome>
-}
-
-function isWarmableLocalBrowseItem(item: LocalBrowseItem): boolean {
-  return (
-    item.itemKind === 'directory' &&
-    item.status === 'available' &&
-    item.availableOperations.some((operation) => operation.kind === 'browseChildren')
-  )
 }
 
 function localBrowseItemNodeId(item: LocalBrowseItem): BrowserTreeNodeId {

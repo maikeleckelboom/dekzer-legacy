@@ -192,10 +192,7 @@ function projectEntryPointChildren(options: {
 }): { readonly children: BrowserTreeChildren; readonly action?: BrowserTreeAction } {
   const target = options.target
 
-  if (
-    target === undefined ||
-    !hasLocalBrowseOperation(options.entry.availableOperations, 'browseChildren')
-  ) {
+  if (target === undefined || !shouldExposeDisclosureForLocalBrowseEntryPoint(options.entry)) {
     return { children: { kind: 'none' } }
   }
 
@@ -238,6 +235,7 @@ function projectLocalBrowseItem(options: {
     ...projectLocalBrowseChildren({
       parentNodeId: nodeId,
       target,
+      exposeDisclosure: shouldExposeDisclosureForLocalBrowseItem(item),
       state:
         target === undefined ? undefined : options.itemStates.get(localBrowseWindowKey(target)),
       itemStates: options.itemStates,
@@ -249,13 +247,14 @@ function projectLocalBrowseItem(options: {
 function projectLocalBrowseChildren(options: {
   readonly parentNodeId: string
   readonly target: LocalBrowseDirectoryTarget | undefined
+  readonly exposeDisclosure?: boolean
   readonly state: LocalBrowseItemState | undefined
   readonly itemStates: ReadonlyMap<string, LocalBrowseItemState>
   readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
 }): { readonly children: BrowserTreeChildren; readonly action?: BrowserTreeAction } {
   const target = options.target
 
-  if (target === undefined) {
+  if (target === undefined || options.exposeDisclosure === false) {
     return { children: { kind: 'none' } }
   }
 
@@ -626,10 +625,26 @@ function directoryTargetForItem(
   }
 }
 
-function isBrowsableLocalBrowseFolder(item: LocalBrowseItem): boolean {
+export function isBrowsableLocalBrowseFolder(item: LocalBrowseItem): boolean {
   return (
-    (item.itemKind === 'directory' || item.itemKind === 'rejectedRoot') &&
+    item.itemKind === 'directory' &&
+    item.status === 'available' &&
     hasLocalBrowseOperation(item.availableOperations, 'browseChildren')
+  )
+}
+
+export function isWarmableLocalBrowseItem(item: LocalBrowseItem): boolean {
+  return isBrowsableLocalBrowseFolder(item)
+}
+
+export function shouldExposeDisclosureForLocalBrowseItem(item: LocalBrowseItem): boolean {
+  return isBrowsableLocalBrowseFolder(item)
+}
+
+function shouldExposeDisclosureForLocalBrowseEntryPoint(entry: LocalBrowseEntryPoint): boolean {
+  return (
+    entry.status === 'available' &&
+    hasLocalBrowseOperation(entry.availableOperations, 'browseChildren')
   )
 }
 
