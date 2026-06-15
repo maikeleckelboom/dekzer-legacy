@@ -88,14 +88,20 @@ export class LibraryRuntimeProbe {
 }
 
 export function normalizeLocalSourcePath(path: string): string {
-  return localPathKey(path)
+  return process.platform === 'win32' ? windowsLocalPathKey(path) : posixLocalPathKey(path)
 }
 
-function localPathKey(path: string): string {
+function windowsLocalPathKey(path: string): string {
   return path
     .replace(/^\\\\\?\\UNC\\/i, '\\\\')
     .replace(/^\\\\\?\\/i, '')
     .replaceAll('/', '\\')
     .replace(/\\+$/, '')
     .toLowerCase()
+}
+
+function posixLocalPathKey(path: string): string {
+  const trimmed = path.replace(/\/+$/, '')
+
+  return trimmed.length === 0 ? '/' : trimmed
 }

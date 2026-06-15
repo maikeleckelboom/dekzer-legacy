@@ -2,7 +2,13 @@ import type { Page } from '@playwright/test'
 
 import type { DialogHelpers } from '../../fixtures/dialogs.fixture'
 import type { ElectronAppHarness } from '../../fixtures/electronApp.fixture'
-import { type LibraryV0AdmittedSource, type LibraryV0GoldenSource } from './LibraryContracts'
+import {
+  type LibraryV0AdmittedSource,
+  type LibraryV0GoldenSource,
+  type LibraryV0ScopedSearchSourceA,
+  type LibraryV0ScopedSearchSourceB,
+  type LibraryV0Source
+} from './LibraryContracts'
 import { LibraryRuntimeProbe } from './LibraryRuntimeProbe'
 import { LibraryPanel } from '../screens/LibraryPanel'
 
@@ -33,7 +39,9 @@ export class LibraryV0 {
     await this.panel.expectAddSourceSurfaceVisible()
   }
 
-  async admitMusicFolder(source: LibraryV0GoldenSource): Promise<LibraryV0AdmittedSource> {
+  async admitMusicFolder<Source extends LibraryV0Source>(
+    source: Source
+  ): Promise<LibraryV0AdmittedSource<Source>> {
     await this.options.dialogs.selectDirectory(source.rootPath)
     await this.openAddSource()
     await this.panel.addMusicFolder()
@@ -45,7 +53,7 @@ export class LibraryV0 {
     return { ...source, sourceId }
   }
 
-  async expectSourceReady(source: LibraryV0AdmittedSource): Promise<void> {
+  async expectSourceReady(source: LibraryV0AdmittedSource<LibraryV0Source>): Promise<void> {
     await this.panel.browse.select(source.sourceName)
     await this.panel.sourceStatus.expectVisible()
     await this.panel.sourceStatus.expectReadyHasVisibleEvidence(this.panel.contents)
@@ -53,6 +61,44 @@ export class LibraryV0 {
     await this.probe.waitForTerminalSourceReadiness(source.sourceId)
     await this.panel.sourceStatus.expectNoActiveScanCopy()
     await this.panel.contents.expectRowsVisible(source.audioRows)
+  }
+
+  async admitAndScanMusicFolder<Source extends LibraryV0Source>(
+    source: Source
+  ): Promise<LibraryV0AdmittedSource<Source>> {
+    const admittedSource = await this.admitMusicFolder(source)
+
+    await this.expectSourceReady(admittedSource)
+
+    return admittedSource
+  }
+
+  async expectScopedSearchRespectsActiveBrowseScope(
+    sourceA: LibraryV0AdmittedSource<LibraryV0ScopedSearchSourceA>,
+    sourceB: LibraryV0AdmittedSource<LibraryV0ScopedSearchSourceB>
+  ): Promise<void> {
+    await this.panel.browse.select(sourceA.sourceName)
+
+    await this.panel.search.searchFor('Only Track B')
+    await this.panel.contents.expectSearchEmpty('source')
+    await this.panel.contents.expectRowsHidden([sourceB.sourceBTrack])
+
+    await this.panel.search.searchFor('Root Track A')
+    await this.panel.contents.expectRowsVisible([sourceA.rootTrack])
+
+    await this.panel.browse.expand(sourceA.sourceName)
+    await this.panel.browse.select(sourceA.nestedFolder)
+
+    await this.panel.search.searchFor('Descendant Only A')
+    await this.panel.contents.expectSearchEmpty('folder')
+    await this.panel.contents.expectRowsHidden([sourceA.descendantOnlyTrack])
+
+    await this.panel.search.searchFor('Nested Track A')
+    await this.panel.contents.expectRowsVisible([sourceA.nestedTrack])
+
+    await this.panel.search.clear()
+    await this.panel.contents.expectTitle(sourceA.nestedFolder)
+    await this.panel.contents.expectRowsVisible([sourceA.nestedTrack])
   }
 
   async expectFolderScopedBrowsing(source: LibraryV0GoldenSource): Promise<void> {

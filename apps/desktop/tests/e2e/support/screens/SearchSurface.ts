@@ -11,12 +11,16 @@ export class SearchSurface {
     this.clearButton = this.libraryRoot.getByRole('button', { name: 'Clear search' })
   }
 
-  async search(query: string): Promise<void> {
+  async searchFor(query: string): Promise<void> {
     if (await this.openButton.isVisible()) {
       await this.openButton.click()
     }
 
     await this.input.fill(query)
+  }
+
+  async search(query: string): Promise<void> {
+    await this.searchFor(query)
   }
 
   async clear(): Promise<void> {

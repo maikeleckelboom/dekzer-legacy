@@ -15,6 +15,10 @@ export type WindowPlacementRequest = {
 
 export type WindowPlacementResult = {
   readonly applied: boolean
+  readonly requestedTarget: WindowPlacementTarget
+  readonly actualTarget: Exclude<WindowPlacementTarget, 'none'> | 'unresolved'
+  readonly fallbackUsed: boolean
+  readonly targetHonored: boolean
   readonly message: string
   readonly warnings: readonly string[]
 }
@@ -40,11 +44,23 @@ export async function applyE2EWindowPlacement(
     return
   }
 
+  log(
+    '[window-placement] ' +
+      `request target=${request.target}; fallback=${request.fallback}; ` +
+      `strict=${String(request.strict)}; bounds=${formatRequestedBounds(request.bounds)}.`
+  )
+
   try {
     const result = await app.evaluate(
       ({ BrowserWindow, screen }, placement): WindowPlacementResult => {
         const window = BrowserWindow.getAllWindows()[0]
         const warnings: string[] = []
+        type DisplayLike = { readonly id: number }
+        const displayTargetName = (
+          display: DisplayLike,
+          primaryDisplay: DisplayLike
+        ): Exclude<WindowPlacementTarget, 'none'> =>
+          display.id === primaryDisplay.id ? 'primary' : 'secondary'
         const waylandSession =
           process.platform === 'linux' &&
           (process.env.XDG_SESSION_TYPE?.toLowerCase() === 'wayland' ||
@@ -59,6 +75,10 @@ export async function applyE2EWindowPlacement(
         if (window === undefined) {
           return {
             applied: false,
+            requestedTarget: placement.target,
+            actualTarget: 'unresolved',
+            fallbackUsed: false,
+            targetHonored: false,
             message: 'No BrowserWindow was available for placement.',
             warnings
           }
@@ -79,6 +99,13 @@ export async function applyE2EWindowPlacement(
           if (placement.fallback === 'unchanged') {
             return {
               applied: false,
+              requestedTarget: placement.target,
+              actualTarget: displayTargetName(
+                screen.getDisplayMatching(currentBounds),
+                primaryDisplay
+              ),
+              fallbackUsed: false,
+              targetHonored: false,
               message:
                 'No secondary display was found; leaving BrowserWindow bounds unchanged by fallback policy.',
               warnings
@@ -99,26 +126,43 @@ export async function applyE2EWindowPlacement(
         }
 
         window.setBounds(nextBounds)
+        const actualTarget = displayTargetName(
+          screen.getDisplayMatching(window.getBounds()),
+          primaryDisplay
+        )
+        const targetHonored = actualTarget === placement.target
 
         return {
           applied: true,
+          requestedTarget: placement.target,
+          actualTarget,
+          fallbackUsed,
+          targetHonored,
           message:
-            `Placed BrowserWindow on ${fallbackUsed ? 'primary fallback' : placement.target} ` +
-            `display at ${nextBounds.x},${nextBounds.y} ${nextBounds.width}x${nextBounds.height}.`,
+            `Placed BrowserWindow at ${nextBounds.x},${nextBounds.y} ` +
+            `${nextBounds.width}x${nextBounds.height}.`,
           warnings
         }
       },
       request
     )
 
-    log(`[window-placement] ${result.message}`)
+    log(
+      `[window-placement] ${result.message} requested=${result.requestedTarget}; ` +
+        `actual=${result.actualTarget}; fallbackUsed=${String(result.fallbackUsed)}; ` +
+        `strict=${String(request.strict)}; targetHonored=${String(result.targetHonored)}.`
+    )
 
     for (const warning of result.warnings) {
       log(`[window-placement] ${warning}`)
     }
 
-    if (request.strict && !result.applied) {
-      throw new Error(result.message)
+    if (request.strict && (!result.applied || !result.targetHonored)) {
+      throw new Error(
+        `Strict window placement failed: requested=${result.requestedTarget}; ` +
+          `actual=${result.actualTarget}; fallbackUsed=${String(result.fallbackUsed)}; ` +
+          `applied=${String(result.applied)}.`
+      )
     }
   } catch (error) {
     const message = formatUnknownError(error)
@@ -218,6 +262,10 @@ function parseBounds(
 
 function isTruthy(value: string | undefined): boolean {
   return value === '1' || value === 'true' || value === 'yes'
+}
+
+function formatRequestedBounds(bounds: WindowPlacementRequest['bounds']): string {
+  return bounds === undefined ? 'current' : `${bounds.width}x${bounds.height}`
 }
 
 function formatUnknownError(error: unknown): string {

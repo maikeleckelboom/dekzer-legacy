@@ -12,6 +12,11 @@ export type LibrarySourceAFixture = {
   readonly emptyPath: string
 }
 
+export type LibrarySourceBFixture = {
+  readonly rootPath: string
+  readonly rootTrackPath: string
+}
+
 export type LibraryFilesystem = {
   readonly rootDir: string
   readonly userDataPath: string
@@ -19,6 +24,7 @@ export type LibraryFilesystem = {
   readonly albumPath: string
   readonly audioFilePath: string
   readonly sourceA: LibrarySourceAFixture
+  readonly sourceB: LibrarySourceBFixture
   readonly createTinyWav: (path: string) => Promise<void>
 }
 
@@ -36,11 +42,13 @@ export const test = base.extend<FilesystemFixtures>({
     const albumPath = join(mediaRootPath, 'Album A')
     const audioFilePath = join(albumPath, '01-tone.wav')
     const sourceA = sourceAFixture(mediaRootPath)
+    const sourceB = sourceBFixture(mediaRootPath)
 
     await rm(rootDir, { recursive: true, force: true })
     await mkdir(albumPath, { recursive: true })
     await createTinyWav(audioFilePath)
     await createSourceAFixture(sourceA)
+    await createSourceBFixture(sourceB)
 
     await use({
       rootDir,
@@ -49,6 +57,7 @@ export const test = base.extend<FilesystemFixtures>({
       albumPath,
       audioFilePath,
       sourceA,
+      sourceB,
       createTinyWav
     })
   }
@@ -71,6 +80,10 @@ async function createSourceAFixture(sourceA: LibrarySourceAFixture): Promise<voi
   await mkdir(sourceA.emptyPath, { recursive: true })
 }
 
+async function createSourceBFixture(sourceB: LibrarySourceBFixture): Promise<void> {
+  await createTinyWav(sourceB.rootTrackPath)
+}
+
 function sourceAFixture(mediaRootPath: string): LibrarySourceAFixture {
   const rootPath = join(mediaRootPath, 'source-a')
 
@@ -82,6 +95,15 @@ function sourceAFixture(mediaRootPath: string): LibrarySourceAFixture {
     coverPath: join(rootPath, 'mixed', 'cover.jpg'),
     readmePath: join(rootPath, 'mixed', 'readme.txt'),
     emptyPath: join(rootPath, 'empty')
+  }
+}
+
+function sourceBFixture(mediaRootPath: string): LibrarySourceBFixture {
+  const rootPath = join(mediaRootPath, 'source-b')
+
+  return {
+    rootPath,
+    rootTrackPath: join(rootPath, 'Only Track B.wav')
   }
 }
 

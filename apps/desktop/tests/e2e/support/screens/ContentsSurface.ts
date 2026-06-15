@@ -27,6 +27,10 @@ export class ContentsSurface {
     await expect(this.table).toBeVisible()
   }
 
+  async expectTitle(title: string | RegExp): Promise<void> {
+    await expect(this.title).toHaveText(title)
+  }
+
   async expectRowsVisible(names: readonly (string | RegExp)[]): Promise<void> {
     for (const name of names) {
       await expect(this.row(name)).toBeVisible()
@@ -45,5 +49,15 @@ export class ContentsSurface {
         /No (audio tracks in this view|playable media in this view|files in this source inventory view)\./
       )
     ).toBeVisible()
+  }
+
+  async expectSearchEmpty(scope: 'source' | 'folder'): Promise<void> {
+    const label =
+      scope === 'source'
+        ? /No matching audio tracks in this source\./
+        : /No matching audio tracks in this folder\./
+
+    await this.expectTitle('Search results')
+    await expect(this.row(label)).toBeVisible()
   }
 }
