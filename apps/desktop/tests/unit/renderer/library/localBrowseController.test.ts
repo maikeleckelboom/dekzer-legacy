@@ -6,7 +6,10 @@ import {
   localBrowseWindowKeyForIdentity,
   type LocalBrowseReadApi
 } from '../../../../src/renderer/library/localBrowse/controller'
-import { localBrowseWindowKey } from '../../../../src/renderer/library/localBrowse/types'
+import {
+  localBrowseWindowKey,
+  type LoadedLocalBrowseItems
+} from '../../../../src/renderer/library/localBrowse/types'
 import type { AddSourceView } from '../../../../src/renderer/library/addSource/view'
 import type { BrowserState } from '../../../../src/renderer/library/state'
 import { projectAddSourceState } from '../../../../src/renderer/library/localBrowse/projection'
@@ -602,6 +605,236 @@ describe('createLocalBrowseController', () => {
     expect(itemRequests).toHaveLength(1)
   })
 
+  it('respects the local browse warmup breadth bound', async () => {
+    const itemRequests: ReadLocalBrowseItemsRequest[] = []
+    const childDirectories = Array.from({ length: 25 }, (_, index) =>
+      directoryNamed(`Folder ${index + 1}`, `C:\\Users\\Maikel\\Music\\Folder ${index + 1}`)
+    )
+    const controller = createLocalBrowseController(
+      testLocalBrowseApi({
+        readItems: async (request) => {
+          itemRequests.push(structuredClone(request))
+
+          return localBrowseItemsResult(
+            request,
+            request.resolvedParentPath === 'C:\\Users\\Maikel\\Music' ? childDirectories : []
+          )
+        }
+      }),
+      { warmup: { enabled: true } }
+    )
+    controller.start()
+
+    await controller.refreshEntryPoints()
+    const projection = projectTree({
+      sourceReadStates: new Map(),
+      directoryReadStates: new Map(),
+      localBrowseEntryPointsState: controller.entryPointsState.value,
+      localBrowseItemStates: controller.itemStates.value
+    })
+    const musicNodeId = requiredNodeIdByLabel(projection, 'Music')
+
+    await expect(controller.requestNodeChildren(musicNodeId, projection)).resolves.toBe(true)
+    await waitForWarmupQueue()
+
+    expect(itemRequests).toHaveLength(25)
+    expect(itemRequests.slice(1).map((request) => request.resolvedParentPath)).toEqual(
+      childDirectories
+        .slice(0, 24)
+        .map((item) => item.identity.resolvedItemPath)
+    )
+    expect(itemRequests.map((request) => request.resolvedParentPath)).not.toContain(
+      'C:\\Users\\Maikel\\Music\\Folder 25'
+    )
+  })
+
+  it('does not warm rejected, protected, blocked, or already-admitted rows', async () => {
+    const itemRequests: ReadLocalBrowseItemsRequest[] = []
+    const controller = createLocalBrowseController(
+      testLocalBrowseApi({
+        readItems: async (request) => {
+          itemRequests.push(structuredClone(request))
+
+          return localBrowseItemsResult(request, [
+            {
+              ...directoryNamed('Rejected', 'C:\\Users\\Maikel\\Music\\Rejected'),
+              status: 'rejected'
+            },
+            {
+              ...directoryNamed('Blocked', 'C:\\Users\\Maikel\\Music\\Blocked'),
+              status: 'permissionBlocked'
+            },
+            {
+              ...directoryNamed('Admitted', 'C:\\Users\\Maikel\\Music\\Admitted'),
+              status: 'duplicateOfAdmittedSource',
+              matchedSourceId: '7'
+            },
+            {
+              ...directoryNamed('Available', 'C:\\Users\\Maikel\\Music\\Available')
+            }
+          ])
+        }
+      }),
+      { warmup: { enabled: true } }
+    )
+    controller.start()
+
+    await controller.refreshEntryPoints()
+    const projection = projectTree({
+      sourceReadStates: new Map(),
+      directoryReadStates: new Map(),
+      localBrowseEntryPointsState: controller.entryPointsState.value,
+      localBrowseItemStates: controller.itemStates.value
+    })
+    const musicNodeId = requiredNodeIdByLabel(projection, 'Music')
+
+    await expect(controller.requestNodeChildren(musicNodeId, projection)).resolves.toBe(true)
+    await waitForWarmupQueue()
+
+    expect(itemRequests.map((request) => request.resolvedParentPath)).toEqual([
+      'C:\\Users\\Maikel\\Music',
+      'C:\\Users\\Maikel\\Music\\Available'
+    ])
+  })
+
+  it('does not duplicate warm reads for loaded, loading, or refreshing child folders', async () => {
+    const itemRequests: ReadLocalBrowseItemsRequest[] = []
+    const loadedKey = localBrowseWindowKey({
+      addSourceView: 'preview',
+      entryPointKind: 'music',
+      resolvedRootPath: 'C:\\Users\\Maikel\\Music',
+      resolvedParentPath: 'C:\\Users\\Maikel\\Music\\Loaded',
+      label: 'Loaded'
+    })
+    const loadingKey = localBrowseWindowKey({
+      addSourceView: 'preview',
+      entryPointKind: 'music',
+      resolvedRootPath: 'C:\\Users\\Maikel\\Music',
+      resolvedParentPath: 'C:\\Users\\Maikel\\Music\\Loading',
+      label: 'Loading'
+    })
+    const refreshingKey = localBrowseWindowKey({
+      addSourceView: 'preview',
+      entryPointKind: 'music',
+      resolvedRootPath: 'C:\\Users\\Maikel\\Music',
+      resolvedParentPath: 'C:\\Users\\Maikel\\Music\\Refreshing',
+      label: 'Refreshing'
+    })
+    const controller = createLocalBrowseController(
+      testLocalBrowseApi({
+        readItems: async (request) => {
+          itemRequests.push(structuredClone(request))
+
+          return localBrowseItemsResult(request, [
+            directoryNamed('Loaded', 'C:\\Users\\Maikel\\Music\\Loaded'),
+            directoryNamed('Loading', 'C:\\Users\\Maikel\\Music\\Loading'),
+            directoryNamed('Refreshing', 'C:\\Users\\Maikel\\Music\\Refreshing'),
+            directoryNamed('Fresh', 'C:\\Users\\Maikel\\Music\\Fresh')
+          ])
+        }
+      }),
+      { warmup: { enabled: true } }
+    )
+    controller.itemStates.value = new Map([
+      [
+        loadedKey,
+        {
+          kind: 'loaded',
+          window: loadedWindowForKey('Loaded', 'C:\\Users\\Maikel\\Music\\Loaded', [])
+        }
+      ],
+      [
+        loadingKey,
+        {
+          kind: 'loading',
+          requestKey: loadingKey,
+          sequence: 1,
+          detail: 'Loading local browse items.'
+        }
+      ],
+      [
+        refreshingKey,
+        {
+          kind: 'refreshing',
+          window: loadedWindowForKey('Refreshing', 'C:\\Users\\Maikel\\Music\\Refreshing', []),
+          requestKey: refreshingKey,
+          sequence: 2,
+          detail: 'Refreshing local browse items.'
+        }
+      ]
+    ])
+    controller.start()
+
+    await controller.refreshEntryPoints()
+    const projection = projectTree({
+      sourceReadStates: new Map(),
+      directoryReadStates: new Map(),
+      localBrowseEntryPointsState: controller.entryPointsState.value,
+      localBrowseItemStates: controller.itemStates.value
+    })
+    const musicNodeId = requiredNodeIdByLabel(projection, 'Music')
+
+    await expect(controller.requestNodeChildren(musicNodeId, projection)).resolves.toBe(true)
+    await waitForWarmupQueue()
+
+    expect(itemRequests.map((request) => request.resolvedParentPath)).toEqual([
+      'C:\\Users\\Maikel\\Music',
+      'C:\\Users\\Maikel\\Music\\Fresh'
+    ])
+  })
+
+  it('projects warmed child rows and empty warm results without cold loading', async () => {
+    const controller = createLocalBrowseController(
+      testLocalBrowseApi({
+        readItems: async (request) => {
+          if (request.resolvedParentPath.endsWith('Albums')) {
+            return localBrowseItemsResult(request, [
+              fileItem('track.flac', 'C:\\Users\\Maikel\\Music\\Albums\\track.flac')
+            ])
+          }
+
+          if (request.resolvedParentPath.endsWith('Empty')) {
+            return localBrowseItemsResult(request, [])
+          }
+
+          return localBrowseItemsResult(request, [
+            directoryNamed('Albums', 'C:\\Users\\Maikel\\Music\\Albums'),
+            directoryNamed('Empty', 'C:\\Users\\Maikel\\Music\\Empty')
+          ])
+        }
+      }),
+      { warmup: { enabled: true } }
+    )
+    controller.start()
+
+    await controller.refreshEntryPoints()
+    let projection = projectTree({
+      sourceReadStates: new Map(),
+      directoryReadStates: new Map(),
+      localBrowseEntryPointsState: controller.entryPointsState.value,
+      localBrowseItemStates: controller.itemStates.value
+    })
+    const musicNodeId = requiredNodeIdByLabel(projection, 'Music')
+
+    await expect(controller.requestNodeChildren(musicNodeId, projection)).resolves.toBe(true)
+    await waitForWarmupQueue()
+
+    projection = projectFromController(controller)
+    expect(firstLoadedChildLabels([requiredNodeByLabel(projection, 'Albums')], 'Albums')).toEqual([
+      'track.flac'
+    ])
+    expect(requiredNodeByLabel(projection, 'Empty').children).toMatchObject({
+      kind: 'loaded',
+      nodes: [
+        {
+          role: 'state',
+          label: 'No local items',
+          icon: 'state'
+        }
+      ]
+    })
+  })
+
   it('ignores late warm reads after the warmup guard stops allowing work', async () => {
     const pendingWarmRead =
       deferred<Awaited<ReturnType<LocalBrowseReadApi['localBrowse']['readItems']>>>()
@@ -718,14 +951,18 @@ function musicEntryPoint(): LocalBrowseEntryPoint {
 }
 
 function directoryItem(): LocalBrowseItem {
+  return directoryNamed('Albums', 'C:\\Users\\Maikel\\Music\\Albums')
+}
+
+function directoryNamed(displayName: string, resolvedItemPath: string): LocalBrowseItem {
   return {
     identity: {
       entryPointKind: 'music',
       resolvedRootPath: 'C:\\Users\\Maikel\\Music',
-      resolvedItemPath: 'C:\\Users\\Maikel\\Music\\Albums'
+      resolvedItemPath
     },
     itemKind: 'directory',
-    displayName: 'Albums',
+    displayName,
     status: 'available',
     platform: 'windows',
     fileKind: null,
@@ -736,7 +973,7 @@ function directoryItem(): LocalBrowseItem {
       {
         kind: 'requestSourceAdmission',
         requestKind: 'selectedDirectory',
-        resolvedPath: 'C:\\Users\\Maikel\\Music\\Albums'
+        resolvedPath: resolvedItemPath
       }
     ],
     failure: null
@@ -783,6 +1020,27 @@ function localBrowseItemsResult(
     totalItems: items.length,
     items,
     failure: null
+  }
+}
+
+function loadedWindowForKey(
+  label: string,
+  resolvedParentPath: string,
+  items: readonly LocalBrowseItem[]
+): LoadedLocalBrowseItems {
+  return {
+    addSourceView: 'preview',
+    identity: {
+      entryPointKind: 'music',
+      resolvedRootPath: 'C:\\Users\\Maikel\\Music',
+      resolvedParentPath
+    },
+    label,
+    items,
+    totalItems: items.length,
+    status: 'complete',
+    failure: null,
+    limit: 50
   }
 }
 

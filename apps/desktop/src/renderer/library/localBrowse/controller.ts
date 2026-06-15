@@ -1032,7 +1032,8 @@ type LocalBrowseActiveWarmRead = {
 
 function isWarmableLocalBrowseItem(item: LocalBrowseItem): boolean {
   return (
-    (item.itemKind === 'directory' || item.itemKind === 'rejectedRoot') &&
+    item.itemKind === 'directory' &&
+    item.status === 'available' &&
     item.availableOperations.some((operation) => operation.kind === 'browseChildren')
   )
 }
