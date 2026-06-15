@@ -102,7 +102,7 @@ describe('source activity projection', () => {
       { label: 'identity', count: 5 }
     ])
     expect(sourceActivityPreparationSummary(activity)).toBe(
-      'Preparation pending: hash 1, probe 2, attachment 3, promotion 4, identity 5. Run maintenance processes a bounded batch.'
+      'Maintenance needed: hash 1, probe 2, attachment 3, promotion 4, identity 5. Run maintenance processes a bounded batch.'
     )
   })
 

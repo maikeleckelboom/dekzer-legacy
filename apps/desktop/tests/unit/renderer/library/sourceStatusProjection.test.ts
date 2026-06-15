@@ -242,9 +242,9 @@ describe('source status projection', () => {
       sourceMaintenance: maintenance({ remainingHashCandidates: 3 })
     })
 
-    expect(view.badge).toBe('Preparation pending')
+    expect(view.badge).toBe('Maintenance needed')
     expect(view.detail).toContain(
-      'Preparation pending: hash 3. Run maintenance processes a bounded batch.'
+      'Maintenance needed: hash 3. Run maintenance processes a bounded batch.'
     )
     expect(view.actions).toEqual([
       expect.objectContaining({ kind: 'scanSource', label: 'Rescan source', enabled: true }),
@@ -310,7 +310,7 @@ describe('source status projection', () => {
       sourceMaintenance: maintenance({ remainingHashCandidates: 1 })
     })
 
-    expect(view.badge).toBe('Preparation pending')
+    expect(view.badge).toBe('Maintenance needed')
     expect(view.actions.find((action) => action.kind === 'scanSource')).toMatchObject({
       enabled: false,
       reason: 'Another source scan is running.'
@@ -336,7 +336,7 @@ describe('source status projection', () => {
       sourceMaintenance: maintenance({ remainingHashCandidates: 1 })
     })
 
-    expect(view.badge).toBe('Preparation pending')
+    expect(view.badge).toBe('Maintenance needed')
     expect(view.actions.find((action) => action.kind === 'scanSource')).toMatchObject({
       enabled: false,
       reason: 'A source scan is already running.'
@@ -370,7 +370,7 @@ describe('source status projection', () => {
     })
 
     expect(view.detail).toContain(
-      'Preparation pending: hash 2, probe 1, promotion 4, identity 8, attachment 13. Run maintenance processes a bounded batch.'
+      'Maintenance needed: hash 2, probe 1, promotion 4, identity 8, attachment 13. Run maintenance processes a bounded batch.'
     )
     expect(view.detail).not.toContain('maintenance items pending')
   })
@@ -388,9 +388,9 @@ describe('source status projection', () => {
       })
     })
 
-    expect(fallback.badge).toBe('Preparation pending')
+    expect(fallback.badge).toBe('Maintenance needed')
     expect(fallback.detail).toContain(
-      'Preparation pending from integrity fallback: probe 8. Run maintenance processes a bounded batch.'
+      'Maintenance needed: probe 8. Run maintenance processes a bounded batch.'
     )
 
     const freshMaintenance = registeredView({
@@ -408,9 +408,9 @@ describe('source status projection', () => {
       })
     })
 
-    expect(freshMaintenance.badge).toBe('Preparation pending')
+    expect(freshMaintenance.badge).toBe('Maintenance needed')
     expect(freshMaintenance.detail).toContain(
-      'Preparation pending: hash 1. Run maintenance processes a bounded batch.'
+      'Maintenance needed: hash 1. Run maintenance processes a bounded batch.'
     )
     expect(freshMaintenance.detail).not.toContain('integrity fallback')
   })
@@ -465,7 +465,7 @@ describe('source status projection', () => {
       })
     })
 
-    expect(view.badge).toBe('Preparation pending')
+    expect(view.badge).toBe('Maintenance needed')
     expect(view.detail).toContain(
       'Maintenance completed; pending work remains: hash 3131, probe 2322, attachment 5457. Run maintenance processes a bounded batch.'
     )
@@ -525,9 +525,9 @@ describe('source status projection', () => {
       })
     })
 
-    expect(view.badge).toBe('Preparation pending')
+    expect(view.badge).toBe('Maintenance needed')
     expect(view.detail).toContain(
-      'Preparation pending: hash 2, probe 1, attachment 3, promotion 4, identity 5.'
+      'Maintenance needed: hash 2, probe 1, attachment 3, promotion 4, identity 5.'
     )
   })
 

@@ -199,8 +199,8 @@ describe('Library home projection', () => {
     expect(projection.productState).toBe('maintenanceNeeded')
     expect(projection.rows).toEqual([
       expect.objectContaining({
-        label: 'Preparation pending',
-        detail: 'Preparation pending. Run maintenance processes a bounded batch.'
+        label: 'Maintenance needed',
+        detail: 'Maintenance needed. Run maintenance processes a bounded batch.'
       })
     ])
   })
@@ -302,8 +302,8 @@ describe('Library home projection', () => {
     expect(projection.productState).toBe('maintenanceNeeded')
     expect(projection.rows).toEqual([
       expect.objectContaining({
-        label: 'Preparation pending',
-        detail: 'Preparation pending: hash 2. Run maintenance processes a bounded batch.'
+        label: 'Maintenance needed',
+        detail: 'Maintenance needed: hash 2. Run maintenance processes a bounded batch.'
       })
     ])
   })

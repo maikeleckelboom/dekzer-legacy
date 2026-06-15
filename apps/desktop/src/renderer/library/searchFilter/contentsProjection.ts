@@ -1,5 +1,11 @@
 import type { LibraryBrowseProfile } from '../libraryBrowseProfile/types'
-import type { ContentProjection, ContentRow, ContentRowIcon } from '../contents/projection'
+import type {
+  ContentProjection,
+  ContentRow,
+  ContentRowIcon,
+  ContentScopeHealth,
+  ContentScopeHeader
+} from '../contents/projection'
 import type { SearchQueryState, SearchResultIdentity } from '../runtime/searchFilterState'
 import type { SearchFilterResultRow } from '../../../shared/library/searchFilter/read'
 
@@ -18,6 +24,7 @@ export function projectSearchFilterContents(options: {
     return {
       surfaceKind: 'indexedContents',
       surfaceLabel: 'Contents',
+      header: searchScopeHeader(options.state, options.activeQuery, options.profile, identity),
       kind: searchProjectionKind(options.state),
       title: 'Search results',
       detail,
@@ -29,6 +36,7 @@ export function projectSearchFilterContents(options: {
   return {
     surfaceKind: 'indexedContents',
     surfaceLabel: 'Contents',
+    header: searchScopeHeader(options.state, options.activeQuery, options.profile, identity),
     kind: 'ready',
     title: 'Search results',
     detail,
@@ -37,6 +45,57 @@ export function projectSearchFilterContents(options: {
         ? projectedRows
         : [...projectedRows, searchLoadMoreRow(nextCursor, loadingMore)]
   }
+}
+
+function searchScopeHeader(
+  state: SearchQueryState,
+  activeQuery: string,
+  profile: LibraryBrowseProfile,
+  identity: SearchResultIdentity | undefined
+): ContentScopeHeader {
+  const query = identity?.textQuery ?? activeQuery
+
+  return {
+    surfaceLabel: 'Library Browse',
+    scopeLabel: 'Search results',
+    profileLabel: profileHeaderLabel(profile),
+    searchLabel: query.length === 0 ? 'Search active' : `Search: "${query}"`,
+    searchScopeLabel: searchScopeHeaderLabel(identity),
+    health: searchHealth(state)
+  }
+}
+
+function profileHeaderLabel(profile: LibraryBrowseProfile): string {
+  switch (profile) {
+    case 'audio':
+      return 'Audio'
+    case 'playable':
+      return 'Audio + Video'
+    case 'allFiles':
+      return 'All Files'
+  }
+}
+
+function searchHealth(state: SearchQueryState): ContentScopeHealth {
+  if (state.kind === 'Idle' || state.kind === 'Pending') {
+    return { label: 'Loading', tone: 'active' }
+  }
+
+  if (state.kind === 'Retained') {
+    if (state.resultState === 'unsupported') {
+      return { label: 'Unavailable', tone: 'danger' }
+    }
+
+    if (state.resultState === 'partial') {
+      return { label: 'Still indexing', tone: 'active' }
+    }
+
+    if (state.resultState === 'empty') {
+      return { label: 'Empty', tone: 'muted' }
+    }
+  }
+
+  return { label: 'Ready', tone: 'ready' }
 }
 
 function rowsForSearchState(state: SearchQueryState): readonly SearchFilterResultRow[] {
@@ -287,6 +346,20 @@ function searchScopePhrase(identity: SearchResultIdentity | undefined): string {
     case 'library':
     case undefined:
       return 'in library'
+  }
+}
+
+function searchScopeHeaderLabel(identity: SearchResultIdentity | undefined): string {
+  switch (identity?.scope.type) {
+    case 'source':
+      return 'Inside selected source'
+    case 'sourceLocation':
+      return 'Inside selected source location'
+    case 'directory':
+      return 'Inside selected folder'
+    case 'library':
+    case undefined:
+      return 'Library-wide'
   }
 }
 

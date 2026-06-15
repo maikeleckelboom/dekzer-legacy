@@ -44,7 +44,7 @@ export type StatusBadge =
   | 'No playable media in this view'
   | 'No files in this source inventory view'
   | 'Needs scan'
-  | 'Preparation pending'
+  | 'Maintenance needed'
   | 'Maintenance running'
   | 'Maintenance unavailable'
   | 'Ready to add'
@@ -380,7 +380,7 @@ function registeredBadge(input: StatusViewInput, sourceId: string): StatusBadge 
       ...(input.maintenanceRunState === undefined ? {} : { runState: input.maintenanceRunState })
     })
   ) {
-    return 'Preparation pending'
+    return 'Maintenance needed'
   }
 
   if (sourceReadinessBadge !== undefined) {
@@ -439,7 +439,7 @@ function registeredActivityBadge(input: StatusViewInput): StatusBadge | undefine
     case 'completedWithRemainingWork':
       return 'Maintenance completed; pending work remains'
     case 'idle':
-      return sourceActivityBacklogTotal(activity) > 0 ? 'Preparation pending' : undefined
+      return sourceActivityBacklogTotal(activity) > 0 ? 'Maintenance needed' : undefined
     case 'failed':
     case 'unavailable':
       return 'Maintenance unavailable'
@@ -549,11 +549,11 @@ function maintenanceBacklogPrefix(backlog: SourceMaintenanceBacklog): string {
     case 'runResult':
       return 'Maintenance completed; pending work remains'
     case 'integrityFallback':
-      return 'Preparation pending from integrity fallback'
+      return 'Maintenance needed'
     case 'maintenance':
-      return 'Preparation pending'
+      return 'Maintenance needed'
     case 'unavailable':
-      return 'Preparation status unavailable'
+      return 'Maintenance status unavailable'
   }
 }
 
@@ -693,7 +693,7 @@ function toneForBadge(badge: StatusBadge): StatusView['tone'] {
     case 'Still indexing':
       return 'active'
     case 'Needs scan':
-    case 'Preparation pending':
+    case 'Maintenance needed':
     case 'Maintenance unavailable':
     case 'Maintenance completed; pending work remains':
     case 'Ready to add':

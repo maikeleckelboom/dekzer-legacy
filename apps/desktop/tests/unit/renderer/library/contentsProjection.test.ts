@@ -62,6 +62,15 @@ describe('projectContents', () => {
     expect(contents.surfaceLabel).toBe('Contents')
     expect(contents.surfaceKind).toBe('indexedContents')
     expect(contents.title).toBe('Source Fixture')
+    expect(contents.header).toMatchObject({
+      surfaceLabel: 'Library Browse',
+      scopeLabel: 'Source Fixture',
+      profileLabel: 'Audio',
+      health: {
+        label: 'Ready',
+        tone: 'ready'
+      }
+    })
     expect(contents.rows.map(rowSummary)).toEqual([
       {
         id: 'asset-1',
@@ -1232,9 +1241,7 @@ describe('projectContents', () => {
     expect(contents.kind).toBe('ready')
     expect(contents.rows.map((row) => row.label)).toEqual(['old.wav'])
     expect(contents.rows[0]).not.toMatchObject({ state: 'failed' })
-    expect(contents.detail).toBe(
-      'Showing previous contents. Unable to request library contents.'
-    )
+    expect(contents.detail).toBe('Showing previous contents. Unable to request library contents.')
   })
 
   it('distinguishes incomplete zero rows from complete authoritative empty', () => {
@@ -1373,6 +1380,10 @@ describe('projectContents', () => {
       kind: 'state',
       state: 'loading',
       label: 'Still indexing'
+    })
+    expect(contents.header.health).toEqual({
+      label: 'Still indexing',
+      tone: 'active'
     })
   })
 

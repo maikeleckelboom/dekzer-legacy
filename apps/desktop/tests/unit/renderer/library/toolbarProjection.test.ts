@@ -21,6 +21,7 @@ describe('library toolbar projection', () => {
       label: 'Add Source'
     })
     expect(toolbar.search.visible).toBe(true)
+    expect(toolbar.search.placeholder).toBe('Search library-wide')
     expect(toolbar.libraryBrowseProfile.visible).toBe(true)
     expect(toolbar.addSourceView.visible).toBe(false)
   })
@@ -124,13 +125,35 @@ describe('library toolbar projection', () => {
     })
     expect(toolbar.search).toMatchObject({
       visible: true,
-      label: 'Search indexed library'
+      label: 'Search indexed library',
+      placeholder: 'Search inside selected source'
     })
     expect(toolbar.libraryBrowseProfile).toMatchObject({
       visible: true,
       label: 'Indexed contents view'
     })
     expect(toolbar.addSourceView.visible).toBe(false)
+  })
+
+  it('labels search as selected-folder scoped for admitted folders', () => {
+    const toolbar = projectLibraryToolbar(
+      input({
+        activeSurface: 'libraryBrowse',
+        selectedNodeId: 'selected',
+        binding: {
+          kind: 'directory',
+          sourceId: '7',
+          directoryId: '12',
+          entryPoint: { kind: 'source', sourceId: '7' },
+          label: 'Album'
+        }
+      })
+    )
+
+    expect(toolbar.search).toMatchObject({
+      visible: true,
+      placeholder: 'Search inside selected folder'
+    })
   })
 
   it('hides scoped controls for neutral read-state selections', () => {

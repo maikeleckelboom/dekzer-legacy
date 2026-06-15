@@ -38,6 +38,17 @@ describe('search/filter contents projection', () => {
     expect(contents.surfaceLabel).toBe('Contents')
     expect(contents.surfaceKind).toBe('indexedContents')
     expect(contents.title).toBe('Search results')
+    expect(contents.header).toMatchObject({
+      surfaceLabel: 'Library Browse',
+      scopeLabel: 'Search results',
+      profileLabel: 'Audio + Video',
+      searchLabel: 'Search: "amen"',
+      searchScopeLabel: 'Library-wide',
+      health: {
+        label: 'Ready',
+        tone: 'ready'
+      }
+    })
     expect(contents.rows.map((projected) => projected.label)).toEqual(['Amen.wav', 'Clip.mp4'])
     expect(contents.rows.map((projected) => projected.icon)).toEqual(['music', 'video'])
   })
@@ -111,6 +122,10 @@ describe('search/filter contents projection', () => {
     })
 
     expect(contents.detail).toBe('1 result in selected source for "amen".')
+    expect(contents.header).toMatchObject({
+      searchLabel: 'Search: "amen"',
+      searchScopeLabel: 'Inside selected source'
+    })
     expect(contents.rows.map((projected) => projected.label)).toEqual(['Amen.wav'])
   })
 

@@ -52,6 +52,7 @@ export function projectLibraryToolbar(input: LibraryToolbarInput): LibraryToolba
     scope === 'addSource' && selectedBinding !== undefined
       ? hasLocalSourceAdmission(selectedBinding)
       : false
+  const searchScope = searchScopeDescription(selectedBinding)
   const showOpenAddSource = scope === 'libraryBrowse'
   const showFolderPicker =
     scope === 'addSource' && input.addSourceView !== 'inventory' && !selectedLocalAdmissionAvailable
@@ -62,8 +63,8 @@ export function projectLibraryToolbar(input: LibraryToolbarInput): LibraryToolba
       visible: scope === 'libraryBrowse',
       enabled: scope === 'libraryBrowse',
       label: 'Search indexed library',
-      title: 'Search indexed library',
-      placeholder: 'Search indexed library'
+      title: `Search indexed library ${searchScope.titleSuffix}`,
+      placeholder: `Search ${searchScope.placeholder}`
     },
     libraryBrowseProfile: {
       visible: scope === 'libraryBrowse',
@@ -86,6 +87,20 @@ export function projectLibraryToolbar(input: LibraryToolbarInput): LibraryToolba
         ? {}
         : { reason: 'A source action is already running.' })
     }
+  }
+}
+
+function searchScopeDescription(binding: RowBinding | undefined): {
+  readonly placeholder: string
+  readonly titleSuffix: string
+} {
+  switch (binding?.kind) {
+    case 'source':
+      return { placeholder: 'inside selected source', titleSuffix: 'inside selected source' }
+    case 'directory':
+      return { placeholder: 'inside selected folder', titleSuffix: 'inside selected folder' }
+    default:
+      return { placeholder: 'library-wide', titleSuffix: 'library-wide' }
   }
 }
 

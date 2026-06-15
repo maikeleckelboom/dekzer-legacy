@@ -64,7 +64,8 @@ export type LibrarySourceReadinessBadge =
   | 'Missing'
   | 'Blocked'
   | 'Offline/unavailable'
-  | 'Preparation pending'
+  | 'Maintenance needed'
+  | 'Maintenance unavailable'
   | 'No audio tracks in this view'
   | 'No playable media in this view'
   | 'No files in this source inventory view'
@@ -279,7 +280,7 @@ function projectLibraryHomeRootReadiness(input: {
   if (backlog.total > 0) {
     return {
       productState: 'maintenanceNeeded',
-      badge: 'Preparation pending',
+      badge: 'Maintenance needed',
       tone: 'warning',
       detail: `${libraryHomeMaintenancePrefix(backlog.source)}. Run maintenance processes a bounded batch.`
     }
@@ -378,28 +379,27 @@ function projectLibraryHomeSourceActivity(input: {
       if (sourceActivityBacklogTotal(activity) > 0) {
         return {
           productState: 'maintenanceNeeded',
-          badge: 'Preparation pending',
+          badge: 'Maintenance needed',
           tone: 'warning',
           detail:
             sourceActivityPreparationSummary(activity) ??
-            'Preparation pending. Run maintenance processes a bounded batch.'
+            'Maintenance needed. Run maintenance processes a bounded batch.'
         }
       }
       break
     case 'failed':
       return {
         productState: 'maintenanceNeeded',
-        badge: 'Preparation pending',
+        badge: 'Maintenance needed',
         tone: 'warning',
-        detail: sourceActivityPreparationSummary(activity) ?? 'Preparation failed.'
+        detail: sourceActivityPreparationSummary(activity) ?? 'Maintenance needed.'
       }
     case 'unavailable':
       return {
         productState: 'maintenanceNeeded',
-        badge: 'Preparation pending',
+        badge: 'Maintenance unavailable',
         tone: 'warning',
-        detail:
-          sourceActivityPreparationSummary(activity) ?? 'Preparation status unavailable.'
+        detail: sourceActivityPreparationSummary(activity) ?? 'Maintenance status unavailable.'
       }
     case 'complete':
       break
@@ -435,13 +435,13 @@ function libraryHomeMaintenancePrefix(
 ): string {
   switch (source) {
     case 'maintenance':
-      return 'Preparation pending'
+      return 'Maintenance needed'
     case 'integrityFallback':
-      return 'Preparation pending from integrity fallback'
+      return 'Maintenance needed'
     case 'runResult':
       return 'Maintenance completed; pending work remains'
     case 'unavailable':
-      return 'Preparation status unavailable'
+      return 'Maintenance status unavailable'
   }
 }
 

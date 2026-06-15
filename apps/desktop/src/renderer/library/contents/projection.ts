@@ -25,6 +25,7 @@ import {
   type LibraryHomeProjection,
   type LibraryHomeRow
 } from '../libraryHome/projection'
+import { libraryBrowseProfileLabel, type LibraryBrowseProfile } from '../libraryBrowseProfile/types'
 import type { BrowserProjection } from '../tree/projection'
 import type { BrowserState, RowBinding } from '../state'
 import type { BrowserTreeNodeId } from '../tree/types'
@@ -118,9 +119,32 @@ export type ContentRow = {
   readonly action?: ContentRowAction
 }
 
+export type ContentScopeHealth = {
+  readonly label:
+    | 'Ready'
+    | 'Loading'
+    | 'Still indexing'
+    | 'Unavailable'
+    | 'Missing'
+    | 'Blocked'
+    | 'Partial'
+    | 'Empty'
+  readonly tone: 'ready' | 'active' | 'warning' | 'danger' | 'muted'
+}
+
+export type ContentScopeHeader = {
+  readonly surfaceLabel: 'Library Browse' | 'Add Source'
+  readonly scopeLabel: string
+  readonly profileLabel?: string
+  readonly searchLabel?: string
+  readonly searchScopeLabel?: string
+  readonly health: ContentScopeHealth
+}
+
 export type ContentProjection = {
   readonly surfaceKind: ContentSurfaceKind
   readonly surfaceLabel: string
+  readonly header: ContentScopeHeader
   readonly kind: ContentProjectionKind
   readonly title: string
   readonly detail?: string
@@ -141,37 +165,115 @@ export type ProjectContentsOptions = {
 type ContentSurface = {
   readonly surfaceKind: ContentSurfaceKind
   readonly surfaceLabel: string
+  readonly workstationSurfaceLabel: ContentScopeHeader['surfaceLabel']
 }
 
 const indexedContentsSurface = {
   surfaceKind: 'indexedContents',
-  surfaceLabel: 'Contents'
+  surfaceLabel: 'Contents',
+  workstationSurfaceLabel: 'Library Browse'
 } satisfies ContentSurface
 
 const librarySurface = {
   surfaceKind: 'libraryStart',
-  surfaceLabel: 'Library'
+  surfaceLabel: 'Library',
+  workstationSurfaceLabel: 'Library Browse'
 } satisfies ContentSurface
 
 const libraryHomeSurface = {
   surfaceKind: 'libraryHome',
-  surfaceLabel: 'Library'
+  surfaceLabel: 'Library',
+  workstationSurfaceLabel: 'Library Browse'
 } satisfies ContentSurface
 
 const sourceStatusSurface = {
   surfaceKind: 'sourceStatus',
-  surfaceLabel: 'Source Status'
+  surfaceLabel: 'Source Status',
+  workstationSurfaceLabel: 'Library Browse'
 } satisfies ContentSurface
 
 function contentProjection(
   surface: ContentSurface,
-  projection: Omit<ContentProjection, 'surfaceKind' | 'surfaceLabel'>
+  projection: Omit<ContentProjection, 'surfaceKind' | 'surfaceLabel' | 'header'> & {
+    readonly header?: ContentScopeHeader
+  }
 ): ContentProjection {
   return {
     surfaceKind: surface.surfaceKind,
     surfaceLabel: surface.surfaceLabel,
+    header: projection.header ?? contentScopeHeader(surface, projection),
     ...projection
   }
+}
+
+function contentScopeHeader(
+  surface: ContentSurface,
+  projection: Pick<ContentProjection, 'kind' | 'title' | 'rows'> & {
+    readonly detail?: string
+  }
+): ContentScopeHeader {
+  return {
+    surfaceLabel: surface.workstationSurfaceLabel,
+    scopeLabel: projection.title,
+    health: contentHealthFromProjection(projection)
+  }
+}
+
+function libraryBrowseHeader(
+  projection: Pick<ContentProjection, 'kind' | 'title' | 'rows'> & {
+    readonly detail?: string
+  },
+  profile: LibraryBrowseProfile | undefined
+): ContentScopeHeader {
+  return {
+    surfaceLabel: 'Library Browse',
+    scopeLabel: projection.title,
+    profileLabel: libraryBrowseProfileLabel(profile ?? 'audio'),
+    health: contentHealthFromProjection(projection)
+  }
+}
+
+function contentHealthFromProjection(
+  projection: Pick<ContentProjection, 'kind' | 'rows'> & { readonly detail?: string }
+): ContentScopeHealth {
+  switch (projection.kind) {
+    case 'ready':
+    case 'libraryHome':
+    case 'libraryStart':
+      return rowsIndicateEmpty(projection.rows)
+        ? { label: 'Empty', tone: 'muted' }
+        : { label: 'Ready', tone: 'ready' }
+    case 'loading':
+    case 'notLoaded':
+      return { label: 'Loading', tone: 'active' }
+    case 'failed':
+      return { label: 'Unavailable', tone: 'danger' }
+    case 'unsupported':
+      return unavailableHealth(projection)
+    case 'emptySelection':
+      return { label: 'Empty', tone: 'muted' }
+  }
+}
+
+function rowsIndicateEmpty(rows: readonly ContentRow[]): boolean {
+  return rows.length === 1 && rows[0]?.kind === 'state' && rows[0].state === 'empty'
+}
+
+function unavailableHealth(projection: {
+  readonly rows: readonly ContentRow[]
+  readonly detail?: string
+}): ContentScopeHealth {
+  const text = `${projection.detail ?? ''} ${projection.rows.map((row) => row.label).join(' ')}`
+
+  if (/missing/i.test(text)) {
+    return { label: 'Missing', tone: 'danger' }
+  }
+
+  if (/blocked/i.test(text)) {
+    return { label: 'Blocked', tone: 'danger' }
+  }
+
+  return { label: 'Unavailable', tone: 'danger' }
 }
 
 export function projectContents(options: ProjectContentsOptions): ContentProjection {
@@ -211,7 +313,8 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
           ...(options.sourceActivityBySourceId === undefined
             ? {}
             : { sourceActivityBySourceId: options.sourceActivityBySourceId })
-        })
+        }),
+        options.state.libraryBrowseProfile
       )
     }
 
@@ -250,7 +353,8 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
         selectedNodeId,
         binding,
         bindingsById: options.bindingsById,
-        contentsState: options.contentsState
+        contentsState: options.contentsState,
+        profile: options.state.libraryBrowseProfile
       })
     case 'directory':
       return projectDirectoryContents({
@@ -258,12 +362,14 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
         selectedNodeId,
         binding,
         bindingsById: options.bindingsById,
-        contentsState: options.contentsState
+        contentsState: options.contentsState,
+        profile: options.state.libraryBrowseProfile
       })
     case 'file':
       return projectFileContents({
         state: options.state,
-        selectedNodeId
+        selectedNodeId,
+        profile: options.state.libraryBrowseProfile
       })
     case 'navigation':
       return stateProjection({
@@ -372,12 +478,20 @@ function contentProjectionFromAddSource(projection: AddSourceProjection): Conten
   })
 }
 
-function contentProjectionFromLibraryHome(projection: LibraryHomeProjection): ContentProjection {
-  return contentProjection(libraryHomeSurface, {
+function contentProjectionFromLibraryHome(
+  projection: LibraryHomeProjection,
+  profile: LibraryBrowseProfile | undefined
+): ContentProjection {
+  const content = {
     kind: 'libraryHome',
     title: projection.title,
     detail: projection.detail,
     rows: projection.rows.map(contentRowFromLibraryHome)
+  } satisfies Omit<ContentProjection, 'surfaceKind' | 'surfaceLabel' | 'header'>
+
+  return contentProjection(libraryHomeSurface, {
+    ...content,
+    header: libraryBrowseHeader(content, profile)
   })
 }
 
@@ -410,17 +524,20 @@ function addSourceContentSurface(projection: AddSourceProjection): ContentSurfac
     case 'inventory':
       return {
         surfaceKind: 'sourceInventory',
-        surfaceLabel: projection.surfaceLabel
+        surfaceLabel: projection.surfaceLabel,
+        workstationSurfaceLabel: 'Add Source'
       }
     case 'preview':
       return {
         surfaceKind: 'sourcePreview',
-        surfaceLabel: projection.surfaceLabel
+        surfaceLabel: projection.surfaceLabel,
+        workstationSurfaceLabel: 'Add Source'
       }
     case 'addSource':
       return {
         surfaceKind: 'addSource',
-        surfaceLabel: projection.surfaceLabel
+        surfaceLabel: projection.surfaceLabel,
+        workstationSurfaceLabel: 'Add Source'
       }
   }
 }
@@ -477,6 +594,7 @@ function projectSourceContents(options: {
   readonly binding: Extract<RowBinding, { readonly kind: 'source' }>
   readonly bindingsById: BrowserProjection['bindingsById'] | undefined
   readonly contentsState: ContentsBoundaryState | undefined
+  readonly profile: LibraryBrowseProfile | undefined
 }): ContentProjection {
   const title = formatSourceDisplayName(options.binding.target.label)
   const acceptedSnapshot = retainedAcceptedSnapshotProjection({
@@ -491,7 +609,8 @@ function projectSourceContents(options: {
       acceptedSnapshot?.retainedNodeId ??
       (useAcceptedFallback ? 'accepted-contents' : options.selectedNodeId),
     title: acceptedSnapshot?.title ?? (useAcceptedFallback ? 'Library contents' : title),
-    contentsState: options.contentsState
+    contentsState: options.contentsState,
+    profile: options.profile
   })
 }
 
@@ -501,6 +620,7 @@ function projectDirectoryContents(options: {
   readonly binding: Extract<RowBinding, { readonly kind: 'directory' }>
   readonly bindingsById: BrowserProjection['bindingsById'] | undefined
   readonly contentsState: ContentsBoundaryState | undefined
+  readonly profile: LibraryBrowseProfile | undefined
 }): ContentProjection {
   const directoryRow = findLoadedChildRow(options.state, options.selectedNodeId)
   const title = directoryRow?.label ?? 'Selected folder'
@@ -516,7 +636,8 @@ function projectDirectoryContents(options: {
       acceptedSnapshot?.retainedNodeId ??
       (useAcceptedFallback ? 'accepted-contents' : options.selectedNodeId),
     title: acceptedSnapshot?.title ?? (useAcceptedFallback ? 'Library contents' : title),
-    contentsState: options.contentsState
+    contentsState: options.contentsState,
+    profile: options.profile
   })
 }
 
@@ -716,62 +837,78 @@ function projectContentsState(options: {
   readonly projectionId: BrowserTreeNodeId
   readonly title: string
   readonly contentsState: ContentsBoundaryState | undefined
+  readonly profile: LibraryBrowseProfile | undefined
 }): ContentProjection {
   const state = options.contentsState
 
   if (state === undefined) {
-    return stateProjection({
-      kind: 'loading',
-      stateRowId: options.projectionId,
-      title: options.title,
-      state: 'loading',
-      label: 'Loading contents',
-      detail: 'Loading contents.'
-    })
+    return withLibraryBrowseHeader(
+      stateProjection({
+        kind: 'loading',
+        stateRowId: options.projectionId,
+        title: options.title,
+        state: 'loading',
+        label: 'Loading contents',
+        detail: 'Loading contents.'
+      }),
+      options.profile
+    )
   }
 
   if (state.kind === 'idle') {
     if (state.pending !== undefined) {
-      return stateProjection({
+      return withLibraryBrowseHeader(
+        stateProjection({
+          kind: 'notLoaded',
+          stateRowId: options.projectionId,
+          title: options.title,
+          state: 'notLoaded',
+          label: 'Contents pending',
+          detail: state.detail ?? 'Contents request is pending.'
+        }),
+        options.profile
+      )
+    }
+
+    return withLibraryBrowseHeader(
+      stateProjection({
         kind: 'notLoaded',
         stateRowId: options.projectionId,
         title: options.title,
         state: 'notLoaded',
-        label: 'Contents pending',
-        detail: state.detail ?? 'Contents request is pending.'
-      })
-    }
-
-    return stateProjection({
-      kind: 'notLoaded',
-      stateRowId: options.projectionId,
-      title: options.title,
-      state: 'notLoaded',
-      label: 'Contents not loaded',
-      detail: state.detail ?? 'Contents have not been loaded.'
-    })
+        label: 'Contents not loaded',
+        detail: state.detail ?? 'Contents have not been loaded.'
+      }),
+      options.profile
+    )
   }
 
   if (state.kind === 'loading') {
-    return stateProjection({
-      kind: 'loading',
-      stateRowId: options.projectionId,
-      title: options.title,
-      state: 'loading',
-      label: 'Loading contents',
-      detail: state.detail ?? 'Loading contents.'
-    })
+    return withLibraryBrowseHeader(
+      stateProjection({
+        kind: 'loading',
+        stateRowId: options.projectionId,
+        title: options.title,
+        state: 'loading',
+        label: 'Loading contents',
+        detail: state.detail ?? 'Loading contents.'
+      }),
+      options.profile
+    )
   }
 
   if (state.kind === 'failed') {
-    return stateProjection({
-      kind: 'failed',
-      stateRowId: options.projectionId,
-      title: options.title,
-      state: 'failed',
-      label: 'Contents unavailable',
-      detail: state.detail
-    })
+    return withLibraryBrowseHeader(
+      stateProjection({
+        kind: 'failed',
+        stateRowId: options.projectionId,
+        title: options.title,
+        state: 'failed',
+        label: 'Contents unavailable',
+        detail: state.detail
+      }),
+      options.profile
+    )
   }
 
   const allowContinuation = retainedSnapshotCanLoadMore(state)
@@ -779,6 +916,7 @@ function projectContentsState(options: {
     projectionId: options.projectionId,
     title: options.title,
     result: state.result,
+    profile: options.profile,
     allowContinuation,
     ...(allowContinuation && state.nextCursor !== undefined
       ? { nextCursor: state.nextCursor }
@@ -817,29 +955,104 @@ function refreshingDetail(prefix: string, detail: string | undefined): string {
   return detail === undefined ? prefix : `${prefix} ${detail}`
 }
 
+function withLibraryBrowseHeader(
+  projection: ContentProjection,
+  profile: LibraryBrowseProfile | undefined
+): ContentProjection {
+  return {
+    ...projection,
+    header: libraryBrowseHeader(projection, profile)
+  }
+}
+
+function libraryBrowseHeaderWithHealth(
+  projection: Pick<ContentProjection, 'kind' | 'title' | 'rows'> & {
+    readonly detail?: string
+  },
+  profile: LibraryBrowseProfile | undefined,
+  health: ContentScopeHealth
+): ContentScopeHeader {
+  return {
+    ...libraryBrowseHeader(projection, profile),
+    health
+  }
+}
+
+function contentHealthFromContentsResult(
+  result: ContentsResult,
+  rowCount: number
+): ContentScopeHealth {
+  switch (result.state) {
+    case 'ready':
+    case 'empty':
+      if (!isVerifiedEmptyResult(result, rowCount)) {
+        return contentHealthFromCoverage(result.scopeCoverage.state)
+      }
+
+      return rowCount === 0 ? { label: 'Empty', tone: 'muted' } : { label: 'Ready', tone: 'ready' }
+    case 'partial':
+      return { label: 'Still indexing', tone: 'active' }
+    case 'sourceUnavailable':
+      return { label: 'Unavailable', tone: 'danger' }
+    case 'locationMissing':
+      return { label: 'Missing', tone: 'danger' }
+    case 'blocked':
+      return { label: 'Blocked', tone: 'danger' }
+    case 'failed':
+      return { label: 'Unavailable', tone: 'danger' }
+  }
+}
+
+function contentHealthFromCoverage(
+  state: ContentsResult['scopeCoverage']['state']
+): ContentScopeHealth {
+  switch (state) {
+    case 'complete':
+      return { label: 'Ready', tone: 'ready' }
+    case 'pending':
+    case 'scanning':
+      return { label: 'Still indexing', tone: 'active' }
+    case 'incomplete':
+      return { label: 'Partial', tone: 'warning' }
+    case 'sourceUnavailable':
+      return { label: 'Unavailable', tone: 'danger' }
+    case 'locationMissing':
+      return { label: 'Missing', tone: 'danger' }
+    case 'blocked':
+      return { label: 'Blocked', tone: 'danger' }
+    case 'failed':
+      return { label: 'Unavailable', tone: 'danger' }
+  }
+}
+
 function projectContentsReadResult(options: {
   readonly projectionId: BrowserTreeNodeId
   readonly title: string
   readonly result: ContentsReadResult
+  readonly profile: LibraryBrowseProfile | undefined
   readonly allowContinuation?: boolean
   readonly nextCursor?: string
   readonly accumulatedRows?: readonly ContentsFileRow[]
 }): ContentProjection {
   if (options.result.state !== 'ready') {
-    return stateProjection({
-      kind: options.result.state === 'readFailed' ? 'failed' : 'unsupported',
-      stateRowId: options.projectionId,
-      title: options.title,
-      state: options.result.state === 'readFailed' ? 'failed' : 'unsupported',
-      label: 'Contents unavailable',
-      detail: options.result.error.message
-    })
+    return withLibraryBrowseHeader(
+      stateProjection({
+        kind: options.result.state === 'readFailed' ? 'failed' : 'unsupported',
+        stateRowId: options.projectionId,
+        title: options.title,
+        state: options.result.state === 'readFailed' ? 'failed' : 'unsupported',
+        label: 'Contents unavailable',
+        detail: options.result.error.message
+      }),
+      options.profile
+    )
   }
 
   return projectContentsResult({
     projectionId: options.projectionId,
     title: options.title,
     result: options.result.result,
+    profile: options.profile,
     ...(options.allowContinuation === undefined
       ? {}
       : { allowContinuation: options.allowContinuation }),
@@ -852,6 +1065,7 @@ function projectContentsResult(options: {
   readonly projectionId: BrowserTreeNodeId
   readonly title: string
   readonly result: ContentsResult
+  readonly profile: LibraryBrowseProfile | undefined
   readonly allowContinuation?: boolean
   readonly nextCursor?: string
   readonly accumulatedRows?: readonly ContentsFileRow[]
@@ -863,16 +1077,25 @@ function projectContentsResult(options: {
   const hasMore = nextCursor !== undefined
 
   if (rows.length === 0 && nextCursor !== undefined) {
-    return contentProjection(indexedContentsSurface, {
+    const projection = {
       kind: contentsProjectionKind(result),
       title: options.title,
       detail: contentsDetailWithContinuation(result, hasMore, options.accumulatedRows),
       rows: [loadMoreRow(options.projectionId, result, nextCursor)]
+    } satisfies Omit<ContentProjection, 'surfaceKind' | 'surfaceLabel' | 'header'>
+
+    return contentProjection(indexedContentsSurface, {
+      ...projection,
+      header: libraryBrowseHeaderWithHealth(
+        projection,
+        options.profile,
+        contentHealthFromContentsResult(result, rows.length)
+      )
     })
   }
 
   if (rows.length === 0) {
-    return contentProjection(indexedContentsSurface, {
+    const projection = {
       kind: contentsProjectionKind(result),
       title: options.title,
       detail: contentsDetail(result, options.accumulatedRows),
@@ -884,37 +1107,61 @@ function projectContentsResult(options: {
           detail: contentsDetail(result, options.accumulatedRows)
         })
       ]
+    } satisfies Omit<ContentProjection, 'surfaceKind' | 'surfaceLabel' | 'header'>
+
+    return contentProjection(indexedContentsSurface, {
+      ...projection,
+      header: libraryBrowseHeaderWithHealth(
+        projection,
+        options.profile,
+        contentHealthFromContentsResult(result, rows.length)
+      )
     })
   }
 
   const contentRows =
-    nextCursor !== undefined ? [...rows, loadMoreRow(options.projectionId, result, nextCursor)] : rows
+    nextCursor !== undefined
+      ? [...rows, loadMoreRow(options.projectionId, result, nextCursor)]
+      : rows
 
-  return contentProjection(indexedContentsSurface, {
+  const projection = {
     kind: contentsProjectionKind(result),
     title: options.title,
     detail: contentsDetailWithContinuation(result, hasMore, options.accumulatedRows),
     rows: contentRows
+  } satisfies Omit<ContentProjection, 'surfaceKind' | 'surfaceLabel' | 'header'>
+
+  return contentProjection(indexedContentsSurface, {
+    ...projection,
+    header: libraryBrowseHeaderWithHealth(
+      projection,
+      options.profile,
+      contentHealthFromContentsResult(result, rows.length)
+    )
   })
 }
 
 function projectFileContents(options: {
   readonly state: BrowserState
   readonly selectedNodeId: BrowserTreeNodeId
+  readonly profile: LibraryBrowseProfile | undefined
 }): ContentProjection {
   const fileRow = findLoadedChildRow(options.state, options.selectedNodeId)
   const title = fileRow?.label ?? 'Selected file'
   const detail =
     fileRow === undefined ? 'File details are not available.' : formatPresenceDetail(fileRow)
 
-  return stateProjection({
-    kind: 'ready',
-    stateRowId: options.selectedNodeId,
-    title,
-    state: 'file',
-    label: 'File selected',
-    detail
-  })
+  return withLibraryBrowseHeader(
+    stateProjection({
+      kind: 'ready',
+      stateRowId: options.selectedNodeId,
+      title,
+      state: 'file',
+      label: 'File selected',
+      detail
+    }),
+    options.profile
+  )
 }
 
 function contentsRow(row: ContentsFileRow): ContentRow {

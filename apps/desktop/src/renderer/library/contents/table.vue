@@ -62,6 +62,64 @@ function formatContentDetail(row: ContentRow): string {
   return ''
 }
 
+function formatContentKind(row: ContentRow): string {
+  if (row.kind === 'directory') return 'Folder'
+  if (row.kind === 'more') return 'More'
+
+  if (row.kind === 'state') {
+    switch (row.state) {
+      case 'empty':
+        return 'Empty'
+      case 'notLoaded':
+        return 'Pending'
+      case 'loading':
+        return 'Loading'
+      case 'failed':
+        return 'Unavailable'
+      case 'unsupported':
+        return 'Unavailable'
+      case 'file':
+        return 'File'
+      default:
+        return 'State'
+    }
+  }
+
+  if (row.fileClass === 'audio') return 'Audio'
+  if (row.fileClass === 'video') return 'Video'
+  if (row.fileClass === 'image') return 'Image'
+
+  switch (row.icon) {
+    case 'cueSheet':
+      return 'Cue sheet'
+    case 'metadata':
+      return 'Metadata'
+    default:
+      return 'File'
+  }
+}
+
+function formatContentState(row: ContentRow): string {
+  if (row.presence === 'missing') return 'Missing'
+  if (row.presence === 'removed') return 'Removed'
+  if (row.kind === 'more') return row.action === undefined ? 'Loading' : 'More available'
+
+  if (row.kind === 'state') {
+    if (row.state === 'empty') return 'Empty'
+    if (row.state === 'notLoaded') return 'Not loaded'
+    if (row.state === 'loading') return 'Loading'
+    if (row.state === 'failed') return 'Unavailable'
+    if (row.state === 'unsupported') return 'Unavailable'
+    if (row.state === 'file') return 'Selected'
+  }
+
+  if (row.detail === 'Indexing') return 'Indexing'
+  if (row.detail === 'Source missing' || row.detail === 'File missing') return 'Missing'
+  if (row.detail === 'Source blocked') return 'Blocked'
+  if (row.detail === 'Source file removed' || row.detail === 'File removed') return 'Removed'
+  return 'Available'
+}
+
 function resolveContentRowIcon(icon: ContentRowIcon | undefined): IconRole | undefined {
   switch (icon) {
     case 'folder':
@@ -164,6 +222,21 @@ function statusBadgeClass(view: StatusView): string {
   }
 }
 
+function scopeHealthClass(tone: ContentProjection['header']['health']['tone']): string {
+  switch (tone) {
+    case 'ready':
+      return 'border-(--color-border) text-(--color-text)'
+    case 'active':
+      return 'border-(--color-accent) text-(--color-accent)'
+    case 'warning':
+      return 'border-(--color-warning) text-(--color-warning)'
+    case 'danger':
+      return 'border-(--color-danger) text-(--color-danger)'
+    case 'muted':
+      return 'border-(--color-border) text-(--color-text-muted)'
+  }
+}
+
 function resolveStatusActionIcon(action: StatusAction): IconRole {
   switch (action.kind) {
     case 'addLocalPath':
@@ -198,21 +271,56 @@ function resolveHandoffActionIcon(action: SourceAdmissionHandoffAction): IconRol
   >
     <header class="shrink-0 border-b border-(--color-border) px-4 py-3">
       <span id="library-contents-region-label" class="sr-only">Library contents</span>
-      <p class="text-xs font-bold uppercase tracking-normal text-(--color-text-muted)">
-        {{ projection.surfaceLabel }}
-      </p>
-      <h3
-        id="library-contents-title"
-        class="mt-1 text-base font-bold leading-6 text-(--color-text)"
-      >
-        {{ projection.title }}
-      </h3>
-      <p
-        v-if="projection.detail !== undefined"
-        class="mt-1 text-xs leading-5 text-(--color-text-muted)"
-      >
-        {{ projection.detail }}
-      </p>
+      <div class="flex min-w-0 items-start justify-between gap-3">
+        <div class="min-w-0">
+          <p class="text-xs font-bold uppercase tracking-normal text-(--color-text-muted)">
+            {{ projection.header.surfaceLabel }}
+            <template v-if="projection.header.profileLabel !== undefined">
+              / {{ projection.header.profileLabel }}
+            </template>
+          </p>
+          <h3
+            id="library-contents-title"
+            class="mt-1 truncate text-base font-bold leading-6 text-(--color-text)"
+            :title="projection.header.scopeLabel"
+          >
+            {{ projection.header.scopeLabel }}
+          </h3>
+          <p
+            v-if="projection.detail !== undefined || projection.header.searchLabel !== undefined"
+            class="mt-1 min-w-0 text-xs leading-5 text-(--color-text-muted)"
+          >
+            <span
+              v-if="projection.header.searchLabel !== undefined"
+              class="font-semibold text-(--color-text)"
+            >
+              {{ projection.header.searchLabel }}
+            </span>
+            <span v-if="projection.header.searchScopeLabel !== undefined">
+              {{ projection.header.searchLabel !== undefined ? ' - ' : '' }}
+              {{ projection.header.searchScopeLabel }}
+            </span>
+            <span
+              v-if="
+                projection.detail !== undefined &&
+                (projection.header.searchLabel !== undefined ||
+                  projection.header.searchScopeLabel !== undefined)
+              "
+            >
+              -
+            </span>
+            <span v-if="projection.detail !== undefined">
+              {{ projection.detail }}
+            </span>
+          </p>
+        </div>
+        <span
+          class="inline-flex min-h-7 shrink-0 items-center rounded-sm border px-2 py-1 text-xs font-bold"
+          :class="scopeHealthClass(projection.header.health.tone)"
+        >
+          {{ projection.header.health.label }}
+        </span>
+      </div>
       <div
         v-if="sourceAdmissionHandoff !== undefined"
         class="mt-3 border border-(--color-border) bg-(--color-surface) px-3 py-2"
@@ -281,8 +389,9 @@ function resolveHandoffActionIcon(action: SourceAdmissionHandoffAction): IconRol
           class="sticky top-0 z-10 border-b border-(--color-border) bg-(--color-background) text-xs uppercase text-(--color-text-muted)"
         >
           <tr>
-            <th class="w-[70%] px-4 py-2 font-bold">Name</th>
-            <th class="w-[30%] px-4 py-2 font-bold">Details</th>
+            <th class="w-[58%] px-4 py-2 font-bold">Name</th>
+            <th class="w-[16%] px-4 py-2 font-bold">Kind</th>
+            <th class="w-[26%] px-4 py-2 font-bold">State</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-(--color-border)">
@@ -307,6 +416,28 @@ function resolveHandoffActionIcon(action: SourceAdmissionHandoffAction): IconRol
                 <span class="min-w-0 flex-1 truncate font-semibold" :class="labelClassForRow(row)">
                   {{ row.label }}
                 </span>
+              </div>
+              <span
+                v-if="formatContentDetail(row).length > 0"
+                class="mt-0.5 block truncate pl-9 text-xs leading-5 text-(--color-text-muted)"
+                :title="formatContentDetail(row)"
+              >
+                {{ formatContentDetail(row) }}
+              </span>
+            </td>
+            <td class="px-4 py-2 align-middle text-xs font-semibold text-(--color-text-muted)">
+              <span class="block truncate" :title="formatContentKind(row)">
+                {{ formatContentKind(row) }}
+              </span>
+            </td>
+            <td class="px-4 py-2 align-middle">
+              <div class="flex min-w-0 items-center justify-between gap-2">
+                <span
+                  class="min-w-0 truncate text-xs leading-5 text-(--color-text-muted)"
+                  :title="formatContentState(row)"
+                >
+                  {{ formatContentState(row) }}
+                </span>
                 <button
                   v-if="row.action !== undefined"
                   type="button"
@@ -317,11 +448,6 @@ function resolveHandoffActionIcon(action: SourceAdmissionHandoffAction): IconRol
                   <span>{{ row.action.label }}</span>
                 </button>
               </div>
-            </td>
-            <td class="px-4 py-2 align-middle text-xs leading-5 text-(--color-text-muted)">
-              <span class="block truncate" :title="formatContentDetail(row)">
-                {{ formatContentDetail(row) }}
-              </span>
             </td>
           </tr>
         </tbody>

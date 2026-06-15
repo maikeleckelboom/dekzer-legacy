@@ -21,8 +21,7 @@ export function projectSourceActivity(input: {
 
   const scan = scanFromProgress(input.scanProgress) ?? activity.scan
   const preparation =
-    input.maintenanceRunState === 'completed' &&
-    activity.preparation.lastRunStatus !== undefined
+    input.maintenanceRunState === 'completed' && activity.preparation.lastRunStatus !== undefined
       ? { ...activity.preparation, provenance: 'runResult' as const }
       : activity.preparation
 
@@ -101,13 +100,13 @@ export function sourceActivityPreparationSummary(
     case 'idle':
       return categoryDetail.length === 0
         ? undefined
-        : `Preparation pending: ${categoryDetail}. Run maintenance processes a bounded batch.`
+        : `Maintenance needed: ${categoryDetail}. Run maintenance processes a bounded batch.`
     case 'complete':
       return 'Preparation complete.'
     case 'failed':
-      return 'Preparation failed.'
+      return 'Maintenance needed.'
     case 'unavailable':
-      return 'Preparation status unavailable.'
+      return 'Maintenance status unavailable.'
   }
 }
 
@@ -184,9 +183,7 @@ function scanFromProgress(
   }
 }
 
-function scanRunningDetail(
-  counters: ReadSourceActivityReply['scan']['counters']
-): string {
+function scanRunningDetail(counters: ReadSourceActivityReply['scan']['counters']): string {
   const parts: string[] = []
 
   if (counters.filesDiscovered !== undefined && counters.filesDiscovered > 0) {
