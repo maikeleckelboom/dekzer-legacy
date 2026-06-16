@@ -5,6 +5,7 @@ import { Icon, type IconRole } from '../../icons'
 import type { WorkstationContextLabel, WorkstationInspectorProps } from './types'
 import type { SourceAdmissionHandoffAction } from '../runtime/sourceAdmissionHandoff'
 import type { StatusAction } from '../sourceStatus/projection'
+import type { TrackAnalysisAction } from '../trackAnalysis/controller'
 
 defineOptions({
   name: 'LibraryWorkstationInspector'
@@ -84,6 +85,8 @@ const showSourceActions = computed(
     (props.status !== undefined || props.sourceAdmissionHandoff !== undefined)
 )
 
+const showTrackAnalysis = computed(() => props.trackAnalysis?.visible === true)
+
 function resolveStatusActionIcon(action: StatusAction): IconRole {
   switch (action.kind) {
     case 'addLocalPath':
@@ -110,6 +113,24 @@ function resolveHandoffActionIcon(action: SourceAdmissionHandoffAction): IconRol
       return 'action.more'
   }
 }
+
+function resolveTrackAnalysisActionIcon(action: TrackAnalysisAction): IconRole {
+  switch (action.kind) {
+    case 'analyze':
+      return 'action.scan'
+  }
+}
+
+function warningClass(severity: 'info' | 'warning' | 'error'): string {
+  switch (severity) {
+    case 'error':
+      return 'text-(--color-danger)'
+    case 'warning':
+      return 'text-(--color-warning)'
+    case 'info':
+      return 'text-(--color-text-muted)'
+  }
+}
 </script>
 
 <template>
@@ -130,6 +151,85 @@ function resolveHandoffActionIcon(action: SourceAdmissionHandoffAction): IconRol
     <p v-else-if="showNoContextCopy" class="mt-3 text-xs leading-5 text-(--color-text-muted)">
       No inspectable context selected.
     </p>
+
+    <section
+      v-if="showTrackAnalysis && trackAnalysis !== undefined"
+      class="mt-4 border-t border-(--color-border) pt-3"
+      aria-label="Track Analysis"
+    >
+      <div class="flex min-w-0 items-start justify-between gap-2">
+        <div class="min-w-0">
+          <h4 class="truncate text-xs font-bold text-(--color-text)">Track Analysis</h4>
+          <p class="mt-1 text-xs leading-5 text-(--color-text-muted)">
+            {{ trackAnalysis.detail }}
+          </p>
+        </div>
+        <span
+          class="inline-flex min-h-6 shrink-0 items-center rounded-sm border border-(--color-border) px-2 py-0.5 text-xs font-bold text-(--color-text)"
+        >
+          {{ trackAnalysis.statusLabel }}
+        </span>
+      </div>
+
+      <div class="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          class="inline-flex min-h-7 items-center justify-center gap-1.5 rounded-sm border border-(--color-border) bg-(--color-background) px-2 py-1 text-xs font-bold text-(--color-text) transition hover:border-(--color-accent) hover:text-(--color-accent) focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-surface) disabled:cursor-not-allowed disabled:opacity-60"
+          :disabled="!trackAnalysis.action.enabled"
+          :title="trackAnalysis.action.reason"
+          @click="activateTrackAnalysisAction?.(trackAnalysis.action)"
+        >
+          <Icon :role="resolveTrackAnalysisActionIcon(trackAnalysis.action)" size="xs" />
+          <span>{{ trackAnalysis.action.label }}</span>
+        </button>
+      </div>
+
+      <dl v-if="trackAnalysis.facts.length > 0" class="mt-3 grid grid-cols-1 gap-2">
+        <div
+          v-for="fact in trackAnalysis.facts"
+          :key="fact.label"
+          class="min-w-0 border-l border-(--color-border) pl-2"
+        >
+          <dt class="text-[11px] font-bold uppercase tracking-normal text-(--color-text-muted)">
+            {{ fact.label }}
+          </dt>
+          <dd class="mt-0.5 text-sm font-bold leading-5 text-(--color-text)">
+            {{ fact.value }}
+          </dd>
+          <dd
+            v-if="fact.detail !== undefined && fact.detail.length > 0"
+            class="text-xs leading-5 text-(--color-text-muted)"
+          >
+            {{ fact.detail }}
+          </dd>
+        </div>
+      </dl>
+
+      <p
+        v-if="trackAnalysis.warningSummary !== undefined"
+        class="mt-3 text-xs leading-5 text-(--color-text-muted)"
+      >
+        {{ trackAnalysis.warningSummary }}
+      </p>
+
+      <ul v-if="trackAnalysis.warnings.length > 0" class="mt-2 space-y-1">
+        <li
+          v-for="warning in trackAnalysis.warnings"
+          :key="`${warning.severity}:${warning.code}:${warning.message}`"
+          class="text-xs leading-5"
+          :class="warningClass(warning.severity)"
+        >
+          {{ warning.message }}
+        </li>
+      </ul>
+
+      <p
+        v-if="trackAnalysis.basisLine !== undefined"
+        class="mt-3 break-words text-[11px] leading-4 text-(--color-text-muted)"
+      >
+        {{ trackAnalysis.basisLine }}
+      </p>
+    </section>
 
     <section
       v-if="showSourceActions"

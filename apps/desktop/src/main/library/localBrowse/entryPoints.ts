@@ -116,7 +116,7 @@ function mapEntryPoint(entry: ContractLocalBrowseEntryPoint): LocalBrowseEntryPo
     displayName: entry.displayName,
     status: entry.status,
     platform: entry.platform,
-    ...(entry.matchedSourceId === undefined ? {} : { matchedSourceId: entry.matchedSourceId }),
+    ...(entry.matchedSourceId == null ? {} : { matchedSourceId: entry.matchedSourceId }),
     availableOperations: entry.availableOperations,
     failure: entry.failure
   }

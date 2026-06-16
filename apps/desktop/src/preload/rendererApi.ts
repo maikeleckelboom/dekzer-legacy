@@ -61,6 +61,10 @@ import {
   type ReadCandidatesRequest,
   type ReadCandidatesResult
 } from '../shared/library/trackIdentity/candidates'
+import type {
+  MusicalAnalysisRequest,
+  MusicalAnalysisResult
+} from '../shared/library/musicalAnalysis/analyze'
 
 import type {
   BoundaryEventDeliveryPayload,
@@ -234,6 +238,14 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
             libraryControlChannels.source.maintenance.read,
             request
           )) as ReadSourceMaintenanceResult
+        }
+      },
+      musicalAnalysis: {
+        async analyzePlayableMedia(request: MusicalAnalysisRequest): Promise<MusicalAnalysisResult> {
+          return (await ipcRenderer.invoke(
+            libraryControlChannels.musicalAnalysis.analyzePlayableMedia,
+            request
+          )) as MusicalAnalysisResult
         }
       },
       trackIdentityDecisions: {

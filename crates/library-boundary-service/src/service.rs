@@ -179,6 +179,9 @@ impl LibraryBoundaryService {
             protocol::CommandRequest::LibraryRoots(command) => self
                 .handle_library_root_command(command)
                 .map(protocol::CommandReply::LibraryRoots),
+            protocol::CommandRequest::MusicalAnalysis(command) => self
+                .handle_musical_analysis_command(command)
+                .map(protocol::CommandReply::MusicalAnalysis),
             protocol::CommandRequest::SourceFileHash(command) => self
                 .handle_source_file_hash_command(command)
                 .map(protocol::CommandReply::SourceFileHash),
@@ -912,6 +915,17 @@ impl LibraryBoundaryService {
         }
     }
 
+    fn handle_musical_analysis_command(
+        &self,
+        command: protocol::MusicalAnalysisCommand,
+    ) -> protocol::ProtocolResult<protocol::MusicalAnalysisReply> {
+        crate::musical_analysis::handle_musical_analysis_command(
+            &self.durable_store,
+            |source_id| self.refresh_root_availability(source_id),
+            command,
+        )
+    }
+
     fn handle_source_maintenance_command(
         &self,
         command: protocol::SourceMaintenanceCommand,
@@ -1636,7 +1650,8 @@ fn map_source_registration_root_class(
 #[cfg(test)]
 mod tests {
     use library_boundary_protocol::{
-        AcceptTrackIdentityCandidateRequest, AttachmentIdentityReadStatus,
+        AcceptTrackIdentityCandidateRequest, AnalyzePlayableMediaReply,
+        AnalyzePlayableMediaRequest, AttachmentIdentityReadStatus,
         AttachmentSourceFileOccurrenceStatus, CancelRootScanReply, CancelRootScanRequest,
         CancelRootScanStatus, CommandOutcome, CommandReply, CommandRequest, ContentsFileClass,
         ContentsPresenceState, ContentsReadPolicy, ContentsReadRequest, ContentsScope,
@@ -1646,16 +1661,16 @@ mod tests {
         HashSourceFilesBlake3SourceFailure, LibraryBoundaryEvent,
         LibraryBoundaryEventStreamCommand, LibraryBoundaryEventStreamReply, LibraryRootCommand,
         LibraryRootReply, LibraryTreeEntryPoint, LibraryTreeNodeKind, LibraryTreePresenceState,
-        LocalRootAvailability, MaintainedSnapshotScope, ProtocolError,
-        ReadAttachmentSourceFilesReply, ReadAttachmentSourceFilesRequest,
-        ReadLibraryBoundaryEventsAfterReply, ReadLibraryBoundaryEventsAfterRequest,
-        ReadLibraryTreeChildrenRequest, ReadSourceAttachmentSummaryReply,
-        ReadSourceAttachmentSummaryRequest, ReadSourceFileAttachmentReply,
-        ReadSourceFileAttachmentRequest, ReadSourceIntegrityReply, ReadSourceIntegrityRequest,
-        ReadSourceLifecycleReply, ReadSourceLifecycleRequest, ReadSourceMaintenanceReply,
-        ReadSourceMaintenanceRequest, ReadTrackIdentityReviewCandidatesRequest,
-        RegisterLocalRootReply, RegisterLocalRootRequest, RegisteredLocalRoot,
-        RejectTrackIdentityCandidateRequest, RunSourceMaintenanceReply,
+        LocalRootAvailability, MaintainedSnapshotScope, MusicalAnalysisCommand,
+        MusicalAnalysisReply, ProtocolError, ReadAttachmentSourceFilesReply,
+        ReadAttachmentSourceFilesRequest, ReadLibraryBoundaryEventsAfterReply,
+        ReadLibraryBoundaryEventsAfterRequest, ReadLibraryTreeChildrenRequest,
+        ReadSourceAttachmentSummaryReply, ReadSourceAttachmentSummaryRequest,
+        ReadSourceFileAttachmentReply, ReadSourceFileAttachmentRequest, ReadSourceIntegrityReply,
+        ReadSourceIntegrityRequest, ReadSourceLifecycleReply, ReadSourceLifecycleRequest,
+        ReadSourceMaintenanceReply, ReadSourceMaintenanceRequest,
+        ReadTrackIdentityReviewCandidatesRequest, RegisterLocalRootReply, RegisterLocalRootRequest,
+        RegisteredLocalRoot, RejectTrackIdentityCandidateRequest, RunSourceMaintenanceReply,
         RunSourceMaintenanceRequest, SearchFilterAuthorityLayer, SearchFilterFileClass,
         SearchFilterReadReply, SearchFilterReadRequest, SearchFilterRecursion,
         SearchFilterResultKind, SearchFilterScope, SearchFilterSet, SearchFilterSort,
@@ -1666,8 +1681,8 @@ mod tests {
         TrackIdentityDecisionCommandResult, TrackIdentityDecisionReply, TrackIdentityDecisionState,
         TrackIdentityEffectiveDecisionCurrentStatus, TrackIdentityEffectiveDecisionPrecedence,
         TrackIdentityReviewReadStatus, TrackIdentityReviewState,
-        TrackIdentityUserBlockingDecisionState, UnregisterLocalRootReply,
-        UnregisterLocalRootRequest,
+        TrackIdentityUserBlockingDecisionState, TrackMusicalAnalysisStatus,
+        UnregisterLocalRootReply, UnregisterLocalRootRequest,
     };
     use rusqlite::Connection;
     use serde_json::json;
@@ -1936,6 +1951,179 @@ mod tests {
     }
 
     #[test]
+    fn analyze_playable_media_runs_dekzer_wav_adapter_without_persisting_results() {
+        let (tempdir, context, service) = open_service_with_context();
+        let source_root = tempdir.path().join("musical-analysis-root");
+        std::fs::create_dir_all(&source_root).expect("create source root");
+        let wav_bytes = tiny_wav_bytes(44_100, 2, 16, 44_100 * 4);
+        std::fs::write(source_root.join("track.wav"), &wav_bytes).expect("write wav");
+
+        let (_json, registered) =
+            register_local_root(&service, source_root.to_string_lossy().into_owned());
+        record_present_source_file(
+            &service,
+            registered.root_id,
+            100,
+            "track.wav",
+            wav_bytes.len(),
+        );
+        run_source_maintenance(
+            &service,
+            registered.root_id,
+            Some(10),
+            Some(10),
+            Some(10),
+            Some(10),
+        );
+
+        let contents = service
+            .read_contents(ContentsReadRequest {
+                scope: ContentsScope::Source {
+                    source_id: registered.root_id,
+                },
+                policy: ContentsReadPolicy::PlayableMedia {
+                    media_kinds: vec![library_boundary_protocol::PlayableMediaKind::Audio],
+                },
+                scope_depth: ContentsScopeDepth::Recursive,
+                limit: Some(10),
+                cursor: None,
+            })
+            .expect("read promoted audio")
+            .result;
+        let row = contents
+            .rows
+            .iter()
+            .find(|row| row.file_name == "track.wav")
+            .expect("track row");
+        let playable = row.playable_media.as_ref().expect("playable media");
+        let artifact_count_before = count_rows(&context, "work_artifacts");
+
+        let reply = analyze_playable_media(
+            &service,
+            AnalyzePlayableMediaRequest {
+                playable_media_id: playable.playable_media_id,
+                source_id: row.source_id,
+                source_file_id: row.source_file_id,
+                attachment_id: playable.attachment_id,
+            },
+        );
+        let result = reply.result;
+
+        assert!(matches!(
+            result.status,
+            TrackMusicalAnalysisStatus::Advisory | TrackMusicalAnalysisStatus::Inconclusive
+        ));
+        assert_eq!(result.target.playable_media_id, playable.playable_media_id);
+        assert_eq!(result.target.source_file_id, row.source_file_id);
+        assert_eq!(
+            result.basis.decoder_policy,
+            "hound_16_bit_integer_pcm_wav_to_mono_f32_v1"
+        );
+        assert_eq!(
+            result.basis.input_policy,
+            "mono_normalized_f32_dekzer_wav_v1"
+        );
+        assert_eq!(result.basis.upstream_crate_name, "stratum-dsp");
+        assert!(!result.basis.ml_enabled);
+        assert!(!result.basis.persistence_authorized);
+        assert!(result.beatgrid.is_some());
+        assert!(
+            result
+                .warnings
+                .iter()
+                .any(|warning| warning.code == "non_authoritative")
+        );
+        assert_eq!(
+            count_rows(&context, "work_artifacts"),
+            artifact_count_before
+        );
+    }
+
+    #[test]
+    fn analyze_playable_media_returns_visible_unsupported_result_for_non_slice_wav() {
+        let (tempdir, context, service) = open_service_with_context();
+        let source_root = tempdir.path().join("musical-analysis-unsupported-root");
+        std::fs::create_dir_all(&source_root).expect("create source root");
+        let wav_bytes = tiny_wav_bytes(44_100, 2, 16, 44_100 * 4);
+        std::fs::write(source_root.join("wide.wav"), &wav_bytes).expect("write wav");
+
+        let (_json, registered) =
+            register_local_root(&service, source_root.to_string_lossy().into_owned());
+        record_present_source_file(
+            &service,
+            registered.root_id,
+            100,
+            "wide.wav",
+            wav_bytes.len(),
+        );
+        run_source_maintenance(
+            &service,
+            registered.root_id,
+            Some(10),
+            Some(10),
+            Some(10),
+            Some(10),
+        );
+        std::fs::write(
+            source_root.join("wide.wav"),
+            tiny_wav_bytes(44_100, 2, 24, 44_100 * 4),
+        )
+        .expect("replace with unsupported wav");
+
+        let contents = service
+            .read_contents(ContentsReadRequest {
+                scope: ContentsScope::Source {
+                    source_id: registered.root_id,
+                },
+                policy: ContentsReadPolicy::PlayableMedia {
+                    media_kinds: vec![library_boundary_protocol::PlayableMediaKind::Audio],
+                },
+                scope_depth: ContentsScopeDepth::Recursive,
+                limit: Some(10),
+                cursor: None,
+            })
+            .expect("read promoted audio")
+            .result;
+        let row = contents
+            .rows
+            .iter()
+            .find(|row| row.file_name == "wide.wav")
+            .expect("wide wav row");
+        let playable = row.playable_media.as_ref().expect("playable media");
+        let artifact_count_before = count_rows(&context, "work_artifacts");
+
+        let reply = analyze_playable_media(
+            &service,
+            AnalyzePlayableMediaRequest {
+                playable_media_id: playable.playable_media_id,
+                source_id: row.source_id,
+                source_file_id: row.source_file_id,
+                attachment_id: playable.attachment_id,
+            },
+        );
+        let result = reply.result;
+
+        assert_eq!(result.status, TrackMusicalAnalysisStatus::Unsupported);
+        assert!(result.bpm.is_none());
+        assert!(result.key.is_none());
+        assert!(result.beatgrid.is_none());
+        assert_eq!(
+            result.basis.input_policy,
+            "blocked_before_adapter_invocation_v1"
+        );
+        assert!(
+            result
+                .warnings
+                .iter()
+                .any(|warning| warning.code == "unsupported_input")
+        );
+        assert_eq!(
+            count_rows(&context, "work_artifacts"),
+            artifact_count_before
+        );
+    }
+
+    #[test]
     fn search_filter_snapshot_read_uses_backend_index_rows() {
         let (tempdir, _context, service) = open_service_with_context();
         let source_root = tempdir.path().join("search-filter-root");
@@ -2099,6 +2287,15 @@ mod tests {
                 reply
             }
             other => panic!("expected hash source files BLAKE3 reply, got {other:?}"),
+        }
+    }
+
+    fn expect_analyze_playable_media_reply(reply: CommandReply) -> AnalyzePlayableMediaReply {
+        match reply {
+            CommandReply::MusicalAnalysis(MusicalAnalysisReply::AnalyzePlayableMedia(reply)) => {
+                reply
+            }
+            other => panic!("expected analyze playable media reply, got {other:?}"),
         }
     }
 
@@ -2272,6 +2469,15 @@ mod tests {
             CommandRequest::SourceFileHash(SourceFileHashCommand::HashSourceFilesBlake3(
                 HashSourceFilesBlake3Request { source_id, limit },
             )),
+        )))
+    }
+
+    fn analyze_playable_media(
+        service: &LibraryBoundaryService,
+        request: AnalyzePlayableMediaRequest,
+    ) -> AnalyzePlayableMediaReply {
+        expect_analyze_playable_media_reply(expect_success(service.handle_command(
+            CommandRequest::MusicalAnalysis(MusicalAnalysisCommand::AnalyzePlayableMedia(request)),
         )))
     }
 

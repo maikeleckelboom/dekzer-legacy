@@ -5,6 +5,8 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+analyzer-musical-stratum = { path = "../analyzer-musical-stratum" }
+hound = "3.5.1"
 library-boundary-protocol = { path = "../library-boundary-protocol" }
 library-domain = { path = "../library-domain" }
 library-store-sqlite = { path = "../library-store-sqlite" }

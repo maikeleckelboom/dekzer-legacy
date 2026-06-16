@@ -40,6 +40,40 @@
         "candidateId"
       ]
     },
+    "AnalyzePlayableMediaReply": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "$ref": "#/$defs/TrackMusicalAnalysisResult"
+        }
+      },
+      "required": [
+        "result"
+      ]
+    },
+    "AnalyzePlayableMediaRequest": {
+      "type": "object",
+      "properties": {
+        "attachmentId": {
+          "type": "string"
+        },
+        "playableMediaId": {
+          "type": "string"
+        },
+        "sourceFileId": {
+          "type": "string"
+        },
+        "sourceId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "playableMediaId",
+        "sourceId",
+        "sourceFileId",
+        "attachmentId"
+      ]
+    },
     "AttachmentIdentity": {
       "type": "object",
       "properties": {
@@ -259,6 +293,22 @@
           "type": "object",
           "properties": {
             "payload": {
+              "$ref": "#/$defs/MusicalAnalysisReply"
+            },
+            "type": {
+              "type": "string",
+              "const": "musicalAnalysis"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
               "$ref": "#/$defs/SourceFileHashReply"
             },
             "type": {
@@ -348,6 +398,22 @@
             "type": {
               "type": "string",
               "const": "libraryRoots"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/MusicalAnalysisCommand"
+            },
+            "type": {
+              "type": "string",
+              "const": "musicalAnalysis"
             }
           },
           "required": [
@@ -2532,6 +2598,46 @@
           "description": "Invalidates maintained source tree, source status, contents, and\ntrack identity candidate snapshot reads.",
           "type": "string",
           "const": "contents"
+        }
+      ]
+    },
+    "MusicalAnalysisCommand": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AnalyzePlayableMediaRequest"
+            },
+            "type": {
+              "type": "string",
+              "const": "analyzePlayableMedia"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        }
+      ]
+    },
+    "MusicalAnalysisReply": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AnalyzePlayableMediaReply"
+            },
+            "type": {
+              "type": "string",
+              "const": "analyzePlayableMedia"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
         }
       ]
     },
@@ -6660,6 +6766,53 @@
         "rootId"
       ]
     },
+    "TrackBeatgridEvidence": {
+      "type": "object",
+      "properties": {
+        "beatCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "gridStability": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "previewSeconds": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "required": [
+        "beatCount",
+        "previewSeconds"
+      ]
+    },
+    "TrackBpmEvidence": {
+      "type": "object",
+      "properties": {
+        "bpm": {
+          "type": "number",
+          "format": "double"
+        },
+        "confidence": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        }
+      },
+      "required": [
+        "bpm"
+      ]
+    },
     "TrackIdentityDecisionCommand": {
       "oneOf": [
         {
@@ -7157,6 +7310,243 @@
         "none",
         "rejected",
         "deferred"
+      ]
+    },
+    "TrackKeyEvidence": {
+      "type": "object",
+      "properties": {
+        "confidence": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "mode": {
+          "$ref": "#/$defs/TrackKeyMode"
+        },
+        "notation": {
+          "type": "string"
+        },
+        "tonicIndex": {
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        }
+      },
+      "required": [
+        "notation",
+        "mode",
+        "tonicIndex"
+      ]
+    },
+    "TrackKeyMode": {
+      "type": "string",
+      "enum": [
+        "major",
+        "minor"
+      ]
+    },
+    "TrackMusicalAnalysisBasis": {
+      "type": "object",
+      "properties": {
+        "adapterKey": {
+          "type": "string"
+        },
+        "adapterVersion": {
+          "type": "string"
+        },
+        "authority": {
+          "type": "string"
+        },
+        "channelMixdownPolicy": {
+          "type": "string"
+        },
+        "decoderPolicy": {
+          "type": "string"
+        },
+        "inputPolicy": {
+          "type": "string"
+        },
+        "mlEnabled": {
+          "type": "boolean"
+        },
+        "normalizationPolicy": {
+          "type": "string"
+        },
+        "persistenceAuthorized": {
+          "type": "boolean"
+        },
+        "sampleRateHz": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "upstreamAnalysisConfigPolicy": {
+          "type": "string"
+        },
+        "upstreamCrateName": {
+          "type": "string"
+        },
+        "upstreamCrateVersion": {
+          "type": "string"
+        },
+        "upstreamFeatureFlags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "adapterKey",
+        "adapterVersion",
+        "upstreamCrateName",
+        "upstreamCrateVersion",
+        "upstreamFeatureFlags",
+        "decoderPolicy",
+        "inputPolicy",
+        "channelMixdownPolicy",
+        "normalizationPolicy",
+        "upstreamAnalysisConfigPolicy",
+        "mlEnabled",
+        "persistenceAuthorized",
+        "authority"
+      ]
+    },
+    "TrackMusicalAnalysisResult": {
+      "type": "object",
+      "properties": {
+        "basis": {
+          "$ref": "#/$defs/TrackMusicalAnalysisBasis"
+        },
+        "beatgrid": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TrackBeatgridEvidence"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "bpm": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TrackBpmEvidence"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "key": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TrackKeyEvidence"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "$ref": "#/$defs/TrackMusicalAnalysisStatus"
+        },
+        "statusDetail": {
+          "type": "string"
+        },
+        "target": {
+          "$ref": "#/$defs/TrackMusicalAnalysisTarget"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TrackMusicalAnalysisWarning"
+          }
+        }
+      },
+      "required": [
+        "target",
+        "status",
+        "statusDetail",
+        "warnings",
+        "basis"
+      ]
+    },
+    "TrackMusicalAnalysisStatus": {
+      "type": "string",
+      "enum": [
+        "advisory",
+        "inconclusive",
+        "blocked",
+        "unsupported"
+      ]
+    },
+    "TrackMusicalAnalysisTarget": {
+      "type": "object",
+      "properties": {
+        "attachmentId": {
+          "type": "string"
+        },
+        "mediaKind": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "playableMediaId": {
+          "type": "string"
+        },
+        "relativePath": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sourceFileId": {
+          "type": "string"
+        },
+        "sourceId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "playableMediaId",
+        "sourceId",
+        "sourceFileId",
+        "attachmentId"
+      ]
+    },
+    "TrackMusicalAnalysisWarning": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/TrackMusicalAnalysisWarningSeverity"
+        }
+      },
+      "required": [
+        "severity",
+        "code",
+        "message"
+      ]
+    },
+    "TrackMusicalAnalysisWarningSeverity": {
+      "type": "string",
+      "enum": [
+        "info",
+        "warning",
+        "error"
       ]
     },
     "UnregisterLocalRootReply": {

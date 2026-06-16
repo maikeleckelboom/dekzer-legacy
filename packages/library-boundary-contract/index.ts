@@ -2,7 +2,7 @@
 // Source of truth: crates/library-boundary-protocol
 // Do not edit by hand.
 
-export type CommandRequest = { "type": "libraryBoundaryEvents", "payload": LibraryBoundaryEventStreamCommand } | { "type": "libraryRoots", "payload": LibraryRootCommand } | { "type": "sourceFileHash", "payload": SourceFileHashCommand } | { "type": "sourceMaintenance", "payload": SourceMaintenanceCommand } | { "type": "trackIdentityDecisions", "payload": TrackIdentityDecisionCommand } | { "type": "snapshotRead", "payload": SnapshotReadCommand };
+export type CommandRequest = { "type": "libraryBoundaryEvents", "payload": LibraryBoundaryEventStreamCommand } | { "type": "libraryRoots", "payload": LibraryRootCommand } | { "type": "musicalAnalysis", "payload": MusicalAnalysisCommand } | { "type": "sourceFileHash", "payload": SourceFileHashCommand } | { "type": "sourceMaintenance", "payload": SourceMaintenanceCommand } | { "type": "trackIdentityDecisions", "payload": TrackIdentityDecisionCommand } | { "type": "snapshotRead", "payload": SnapshotReadCommand };
 
 export type LibraryBoundaryEventStreamCommand = { "type": "readAfter", "payload": ReadLibraryBoundaryEventsAfterRequest };
 
@@ -38,6 +38,10 @@ export type UnregisterLocalRootRequest = { rootId: string, };
 export type LocalRootAvailability = "available" | "unavailable";
 
 export type LocalRoot = { rootId: string, admittedRootPath: string, availability: LocalRootAvailability, };
+
+export type MusicalAnalysisCommand = { "type": "analyzePlayableMedia", "payload": AnalyzePlayableMediaRequest };
+
+export type AnalyzePlayableMediaRequest = { playableMediaId: string, sourceId: string, sourceFileId: string, attachmentId: string, };
 
 export type SourceFileHashCommand = { "type": "hashSourceFilesBlake3", "payload": HashSourceFilesBlake3Request };
 
@@ -163,7 +167,7 @@ export type PlayableMediaKind = "audio" | "video";
 
 export type ContentsScopeDepth = "immediate" | "recursive";
 
-export type CommandReply = { "type": "libraryBoundaryEvents", "payload": LibraryBoundaryEventStreamReply } | { "type": "libraryRoots", "payload": LibraryRootReply } | { "type": "sourceFileHash", "payload": SourceFileHashReply } | { "type": "sourceMaintenance", "payload": SourceMaintenanceReply } | { "type": "trackIdentityDecisions", "payload": TrackIdentityDecisionReply } | { "type": "snapshotRead", "payload": SnapshotReadReply };
+export type CommandReply = { "type": "libraryBoundaryEvents", "payload": LibraryBoundaryEventStreamReply } | { "type": "libraryRoots", "payload": LibraryRootReply } | { "type": "musicalAnalysis", "payload": MusicalAnalysisReply } | { "type": "sourceFileHash", "payload": SourceFileHashReply } | { "type": "sourceMaintenance", "payload": SourceMaintenanceReply } | { "type": "trackIdentityDecisions", "payload": TrackIdentityDecisionReply } | { "type": "snapshotRead", "payload": SnapshotReadReply };
 
 export type LibraryBoundaryEventStreamReply = { "type": "readAfter", "payload": ReadLibraryBoundaryEventsAfterReply };
 
@@ -199,6 +203,30 @@ export type CancelRootScanReply = { status: CancelRootScanStatus, };
 export type ReadLocalRootsReply = { roots: Array<LocalRoot>, };
 
 export type UnregisterLocalRootReply = { unregistered: boolean, };
+
+export type MusicalAnalysisReply = { "type": "analyzePlayableMedia", "payload": AnalyzePlayableMediaReply };
+
+export type AnalyzePlayableMediaReply = { result: TrackMusicalAnalysisResult, };
+
+export type TrackMusicalAnalysisResult = { target: TrackMusicalAnalysisTarget, status: TrackMusicalAnalysisStatus, statusDetail: string, bpm?: TrackBpmEvidence, key?: TrackKeyEvidence, beatgrid?: TrackBeatgridEvidence, warnings: Array<TrackMusicalAnalysisWarning>, basis: TrackMusicalAnalysisBasis, };
+
+export type TrackMusicalAnalysisStatus = "advisory" | "inconclusive" | "blocked" | "unsupported";
+
+export type TrackMusicalAnalysisTarget = { playableMediaId: string, sourceId: string, sourceFileId: string, attachmentId: string, relativePath?: string, mediaKind?: string, };
+
+export type TrackBpmEvidence = { bpm: number, confidence?: number, };
+
+export type TrackKeyEvidence = { notation: string, mode: TrackKeyMode, tonicIndex: number, confidence?: number, };
+
+export type TrackKeyMode = "major" | "minor";
+
+export type TrackBeatgridEvidence = { beatCount: number, previewSeconds: Array<number>, gridStability?: number, };
+
+export type TrackMusicalAnalysisWarning = { severity: TrackMusicalAnalysisWarningSeverity, code: string, message: string, };
+
+export type TrackMusicalAnalysisWarningSeverity = "info" | "warning" | "error";
+
+export type TrackMusicalAnalysisBasis = { adapterKey: string, adapterVersion: string, upstreamCrateName: string, upstreamCrateVersion: string, upstreamFeatureFlags: Array<string>, decoderPolicy: string, inputPolicy: string, channelMixdownPolicy: string, normalizationPolicy: string, upstreamAnalysisConfigPolicy: string, sampleRateHz?: number, mlEnabled: boolean, persistenceAuthorized: boolean, authority: string, };
 
 export type SourceFileHashReply = { "type": "hashSourceFilesBlake3", "payload": HashSourceFilesBlake3Reply };
 

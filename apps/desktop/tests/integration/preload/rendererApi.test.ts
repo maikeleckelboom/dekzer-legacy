@@ -35,6 +35,7 @@ import {
 } from '../../../src/shared/library/source/maintenance'
 import { type TrackIdentityDecisionCommandResult } from '../../../src/shared/library/trackIdentity/decisions'
 import { type ReadCandidatesResult } from '../../../src/shared/library/trackIdentity/candidates'
+import type { MusicalAnalysisResult } from '../../../src/shared/library/musicalAnalysis/analyze'
 import { type BoundaryEventDeliveryPayload } from '../../../src/shared/library/boundary/events'
 import { emitStatus, testStatus } from '../../support/library/boundary'
 import { firstAvailableSourceReadRequest } from '../../support/library/hierarchy'
@@ -73,6 +74,12 @@ describe('preload renderer API', () => {
       identityDecisionLimit: 7
     }
     const readSourceMaintenanceRequest = { sourceId: '7' }
+    const analyzePlayableMediaRequest = {
+      playableMediaId: '21',
+      sourceId: '7',
+      sourceFileId: '11',
+      attachmentId: '13'
+    }
     const acceptTrackIdentityCandidateRequest = {
       candidateId: '7',
       reason: 'same identity'
@@ -89,9 +96,11 @@ describe('preload renderer API', () => {
     }
     const scanRequest = { rootId: 'root-1' }
     const persistedViewState: PersistedLibraryViewState = {
-      version: 1,
-      selectedNodeId: 'navigation-row:1',
-      expandedNodeIds: ['navigation-row:1']
+      version: 3,
+      activeSurface: 'libraryBrowse',
+      selectedLibraryNodeId: 'navigation-row:1',
+      expandedLibraryNodeIds: ['navigation-row:1'],
+      expandedAddSourceNodeIds: []
     }
     const navigationResult: NavigationReadRowsResult = {
       state: 'ready',
@@ -451,6 +460,44 @@ describe('preload renderer API', () => {
         remainingTrackIdentityDecisionProductionCandidates: 0
       }
     }
+    const musicalAnalysisResult: MusicalAnalysisResult = {
+      result: {
+        target: {
+          playableMediaId: '21',
+          sourceId: '7',
+          sourceFileId: '11',
+          attachmentId: '13',
+          mediaKind: 'audio'
+        },
+        status: 'advisory',
+        statusDetail: 'One-shot analysis result; advisory only.',
+        bpm: {
+          bpm: 128,
+          confidence: 0.62
+        },
+        beatgrid: {
+          beatCount: 4,
+          previewSeconds: [0, 0.47, 0.94, 1.41]
+        },
+        warnings: [],
+        basis: {
+          adapterKey: 'stratum_dsp_v1',
+          adapterVersion: 'dekzer_analyzer_musical_stratum_v1',
+          upstreamCrateName: 'stratum-dsp',
+          upstreamCrateVersion: '1.0.0',
+          upstreamFeatureFlags: [],
+          decoderPolicy: 'hound_16_bit_integer_pcm_wav_to_mono_f32_v1',
+          inputPolicy: 'mono_normalized_f32_dekzer_wav_v1',
+          channelMixdownPolicy: 'dekzer_hound_wav_mean_mixdown_to_mono_v1',
+          normalizationPolicy: 'dekzer_hound_16_bit_integer_pcm_full_scale_v1',
+          upstreamAnalysisConfigPolicy: 'stratum_default_analysis_config_v1',
+          sampleRateHz: 44100,
+          mlEnabled: false,
+          persistenceAuthorized: false,
+          authority: 'non_authoritative_advisory_v1'
+        }
+      }
+    }
     const choiceResult: LocalRootChoiceResult = {
       state: 'registered',
       root: {
@@ -483,9 +530,11 @@ describe('preload renderer API', () => {
     const viewStateReadResult: LibraryViewStateReadResult = {
       state: 'ready',
       viewState: {
-        version: 1,
-        selectedNodeId: 'navigation-row:1',
-        expandedNodeIds: ['navigation-row:1', 'source-directory:2']
+        version: 3,
+        activeSurface: 'libraryBrowse',
+        selectedLibraryNodeId: 'navigation-row:1',
+        expandedLibraryNodeIds: ['navigation-row:1', 'source-directory:2'],
+        expandedAddSourceNodeIds: []
       }
     }
     const viewStateWriteResult: LibraryViewStateWriteResult = { state: 'written' }
@@ -504,6 +553,7 @@ describe('preload renderer API', () => {
     let receivedHashRequest: unknown
     let receivedRunSourceMaintenanceRequest: unknown
     let receivedReadSourceMaintenanceRequest: unknown
+    let receivedAnalyzePlayableMediaRequest: unknown
     let receivedAcceptTrackIdentityCandidateRequest: unknown
     let receivedRejectTrackIdentityCandidateRequest: unknown
     let receivedDeferTrackIdentityCandidateRequest: unknown
@@ -577,6 +627,11 @@ describe('preload renderer API', () => {
         if (channel === libraryControlChannels.source.maintenance.read) {
           receivedReadSourceMaintenanceRequest = args[0]
           return readSourceMaintenanceResult
+        }
+
+        if (channel === libraryControlChannels.musicalAnalysis.analyzePlayableMedia) {
+          receivedAnalyzePlayableMediaRequest = args[0]
+          return musicalAnalysisResult
         }
 
         if (channel === libraryControlChannels.trackIdentity.decisions.accept) {
@@ -731,6 +786,10 @@ describe('preload renderer API', () => {
       api.library.sourceMaintenance.readSourceMaintenance(readSourceMaintenanceRequest)
     ).resolves.toBe(readSourceMaintenanceResult)
     expect(receivedReadSourceMaintenanceRequest).toBe(readSourceMaintenanceRequest)
+    await expect(
+      api.library.musicalAnalysis.analyzePlayableMedia(analyzePlayableMediaRequest)
+    ).resolves.toBe(musicalAnalysisResult)
+    expect(receivedAnalyzePlayableMediaRequest).toBe(analyzePlayableMediaRequest)
     await expect(
       api.library.trackIdentityDecisions.acceptTrackIdentityCandidate(
         acceptTrackIdentityCandidateRequest

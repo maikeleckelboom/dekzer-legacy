@@ -7,8 +7,13 @@ pub const ADAPTER_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const UPSTREAM_CRATE_NAME: &str = "stratum-dsp";
 pub const UPSTREAM_CRATE_VERSION: &str = "1.0.0";
 pub const INPUT_POLICY_MONO_NORMALIZED_F32_FIXTURE_V1: &str = "mono_normalized_f32_fixture_v1";
+pub const INPUT_POLICY_MONO_NORMALIZED_F32_DEKZER_WAV_V1: &str =
+    "mono_normalized_f32_dekzer_wav_v1";
 pub const CHANNEL_MIXDOWN_POLICY: &str = "already_mono_no_mixdown_fixture_v1";
+pub const CHANNEL_MIXDOWN_POLICY_DEKZER_WAV_V1: &str = "dekzer_hound_wav_mean_mixdown_to_mono_v1";
 pub const NORMALIZATION_POLICY: &str = "caller_supplied_normalized_f32_checked_v1";
+pub const NORMALIZATION_POLICY_DEKZER_WAV_V1: &str =
+    "dekzer_hound_16_bit_integer_pcm_full_scale_v1";
 pub const UPSTREAM_ANALYSIS_CONFIG_POLICY: &str =
     "stratum_default_with_fixture_normalization_and_silence_trimming_disabled_v1";
 
@@ -22,12 +27,28 @@ const LOW_GRID_STABILITY_THRESHOLD: f32 = 0.50;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MusicalAnalysisInputPolicy {
     MonoNormalizedF32FixtureV1,
+    MonoNormalizedF32DekzerWavV1,
 }
 
 impl MusicalAnalysisInputPolicy {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::MonoNormalizedF32FixtureV1 => INPUT_POLICY_MONO_NORMALIZED_F32_FIXTURE_V1,
+            Self::MonoNormalizedF32DekzerWavV1 => INPUT_POLICY_MONO_NORMALIZED_F32_DEKZER_WAV_V1,
+        }
+    }
+
+    pub fn channel_mixdown_policy(self) -> &'static str {
+        match self {
+            Self::MonoNormalizedF32FixtureV1 => CHANNEL_MIXDOWN_POLICY,
+            Self::MonoNormalizedF32DekzerWavV1 => CHANNEL_MIXDOWN_POLICY_DEKZER_WAV_V1,
+        }
+    }
+
+    pub fn normalization_policy(self) -> &'static str {
+        match self {
+            Self::MonoNormalizedF32FixtureV1 => NORMALIZATION_POLICY,
+            Self::MonoNormalizedF32DekzerWavV1 => NORMALIZATION_POLICY_DEKZER_WAV_V1,
         }
     }
 }
@@ -45,6 +66,14 @@ impl<'a> MusicalAnalysisInput<'a> {
             samples,
             sample_rate_hz,
             input_policy: MusicalAnalysisInputPolicy::MonoNormalizedF32FixtureV1,
+        }
+    }
+
+    pub fn mono_normalized_f32_dekzer_wav(samples: &'a [f32], sample_rate_hz: u32) -> Self {
+        Self {
+            samples,
+            sample_rate_hz,
+            input_policy: MusicalAnalysisInputPolicy::MonoNormalizedF32DekzerWavV1,
         }
     }
 }
@@ -487,8 +516,8 @@ fn basis(input: MusicalAnalysisInput<'_>) -> MusicalAnalysisBasis {
         upstream_analysis_config_policy: UPSTREAM_ANALYSIS_CONFIG_POLICY,
         sample_rate_hz: input.sample_rate_hz,
         input_policy: input.input_policy.as_str(),
-        channel_mixdown_policy: CHANNEL_MIXDOWN_POLICY,
-        normalization_policy: NORMALIZATION_POLICY,
+        channel_mixdown_policy: input.input_policy.channel_mixdown_policy(),
+        normalization_policy: input.input_policy.normalization_policy(),
         ml_enabled: false,
         persistence_authorized: false,
     }
@@ -839,6 +868,32 @@ mod tests {
                 "basis must record upstream feature flag {required_flag}: {result:?}"
             );
         }
+    }
+
+    #[test]
+    fn dekzer_wav_input_policy_records_real_file_basis_policy() {
+        let samples = pulse_train(120.0, 8.0, SAMPLE_RATE_HZ);
+        let result = analyze_musical_input(MusicalAnalysisInput::mono_normalized_f32_dekzer_wav(
+            &samples,
+            SAMPLE_RATE_HZ,
+        ))
+        .expect("analysis");
+
+        assert_eq!(
+            result.basis.input_policy,
+            INPUT_POLICY_MONO_NORMALIZED_F32_DEKZER_WAV_V1
+        );
+        assert_eq!(
+            result.basis.channel_mixdown_policy,
+            CHANNEL_MIXDOWN_POLICY_DEKZER_WAV_V1
+        );
+        assert_eq!(
+            result.basis.normalization_policy,
+            NORMALIZATION_POLICY_DEKZER_WAV_V1
+        );
+        assert!(!result.basis.persistence_authorized);
+        assert!(!result.basis.ml_enabled);
+        assert_ne!(result.status, MusicalAnalysisStatus::Accepted);
     }
 
     #[test]

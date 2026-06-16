@@ -384,6 +384,8 @@ dependencies = [
 name = "library-boundary-service"
 version = "0.0.0"
 dependencies = [
+ "analyzer-musical-stratum",
+ "hound",
  "library-boundary-protocol",
  "library-domain",
  "library-store-sqlite",

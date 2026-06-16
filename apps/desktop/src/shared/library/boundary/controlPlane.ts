@@ -29,6 +29,9 @@ export const libraryControlChannels = {
       read: 'desktop:library-local-browse-items:read'
     }
   },
+  musicalAnalysis: {
+    analyzePlayableMedia: 'desktop:library-musical-analysis:analyze-playable-media'
+  },
   navigation: {
     read: 'desktop:library-navigation:read-rows'
   },

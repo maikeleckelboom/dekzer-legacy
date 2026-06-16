@@ -1,5 +1,7 @@
 import type {
   AcceptTrackIdentityCandidateRequest,
+  AnalyzePlayableMediaReply,
+  AnalyzePlayableMediaRequest,
   CancelRootScanReply,
   CancelRootScanRequest,
   CommandReply,
@@ -139,6 +141,19 @@ export class LibraryBoundaryClient {
       },
       'sourceFileHash',
       'hashSourceFilesBlake3'
+    )
+  }
+
+  analyzePlayableMedia(
+    request: AnalyzePlayableMediaRequest
+  ): Promise<AnalyzePlayableMediaReply> {
+    return this.sendAndExpect(
+      {
+        type: 'musicalAnalysis',
+        payload: { type: 'analyzePlayableMedia', payload: request }
+      },
+      'musicalAnalysis',
+      'analyzePlayableMedia'
     )
   }
 

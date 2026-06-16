@@ -40,6 +40,8 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::UnregisterLocalRootRequest>(&cfg, &mut output);
     push_ts_decl::<crate::LocalRootAvailability>(&cfg, &mut output);
     push_ts_decl::<crate::LocalRoot>(&cfg, &mut output);
+    push_ts_decl::<crate::MusicalAnalysisCommand>(&cfg, &mut output);
+    push_ts_decl::<crate::AnalyzePlayableMediaRequest>(&cfg, &mut output);
     push_ts_decl::<crate::SourceFileHashCommand>(&cfg, &mut output);
     push_ts_decl::<crate::HashSourceFilesBlake3Request>(&cfg, &mut output);
     push_ts_decl::<crate::SourceMaintenanceCommand>(&cfg, &mut output);
@@ -111,6 +113,18 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::CancelRootScanReply>(&cfg, &mut output);
     push_ts_decl::<crate::ReadLocalRootsReply>(&cfg, &mut output);
     push_ts_decl::<crate::UnregisterLocalRootReply>(&cfg, &mut output);
+    push_ts_decl::<crate::MusicalAnalysisReply>(&cfg, &mut output);
+    push_ts_decl::<crate::AnalyzePlayableMediaReply>(&cfg, &mut output);
+    push_ts_decl::<crate::TrackMusicalAnalysisResult>(&cfg, &mut output);
+    push_ts_decl::<crate::TrackMusicalAnalysisStatus>(&cfg, &mut output);
+    push_ts_decl::<crate::TrackMusicalAnalysisTarget>(&cfg, &mut output);
+    push_ts_decl::<crate::TrackBpmEvidence>(&cfg, &mut output);
+    push_ts_decl::<crate::TrackKeyEvidence>(&cfg, &mut output);
+    push_ts_decl::<crate::TrackKeyMode>(&cfg, &mut output);
+    push_ts_decl::<crate::TrackBeatgridEvidence>(&cfg, &mut output);
+    push_ts_decl::<crate::TrackMusicalAnalysisWarning>(&cfg, &mut output);
+    push_ts_decl::<crate::TrackMusicalAnalysisWarningSeverity>(&cfg, &mut output);
+    push_ts_decl::<crate::TrackMusicalAnalysisBasis>(&cfg, &mut output);
     push_ts_decl::<crate::SourceFileHashReply>(&cfg, &mut output);
     push_ts_decl::<crate::HashSourceFilesBlake3Reply>(&cfg, &mut output);
     push_ts_decl::<crate::SourceMaintenanceReply>(&cfg, &mut output);
@@ -303,6 +317,8 @@ mod tests {
         assert!(ts.contains("startRootScan"));
         assert!(ts.contains("readLocalRoots"));
         assert!(ts.contains("unregisterLocalRoot"));
+        assert!(ts.contains("analyzePlayableMedia"));
+        assert!(ts.contains("TrackMusicalAnalysisResult"));
         assert!(ts.contains("readSourceLifecycle"));
         assert!(ts.contains("SourceLifecycle"));
         assert!(ts.contains("readLibraryTreeChildren"));
@@ -349,6 +365,7 @@ mod tests {
         assert!(schema.contains("\"CommandOutcome\""));
         assert!(schema.contains("\"ProtocolError\""));
         assert!(schema.contains("\"registerLocalRoot\""));
+        assert!(schema.contains("\"analyzePlayableMedia\""));
         assert!(schema.contains("\"readSourceLifecycle\""));
         assert!(schema.contains("\"readLibraryTreeChildren\""));
         assert!(schema.contains("\"fileClass\""));

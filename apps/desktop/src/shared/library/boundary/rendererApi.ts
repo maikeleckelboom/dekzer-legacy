@@ -37,6 +37,10 @@ import type {
   TrackIdentityDecisionRequest
 } from '../trackIdentity/decisions'
 import type { ReadCandidatesRequest, ReadCandidatesResult } from '../trackIdentity/candidates'
+import type {
+  MusicalAnalysisRequest,
+  MusicalAnalysisResult
+} from '../musicalAnalysis/analyze'
 import type { LocalRootChoiceResult } from '../roots/chooseLocal'
 import type { ReadLocalRootsOutcome } from '../roots/read'
 import type { LocalRootRegistrationRequest, LocalRootRegistrationResult } from '../roots/register'
@@ -55,6 +59,7 @@ export type LibraryApi = {
   readonly attachmentIdentity: LibraryAttachmentIdentityApi
   readonly hashing: LibraryHashingApi
   readonly sourceMaintenance: LibrarySourceMaintenanceApi
+  readonly musicalAnalysis: LibraryMusicalAnalysisApi
   readonly trackIdentityDecisions: LibraryTrackIdentityDecisionApi
   readonly trackIdentityReview: TrackIdentityReviewApi
   readonly contents: LibraryContentsApi
@@ -139,6 +144,10 @@ export type LibraryTrackIdentityDecisionApi = {
   deferTrackIdentityCandidate(
     request: TrackIdentityDecisionRequest
   ): Promise<TrackIdentityDecisionCommandResult>
+}
+
+export type LibraryMusicalAnalysisApi = {
+  analyzePlayableMedia(request: MusicalAnalysisRequest): Promise<MusicalAnalysisResult>
 }
 
 export type TrackIdentityReviewApi = {

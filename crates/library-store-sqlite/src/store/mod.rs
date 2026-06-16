@@ -17,6 +17,7 @@ mod contents_reads;
 mod context;
 mod discovery;
 mod literal_hierarchy_reads;
+mod musical_analysis_targets;
 mod navigation_reads;
 mod playable_media_promotion;
 mod projections;
@@ -44,6 +45,10 @@ pub use context::{
 };
 pub use discovery::{
     RootScanHierarchyObservationReason, RootScanMaterializationResult, RootScanObservation,
+};
+pub use musical_analysis_targets::{
+    StorePlayableMediaAnalysisSourceFileBasis, StorePlayableMediaAnalysisTarget,
+    StorePlayableMediaAnalysisTargetError,
 };
 pub use playable_media_promotion::{
     PromotePlayableMediaForSourceResult, effective_playable_media_promotion_limit,

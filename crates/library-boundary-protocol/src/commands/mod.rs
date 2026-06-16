@@ -1,4 +1,5 @@
 pub mod library_roots;
+pub mod musical_analysis;
 pub mod search_filter;
 pub mod session_events;
 pub mod snapshot_reads;
@@ -8,6 +9,7 @@ pub mod source_maintenance;
 pub mod track_identity_decisions;
 
 pub use library_roots::*;
+pub use musical_analysis::*;
 pub use search_filter::*;
 pub use session_events::*;
 pub use snapshot_reads::*;
@@ -26,6 +28,7 @@ use crate::ProtocolError;
 pub enum CommandRequest {
     LibraryBoundaryEvents(LibraryBoundaryEventStreamCommand),
     LibraryRoots(LibraryRootCommand),
+    MusicalAnalysis(MusicalAnalysisCommand),
     SourceFileHash(SourceFileHashCommand),
     SourceMaintenance(SourceMaintenanceCommand),
     TrackIdentityDecisions(TrackIdentityDecisionCommand),
@@ -40,6 +43,7 @@ pub enum CommandRequest {
 pub enum CommandReply {
     LibraryBoundaryEvents(LibraryBoundaryEventStreamReply),
     LibraryRoots(LibraryRootReply),
+    MusicalAnalysis(MusicalAnalysisReply),
     SourceFileHash(SourceFileHashReply),
     SourceMaintenance(Box<SourceMaintenanceReply>),
     TrackIdentityDecisions(TrackIdentityDecisionReply),
@@ -87,10 +91,11 @@ mod tests {
     use super::{
         CommandErrorEnvelope, CommandOutcome, CommandReply, CommandRequest, CommandSuccessEnvelope,
         LibraryBoundaryEventStreamCommand, LibraryBoundaryEventStreamReply, LibraryRootCommand,
-        LibraryRootReply, ProtocolError, ReadLibraryBoundaryEventsAfterRequest,
-        ReadNavigationRowsReply, SnapshotReadCommand, SnapshotReadReply, SourceFileHashCommand,
-        SourceFileHashReply, SourceMaintenanceCommand, SourceMaintenanceReply, StartRootScanReply,
-        StartRootScanRequest, TrackIdentityDecisionCommand, TrackIdentityDecisionCommandResult,
+        LibraryRootReply, MusicalAnalysisCommand, MusicalAnalysisReply, ProtocolError,
+        ReadLibraryBoundaryEventsAfterRequest, ReadNavigationRowsReply, SnapshotReadCommand,
+        SnapshotReadReply, SourceFileHashCommand, SourceFileHashReply, SourceMaintenanceCommand,
+        SourceMaintenanceReply, StartRootScanReply, StartRootScanRequest,
+        TrackIdentityDecisionCommand, TrackIdentityDecisionCommandResult,
         TrackIdentityDecisionCommandSuccess, TrackIdentityDecisionReply,
         TrackIdentityDecisionState, TrackIdentityEffectiveDecisionCurrentStatus,
         TrackIdentityEffectiveDecisionPrecedence, TrackIdentityEffectiveDecisionSummary,
@@ -121,6 +126,14 @@ mod tests {
                 limit: Some(16),
             },
         ));
+        let musical_analysis = CommandRequest::MusicalAnalysis(
+            MusicalAnalysisCommand::AnalyzePlayableMedia(super::AnalyzePlayableMediaRequest {
+                playable_media_id: 40,
+                source_id: 7,
+                source_file_id: 11,
+                attachment_id: 30,
+            }),
+        );
         let maintenance = CommandRequest::SourceMaintenance(
             SourceMaintenanceCommand::RunSourceMaintenance(super::RunSourceMaintenanceRequest {
                 source_id: 7,
@@ -146,6 +159,7 @@ mod tests {
             library_roots,
             snapshot,
             hash,
+            musical_analysis,
             maintenance,
             identity_decision_command,
         ] {
@@ -153,6 +167,7 @@ mod tests {
                 CommandRequest::LibraryBoundaryEvents(_) => {}
                 CommandRequest::LibraryRoots(_) => {}
                 CommandRequest::SourceFileHash(_) => {}
+                CommandRequest::MusicalAnalysis(_) => {}
                 CommandRequest::SourceMaintenance(_) => {}
                 CommandRequest::TrackIdentityDecisions(_) => {}
                 CommandRequest::SnapshotRead(_) => {}
@@ -226,6 +241,31 @@ mod tests {
                         "sourceId": "7",
                         "hashLimit": 8,
                         "attachmentLimit": 4
+                    }
+                }
+            })
+        );
+
+        let musical_analysis_command = CommandRequest::MusicalAnalysis(
+            MusicalAnalysisCommand::AnalyzePlayableMedia(super::AnalyzePlayableMediaRequest {
+                playable_media_id: 40,
+                source_id: 7,
+                source_file_id: 11,
+                attachment_id: 30,
+            }),
+        );
+        assert_eq!(
+            serde_json::to_value(&musical_analysis_command)
+                .expect("serialize musical analysis command"),
+            json!({
+                "type": "musicalAnalysis",
+                "payload": {
+                    "type": "analyzePlayableMedia",
+                    "payload": {
+                        "playableMediaId": "40",
+                        "sourceId": "7",
+                        "sourceFileId": "11",
+                        "attachmentId": "30"
                     }
                 }
             })
@@ -398,6 +438,55 @@ mod tests {
         assert_eq!(
             serde_json::from_value::<CommandReply>(json).expect("deserialize maintenance reply"),
             maintenance_reply
+        );
+
+        let musical_analysis_reply = CommandReply::MusicalAnalysis(
+            MusicalAnalysisReply::AnalyzePlayableMedia(super::AnalyzePlayableMediaReply {
+                result: super::TrackMusicalAnalysisResult {
+                    target: super::TrackMusicalAnalysisTarget {
+                        playable_media_id: 40,
+                        source_id: 7,
+                        source_file_id: 11,
+                        attachment_id: 30,
+                        relative_path: Some("Album/track.wav".to_string()),
+                        media_kind: Some("audio".to_string()),
+                    },
+                    status: super::TrackMusicalAnalysisStatus::Blocked,
+                    status_detail: "analysis was blocked".to_string(),
+                    bpm: None,
+                    key: None,
+                    beatgrid: None,
+                    warnings: Vec::new(),
+                    basis: super::TrackMusicalAnalysisBasis {
+                        adapter_key: "dekzer_analyzer_musical_stratum_spike".to_string(),
+                        adapter_version: "0.0.0".to_string(),
+                        upstream_crate_name: "stratum-dsp".to_string(),
+                        upstream_crate_version: "1.0.0".to_string(),
+                        upstream_feature_flags: Vec::new(),
+                        decoder_policy: "hound_16_bit_integer_pcm_wav_to_mono_f32_v1".to_string(),
+                        input_policy: "blocked_before_adapter_invocation_v1".to_string(),
+                        channel_mixdown_policy: "not_applicable_adapter_not_invoked_v1".to_string(),
+                        normalization_policy: "not_applicable_adapter_not_invoked_v1".to_string(),
+                        upstream_analysis_config_policy: "not_applicable_adapter_not_invoked_v1"
+                            .to_string(),
+                        sample_rate_hz: None,
+                        ml_enabled: false,
+                        persistence_authorized: false,
+                        authority: "non_authoritative_advisory_v1".to_string(),
+                    },
+                },
+            }),
+        );
+        let json = serde_json::to_value(&musical_analysis_reply).expect("serialize analysis reply");
+        assert_eq!(json["type"], json!("musicalAnalysis"));
+        assert_eq!(json["payload"]["type"], json!("analyzePlayableMedia"));
+        assert_eq!(
+            json["payload"]["payload"]["result"]["target"]["playableMediaId"],
+            json!("40")
+        );
+        assert_eq!(
+            serde_json::from_value::<CommandReply>(json).expect("deserialize analysis reply"),
+            musical_analysis_reply
         );
 
         let decision_command_reply = CommandReply::TrackIdentityDecisions(

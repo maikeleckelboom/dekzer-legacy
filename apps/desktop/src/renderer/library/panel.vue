@@ -76,6 +76,10 @@ import {
   type StatusAction
 } from './sourceStatus/projection'
 import {
+  useTrackAnalysis,
+  type TrackAnalysisAction
+} from './trackAnalysis/controller'
+import {
   clearSelection,
   isValidSelection,
   rowSubject,
@@ -147,6 +151,8 @@ const integrityRead = useIntegrityRead()
 const maintenanceRead = useMaintenanceRead()
 const activityRead = useActivityRead()
 const searchFilterRead = useSearchFilterRead()
+const trackAnalysis = useTrackAnalysis(undefined, { selection: primarySelection })
+const trackAnalysisView = trackAnalysis.view
 const disclosureReconciler = createDisclosureReconciler({
   requestNodeChildren: (nodeId) => requestLibraryNodeChildren(nodeId)
 })
@@ -1305,6 +1311,16 @@ async function handleStatusAction(action: StatusAction): Promise<void> {
   }
 }
 
+function activateTrackAnalysisAction(action: TrackAnalysisAction): void {
+  if (!action.enabled) {
+    return
+  }
+
+  if (action.kind === 'analyze') {
+    void trackAnalysis.analyzeSelected()
+  }
+}
+
 function showAdmittedSource(sourceId: string): void {
   markUserInteraction()
   const projection = libraryBrowseProjection.value
@@ -1633,8 +1649,10 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
       selection: primarySelection,
       status: inspectorStatusView,
       sourceAdmissionHandoff: inspectorSourceAdmissionHandoffView,
+      trackAnalysis: trackAnalysisView,
       activateStatusAction: handleStatusAction,
-      activateSourceAdmissionHandoffAction: activateSourceAdmissionHandoffAction
+      activateSourceAdmissionHandoffAction: activateSourceAdmissionHandoffAction,
+      activateTrackAnalysisAction: activateTrackAnalysisAction
     }"
     @select="selectNode"
     @toggle="toggleNode"

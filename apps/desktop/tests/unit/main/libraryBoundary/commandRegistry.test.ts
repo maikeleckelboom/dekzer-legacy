@@ -40,6 +40,14 @@ describe('registerLibraryIpcCommands', () => {
       state: 'invalidRequest',
       error: { code: 'invalidRequest' }
     })
+    await expect(
+      registrations.get(libraryControlChannels.musicalAnalysis.analyzePlayableMedia)?.({}, null)
+    ).resolves.toMatchObject({
+      result: {
+        status: 'blocked',
+        warnings: [{ code: 'invalid_request' }]
+      }
+    })
 
     expect(
       registrations.get(libraryControlChannels.boundary.events.subscribe)?.({
@@ -100,6 +108,7 @@ function expectedLibraryControlChannels(): readonly string[] {
     libraryControlChannels.hierarchy.read,
     libraryControlChannels.localBrowse.items.read,
     libraryControlChannels.localBrowse.entryPoints.read,
+    libraryControlChannels.musicalAnalysis.analyzePlayableMedia,
     libraryControlChannels.navigation.read,
     libraryControlChannels.roots.cancel,
     libraryControlChannels.roots.chooseLocal,

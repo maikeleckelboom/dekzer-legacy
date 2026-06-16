@@ -9,6 +9,7 @@ import { readThroughHost } from '../hierarchy/read'
 import { readItems as readLocalBrowseItems } from '../localBrowse/items'
 import { readEntryPoints as readLocalBrowseEntryPoints } from '../localBrowse/entryPoints'
 import { readNavigationRowsThroughHost } from '../navigation/read'
+import { analyzePlayableMediaThroughHost } from '../musicalAnalysis/analyze'
 import { readSearchFilterThroughHost } from '../searchFilter/read'
 import { cancelRootScanThroughHost, type CancelScanLogger } from '../roots/cancel'
 import { chooseAndRegisterLocalRoot, type LocalRootChoiceDependencies } from '../roots/chooseLocal'
@@ -100,6 +101,9 @@ export function registerLibraryIpcCommands(options: RegisterLibraryIpcCommandsOp
   )
   ipcMain.handle(libraryControlChannels.localBrowse.items.read, (_event, request) =>
     readLocalBrowseItems(host, request as ReadLocalBrowseItemsRequest)
+  )
+  ipcMain.handle(libraryControlChannels.musicalAnalysis.analyzePlayableMedia, (_event, request) =>
+    analyzePlayableMediaThroughHost(host, request)
   )
   ipcMain.handle(libraryControlChannels.hierarchy.read, (_event, request) =>
     readThroughHost(host, request)

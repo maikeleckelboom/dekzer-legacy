@@ -5,6 +5,7 @@ import type {
 } from '../runtime/sourceAdmissionHandoff'
 import type { PrimarySelection } from '../selection/model'
 import type { StatusAction, StatusView } from '../sourceStatus/projection'
+import type { TrackAnalysisAction, TrackAnalysisView } from '../trackAnalysis/controller'
 import type { BrowserProjection } from '../tree/projection'
 import type { BrowserTreeNode, BrowserTreeNodeId } from '../tree/types'
 import type { ViewMode } from '../viewMode/model'
@@ -50,6 +51,8 @@ export type WorkstationInspectorProps = {
   readonly selection: PrimarySelection
   readonly status?: StatusView | undefined
   readonly sourceAdmissionHandoff?: SourceAdmissionHandoffProjection | undefined
+  readonly trackAnalysis?: TrackAnalysisView | undefined
   readonly activateStatusAction?: (action: StatusAction) => void
   readonly activateSourceAdmissionHandoffAction?: (action: SourceAdmissionHandoffAction) => void
+  readonly activateTrackAnalysisAction?: (action: TrackAnalysisAction) => void
 }
