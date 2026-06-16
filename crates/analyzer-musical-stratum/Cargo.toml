@@ -1,0 +1,8 @@
+[package]
+name = "analyzer-musical-stratum"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+stratum-dsp = { version = "=1.0.0", default-features = false }
