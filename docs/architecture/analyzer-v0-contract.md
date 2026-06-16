@@ -69,7 +69,7 @@ Successful envelope:
 {
   "envelope_schema": "dekzer.analyzer.analyze_one_file.v0",
   "status": "completed",
-  "payload_hash": "sha256:<64 lowercase hex chars>",
+  "payload_hash": "blake3:<64 lowercase hex chars>",
   "payload": {
     "payload_schema": "dekzer.analyzer.technical_sample_facts.v0",
     "analyzer": {
@@ -80,7 +80,7 @@ Successful envelope:
     },
     "basis": {
       "basis_schema": "dekzer.analyzer_basis.v0",
-      "basis_hash": "sha256:<64 lowercase hex chars>",
+      "basis_hash": "blake3:<64 lowercase hex chars>",
       "input_policy": "wav_hound_slice1",
       "decoder_key": "hound",
       "decoder_version": "<crate-version>",
@@ -131,7 +131,7 @@ Failed envelope:
 }
 ```
 
-`payload_hash` is the SHA-256 hash of the canonical UTF-8 JSON bytes of the `payload` object only. The hash field itself
+`payload_hash` is the BLAKE3 hash of the canonical UTF-8 JSON bytes of the `payload` object only. The hash field itself
 is not part of the hash input. Failed runs do not produce an analysis payload hash.
 
 Paths, timestamps, host names, source ids, thread counts, and process-local details must not enter the canonical
@@ -173,7 +173,7 @@ The basis excludes:
 - renderer state;
 - labels or display names.
 
-For the headless V0 proof, `basis_hash = sha256(canonical_json_utf8(basis_without_basis_hash))`.
+For the headless V0 proof, `basis_hash = blake3(canonical_json_utf8(basis_without_basis_hash))`.
 
 For future persistence, this headless basis is not automatically sufficient. The persisted basis fingerprint contract
 must be reviewed before schema or boundary work starts.
