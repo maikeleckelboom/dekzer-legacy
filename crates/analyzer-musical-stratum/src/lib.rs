@@ -601,6 +601,28 @@ mod tests {
                 .any(|warning| warning.kind == MusicalAnalysisWarningKind::NonAuthoritativeSpike)
         );
 
+        let bpm = result
+            .bpm
+            .expect("current stratum-dsp 1.0.0 spike should return a BPM candidate");
+        assert!(
+            (110.0..=125.0).contains(&bpm),
+            "120 BPM fixture is evidence only, but should remain in the observed broad neighborhood: {result:?}"
+        );
+        let bpm_confidence = result
+            .bpm_confidence
+            .expect("current stratum-dsp 1.0.0 spike should return BPM confidence");
+        assert!(
+            bpm_confidence < LOW_BPM_CONFIDENCE_THRESHOLD,
+            "current 120 BPM pulse evidence should keep exposing low confidence instead of hiding it: {result:?}"
+        );
+        assert!(
+            result
+                .warnings
+                .iter()
+                .any(|warning| warning.kind == MusicalAnalysisWarningKind::LowBpmConfidence),
+            "{result:?}"
+        );
+
         let plausible = has_plausible_tempo_evidence(&result, 120.0);
         if !plausible {
             assert!(
@@ -615,6 +637,173 @@ mod tests {
                 "surprising pulse output must carry warnings: {result:?}"
             );
         }
+    }
+
+    #[test]
+    fn current_safe_fixtures_never_return_accepted_status() {
+        let fixtures = [
+            ("empty", Vec::new()),
+            ("silence", vec![0.0_f32; SAMPLE_RATE_HZ as usize * 4]),
+            ("too_short_constant", vec![0.25_f32; 64]),
+            ("pulse_120_bpm", pulse_train(120.0, 16.0, SAMPLE_RATE_HZ)),
+            ("pulse_90_bpm", pulse_train(90.0, 16.0, SAMPLE_RATE_HZ)),
+        ];
+
+        for (name, samples) in fixtures {
+            let result = analyze_musical_input(MusicalAnalysisInput::mono_normalized_f32_fixture(
+                &samples,
+                SAMPLE_RATE_HZ,
+            ))
+            .unwrap_or_else(|error| panic!("{name} should produce a safe spike result: {error:?}"));
+
+            assert_ne!(
+                result.status,
+                MusicalAnalysisStatus::Accepted,
+                "{name} must not become authoritative spike output: {result:?}"
+            );
+            assert!(
+                matches!(
+                    result.status,
+                    MusicalAnalysisStatus::Advisory | MusicalAnalysisStatus::Inconclusive
+                ),
+                "{name} should remain non-authoritative: {result:?}"
+            );
+            assert!(
+                result.warnings.iter().any(
+                    |warning| warning.kind == MusicalAnalysisWarningKind::NonAuthoritativeSpike
+                ),
+                "{name} must carry the non-authoritative spike warning: {result:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn pulse_train_120_bpm_is_repeatable_within_one_process() {
+        let samples = pulse_train(120.0, 16.0, SAMPLE_RATE_HZ);
+        let baseline = analyze_musical_input(MusicalAnalysisInput::mono_normalized_f32_fixture(
+            &samples,
+            SAMPLE_RATE_HZ,
+        ))
+        .expect("baseline pulse train should produce a safe adapter result");
+
+        for iteration in 1..8 {
+            let next = analyze_musical_input(MusicalAnalysisInput::mono_normalized_f32_fixture(
+                &samples,
+                SAMPLE_RATE_HZ,
+            ))
+            .unwrap_or_else(|error| panic!("repeat iteration {iteration} failed: {error:?}"));
+
+            assert_eq!(
+                next.basis, baseline.basis,
+                "basis drifted in repeat iteration {iteration}"
+            );
+            assert_eq!(
+                next.status, baseline.status,
+                "status drifted in repeat iteration {iteration}: baseline={baseline:?}, next={next:?}"
+            );
+            assert_optional_f32_close(
+                "bpm",
+                baseline.bpm,
+                next.bpm,
+                0.01,
+                iteration,
+                &baseline,
+                &next,
+            );
+            assert_optional_f32_close(
+                "bpm_confidence",
+                baseline.bpm_confidence,
+                next.bpm_confidence,
+                0.0001,
+                iteration,
+                &baseline,
+                &next,
+            );
+            assert_optional_f32_close(
+                "grid_stability",
+                baseline.grid_stability,
+                next.grid_stability,
+                0.0001,
+                iteration,
+                &baseline,
+                &next,
+            );
+            assert_eq!(
+                warning_kinds(&next),
+                warning_kinds(&baseline),
+                "warning kinds drifted in repeat iteration {iteration}: baseline={baseline:?}, next={next:?}"
+            );
+            assert_eq!(
+                next.beat_positions.len(),
+                baseline.beat_positions.len(),
+                "beat count drifted in repeat iteration {iteration}: baseline={baseline:?}, next={next:?}"
+            );
+
+            for (beat_index, (baseline_beat, next_beat)) in baseline
+                .beat_positions
+                .iter()
+                .zip(next.beat_positions.iter())
+                .enumerate()
+            {
+                assert_f32_close(
+                    "beat_position",
+                    *baseline_beat,
+                    *next_beat,
+                    0.001,
+                    iteration,
+                    beat_index,
+                    &baseline,
+                    &next,
+                );
+            }
+        }
+
+        assert_ne!(baseline.status, MusicalAnalysisStatus::Accepted);
+    }
+
+    #[test]
+    fn second_pulse_fixture_low_confidence_or_surprise_remains_non_authoritative() {
+        let samples = pulse_train(90.0, 16.0, SAMPLE_RATE_HZ);
+        let result = analyze_musical_input(MusicalAnalysisInput::mono_normalized_f32_fixture(
+            &samples,
+            SAMPLE_RATE_HZ,
+        ))
+        .expect("90 BPM pulse train should produce a safe adapter result");
+
+        assert_ne!(result.status, MusicalAnalysisStatus::Accepted);
+
+        let surprising = !has_plausible_tempo_evidence(&result, 90.0);
+        let low_bpm_confidence = result
+            .bpm_confidence
+            .map_or(true, |confidence| confidence < LOW_BPM_CONFIDENCE_THRESHOLD);
+        assert!(
+            surprising || low_bpm_confidence,
+            "90 BPM fixture should continue exercising surprising or low-confidence spike evidence: {result:?}"
+        );
+        assert!(
+            matches!(
+                result.status,
+                MusicalAnalysisStatus::Advisory | MusicalAnalysisStatus::Inconclusive
+            ),
+            "surprising or low-confidence pulse output must remain non-authoritative: {result:?}"
+        );
+        assert!(
+            !result.warnings.is_empty(),
+            "surprising or low-confidence pulse output must carry warnings: {result:?}"
+        );
+        assert!(
+            result.warnings.iter().any(|warning| matches!(
+                warning.kind,
+                MusicalAnalysisWarningKind::BpmUnavailable
+                    | MusicalAnalysisWarningKind::LowBpmConfidence
+                    | MusicalAnalysisWarningKind::LowGridStability
+                    | MusicalAnalysisWarningKind::EmptyBeatGrid
+                    | MusicalAnalysisWarningKind::UpstreamWarning
+                    | MusicalAnalysisWarningKind::UpstreamFlag
+                    | MusicalAnalysisWarningKind::NonAuthoritativeSpike
+            )),
+            "{result:?}"
+        );
     }
 
     #[test]
@@ -639,19 +828,17 @@ mod tests {
         assert_eq!(result.basis.normalization_policy, NORMALIZATION_POLICY);
         assert!(!result.basis.ml_enabled);
         assert!(!result.basis.persistence_authorized);
-        assert!(
-            result
-                .basis
-                .upstream_feature_flags
-                .contains(&"default-features=false")
-        );
-        assert!(result.basis.upstream_feature_flags.contains(&"ml=disabled"));
-        assert!(
-            result
-                .basis
-                .upstream_feature_flags
-                .contains(&"ort=disabled")
-        );
+        for required_flag in [
+            "default=[]",
+            "default-features=false",
+            "ml=disabled",
+            "ort=disabled",
+        ] {
+            assert!(
+                result.basis.upstream_feature_flags.contains(&required_flag),
+                "basis must record upstream feature flag {required_flag}: {result:?}"
+            );
+        }
     }
 
     #[test]
@@ -663,12 +850,31 @@ mod tests {
         ))
         .expect("silence should return a safe non-authoritative result");
 
-        assert_ne!(result.status, MusicalAnalysisStatus::Accepted);
+        let bpm = result.bpm.expect(
+            "current stratum-dsp 1.0.0 behavior returns a positive BPM candidate for silence",
+        );
+        assert!(
+            (35.0..=45.0).contains(&bpm),
+            "silence BPM candidate should remain documented as suspicious spike evidence: {result:?}"
+        );
+        assert_eq!(
+            result.bpm_confidence,
+            Some(0.0),
+            "silence BPM confidence must remain exposed as zero confidence: {result:?}"
+        );
+        assert_eq!(result.status, MusicalAnalysisStatus::Inconclusive);
         assert!(
             result
                 .warnings
                 .iter()
                 .any(|warning| warning.kind == MusicalAnalysisWarningKind::SilentInput),
+            "{result:?}"
+        );
+        assert!(
+            result
+                .warnings
+                .iter()
+                .any(|warning| warning.kind == MusicalAnalysisWarningKind::LowBpmConfidence),
             "{result:?}"
         );
     }
@@ -854,6 +1060,47 @@ mod tests {
 
         let median_interval = intervals[intervals.len() / 2];
         Some(60.0 / median_interval)
+    }
+
+    fn warning_kinds(result: &MusicalAnalysisResult) -> Vec<MusicalAnalysisWarningKind> {
+        result.warnings.iter().map(|warning| warning.kind).collect()
+    }
+
+    fn assert_optional_f32_close(
+        label: &str,
+        expected: Option<f32>,
+        actual: Option<f32>,
+        tolerance: f32,
+        iteration: usize,
+        baseline: &MusicalAnalysisResult,
+        next: &MusicalAnalysisResult,
+    ) {
+        match (expected, actual) {
+            (Some(expected), Some(actual)) => assert!(
+                (expected - actual).abs() <= tolerance,
+                "{label} drifted in repeat iteration {iteration}: expected {expected}, got {actual}; baseline={baseline:?}, next={next:?}"
+            ),
+            (None, None) => {}
+            _ => panic!(
+                "{label} presence drifted in repeat iteration {iteration}: baseline={baseline:?}, next={next:?}"
+            ),
+        }
+    }
+
+    fn assert_f32_close(
+        label: &str,
+        expected: f32,
+        actual: f32,
+        tolerance: f32,
+        iteration: usize,
+        index: usize,
+        baseline: &MusicalAnalysisResult,
+        next: &MusicalAnalysisResult,
+    ) {
+        assert!(
+            (expected - actual).abs() <= tolerance,
+            "{label}[{index}] drifted in repeat iteration {iteration}: expected {expected}, got {actual}; baseline={baseline:?}, next={next:?}"
+        );
     }
 
     fn lock_contains_package(lock: &str, package_name: &str) -> bool {
