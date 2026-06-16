@@ -2124,6 +2124,178 @@ mod tests {
     }
 
     #[test]
+    fn analyze_playable_media_refreshes_store_owned_source_when_renderer_source_is_stale() {
+        let (tempdir, context, service) = open_service_with_context();
+        let source_root = tempdir.path().join("musical-analysis-store-owned-refresh-root");
+        std::fs::create_dir_all(&source_root).expect("create source root");
+        let wav_bytes = tiny_wav_bytes(44_100, 2, 16, 44_100 * 4);
+        std::fs::write(source_root.join("track.wav"), &wav_bytes).expect("write wav");
+
+        let (_json, registered) =
+            register_local_root(&service, source_root.to_string_lossy().into_owned());
+        record_present_source_file(
+            &service,
+            registered.root_id,
+            100,
+            "track.wav",
+            wav_bytes.len(),
+        );
+        run_source_maintenance(
+            &service,
+            registered.root_id,
+            Some(10),
+            Some(10),
+            Some(10),
+            Some(10),
+        );
+
+        let contents = service
+            .read_contents(ContentsReadRequest {
+                scope: ContentsScope::Source {
+                    source_id: registered.root_id,
+                },
+                policy: ContentsReadPolicy::PlayableMedia {
+                    media_kinds: vec![library_boundary_protocol::PlayableMediaKind::Audio],
+                },
+                scope_depth: ContentsScopeDepth::Recursive,
+                limit: Some(10),
+                cursor: None,
+            })
+            .expect("read promoted audio")
+            .result;
+        let row = contents
+            .rows
+            .iter()
+            .find(|row| row.file_name == "track.wav")
+            .expect("track row");
+        let playable = row.playable_media.as_ref().expect("playable media");
+        let stale_renderer_source_id = registered.root_id + 10_000;
+        let persistence_before = (
+            count_rows(&context, "work_items"),
+            count_rows(&context, "work_runs"),
+            count_rows(&context, "work_artifacts"),
+        );
+
+        let mut refreshed_source_ids = Vec::new();
+        let reply = crate::musical_analysis::handle_musical_analysis_command(
+            &service.durable_store,
+            |source_id| {
+                refreshed_source_ids.push(source_id);
+                Ok(())
+            },
+            MusicalAnalysisCommand::AnalyzePlayableMedia(AnalyzePlayableMediaRequest {
+                playable_media_id: playable.playable_media_id,
+                source_id: stale_renderer_source_id,
+                source_file_id: row.source_file_id,
+                attachment_id: playable.attachment_id,
+            }),
+        )
+        .expect("analyze command")
+        .expect_direct_analyze_playable_media_reply();
+        let result = reply.result;
+
+        assert_eq!(refreshed_source_ids, vec![registered.root_id]);
+        assert_ne!(refreshed_source_ids, vec![stale_renderer_source_id]);
+        assert_eq!(result.status, TrackMusicalAnalysisStatus::Blocked);
+        assert_eq!(result.target.source_id, registered.root_id);
+        assert!(result.warnings.iter().any(|warning| {
+            warning.code == "selected_source_mismatch"
+                && warning
+                    .message
+                    .contains(&format!("requested sourceId {stale_renderer_source_id}"))
+        }));
+        assert_eq!(
+            (
+                count_rows(&context, "work_items"),
+                count_rows(&context, "work_runs"),
+                count_rows(&context, "work_artifacts"),
+            ),
+            persistence_before
+        );
+    }
+
+    #[test]
+    fn analyze_playable_media_does_not_require_renderer_source_refresh_to_succeed() {
+        let (tempdir, _context, service) = open_service_with_context();
+        let source_root = tempdir
+            .path()
+            .join("musical-analysis-no-renderer-refresh-root");
+        std::fs::create_dir_all(&source_root).expect("create source root");
+        let wav_bytes = tiny_wav_bytes(44_100, 2, 16, 44_100 * 4);
+        std::fs::write(source_root.join("track.wav"), &wav_bytes).expect("write wav");
+
+        let (_json, registered) =
+            register_local_root(&service, source_root.to_string_lossy().into_owned());
+        record_present_source_file(
+            &service,
+            registered.root_id,
+            100,
+            "track.wav",
+            wav_bytes.len(),
+        );
+        run_source_maintenance(
+            &service,
+            registered.root_id,
+            Some(10),
+            Some(10),
+            Some(10),
+            Some(10),
+        );
+
+        let contents = service
+            .read_contents(ContentsReadRequest {
+                scope: ContentsScope::Source {
+                    source_id: registered.root_id,
+                },
+                policy: ContentsReadPolicy::PlayableMedia {
+                    media_kinds: vec![library_boundary_protocol::PlayableMediaKind::Audio],
+                },
+                scope_depth: ContentsScopeDepth::Recursive,
+                limit: Some(10),
+                cursor: None,
+            })
+            .expect("read promoted audio")
+            .result;
+        let row = contents
+            .rows
+            .iter()
+            .find(|row| row.file_name == "track.wav")
+            .expect("track row");
+        let playable = row.playable_media.as_ref().expect("playable media");
+        let stale_renderer_source_id = registered.root_id + 10_000;
+
+        let reply = crate::musical_analysis::handle_musical_analysis_command(
+            &service.durable_store,
+            |source_id| {
+                assert_eq!(
+                    source_id, registered.root_id,
+                    "refresh must use the store-owned playable media source"
+                );
+                assert_ne!(
+                    source_id, stale_renderer_source_id,
+                    "refresh must not use renderer-supplied stale sourceId"
+                );
+                Ok(())
+            },
+            MusicalAnalysisCommand::AnalyzePlayableMedia(AnalyzePlayableMediaRequest {
+                playable_media_id: playable.playable_media_id,
+                source_id: stale_renderer_source_id,
+                source_file_id: row.source_file_id,
+                attachment_id: playable.attachment_id,
+            }),
+        )
+        .expect("analyze command")
+        .expect_direct_analyze_playable_media_reply();
+
+        assert_eq!(reply.result.status, TrackMusicalAnalysisStatus::Blocked);
+        assert!(reply
+            .result
+            .warnings
+            .iter()
+            .any(|warning| warning.code == "selected_source_mismatch"));
+    }
+
+    #[test]
     fn search_filter_snapshot_read_uses_backend_index_rows() {
         let (tempdir, _context, service) = open_service_with_context();
         let source_root = tempdir.path().join("search-filter-root");
@@ -2479,6 +2651,18 @@ mod tests {
         expect_analyze_playable_media_reply(expect_success(service.handle_command(
             CommandRequest::MusicalAnalysis(MusicalAnalysisCommand::AnalyzePlayableMedia(request)),
         )))
+    }
+
+    trait DirectMusicalAnalysisReplyExt {
+        fn expect_direct_analyze_playable_media_reply(self) -> AnalyzePlayableMediaReply;
+    }
+
+    impl DirectMusicalAnalysisReplyExt for MusicalAnalysisReply {
+        fn expect_direct_analyze_playable_media_reply(self) -> AnalyzePlayableMediaReply {
+            match self {
+                MusicalAnalysisReply::AnalyzePlayableMedia(reply) => reply,
+            }
+        }
     }
 
     fn wait_for_scan_completed(service: &LibraryBoundaryService, root_id: i64) {

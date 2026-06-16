@@ -43,8 +43,6 @@ fn analyze_playable_media(
     let source_file_id = require_positive_i64(request.source_file_id, "sourceFileId")?;
     let attachment_id = require_positive_i64(request.attachment_id, "attachmentId")?;
 
-    refresh_source(source_id)?;
-
     let request_target = protocol::TrackMusicalAnalysisTarget {
         playable_media_id,
         source_id,
@@ -53,6 +51,21 @@ fn analyze_playable_media(
         relative_path: None,
         media_kind: None,
     };
+    let source_file_basis =
+        match store.read_playable_media_analysis_source_file_basis(playable_media_id) {
+            Ok(source_file_basis) => source_file_basis,
+            Err(StorePlayableMediaAnalysisTargetError::Store(error)) => {
+                return Err(map_store_error(error));
+            }
+            Err(error) => {
+                return Ok(protocol::AnalyzePlayableMediaReply {
+                    result: blocked_target_resolution_result(request_target, error),
+                });
+            }
+        };
+
+    refresh_source(source_file_basis.source_id)?;
+
     let target = match store.resolve_playable_media_analysis_target(playable_media_id) {
         Ok(target) => target,
         Err(StorePlayableMediaAnalysisTargetError::Store(error)) => {

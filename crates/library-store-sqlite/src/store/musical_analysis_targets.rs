@@ -90,6 +90,28 @@ pub enum StorePlayableMediaAnalysisTargetError {
 }
 
 impl SqliteDurableStore {
+    pub fn read_playable_media_analysis_source_file_basis(
+        &self,
+        playable_media_id: i64,
+    ) -> Result<
+        StorePlayableMediaAnalysisSourceFileBasis,
+        StorePlayableMediaAnalysisTargetError,
+    > {
+        let row = self
+            .read_playable_media_analysis_target_row(playable_media_id)?
+            .ok_or(
+                StorePlayableMediaAnalysisTargetError::PlayableMediaNotFound { playable_media_id },
+            )?;
+        let source_file_id = SourceFileId::new(row.evidence_source_file_id).ok_or_else(|| {
+            StorePlayableMediaAnalysisTargetError::InvalidEvidenceSourceFileId {
+                playable_media_id,
+                source_file_id: row.evidence_source_file_id,
+            }
+        })?;
+
+        self.read_playable_media_analysis_source_file_basis_by_id(source_file_id)
+    }
+
     pub fn resolve_playable_media_analysis_target(
         &self,
         playable_media_id: i64,
@@ -149,6 +171,38 @@ impl SqliteDurableStore {
             )
             .optional()
             .map_err(LibrarySqliteError::from)
+    }
+
+    fn read_playable_media_analysis_source_file_basis_by_id(
+        &self,
+        source_file_id: SourceFileId,
+    ) -> Result<
+        StorePlayableMediaAnalysisSourceFileBasis,
+        StorePlayableMediaAnalysisTargetError,
+    > {
+        let connection = self.open_read_connection()?;
+        connection
+            .query_row(
+                "SELECT source_id,
+                        relative_path,
+                        file_kind
+                 FROM source_files
+                 WHERE source_file_id = ?1",
+                [source_file_id.get()],
+                |row| {
+                    Ok(StorePlayableMediaAnalysisSourceFileBasis {
+                        source_file_id: source_file_id.get(),
+                        source_id: row.get(0)?,
+                        relative_path: row.get(1)?,
+                        file_kind: row.get(2)?,
+                    })
+                },
+            )
+            .optional()
+            .map_err(LibrarySqliteError::from)?
+            .ok_or(StorePlayableMediaAnalysisTargetError::SourceFileNotFound {
+                source_file_id: source_file_id.get(),
+            })
     }
 }
 
