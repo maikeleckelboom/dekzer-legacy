@@ -70,7 +70,8 @@ The adapter basis records:
 Silence fixture:
 
 - input: four seconds of mono normalized `f32` zeros at 44,100 Hz;
-- upstream behavior observed: a positive BPM candidate around `40.0` with `bpm_confidence = 0.0`;
+- current pinned stratum-dsp 1.0.0 spike observation: silence produced a positive BPM candidate around `40.0`
+  with `bpm_confidence = 0.0`; this is adoption evidence, not a Dekzer correctness requirement;
 - adapter behavior: status remains `Inconclusive`;
 - warnings include the non-authoritative spike warning, silent input, and low BPM confidence.
 
@@ -95,7 +96,8 @@ persist results, generate boundary protocol, drive UI, or modify Analyzer V0.
 
 - Dekzer-owned validation corpus and acceptance policy do not exist yet.
 - Duplicate Symphonia lines require license, security, and maintenance review.
-- The observed silence behavior proves upstream BPM output can be positive with zero confidence.
+- The current pinned stratum-dsp 1.0.0 spike showed silence can produce a positive upstream BPM candidate with zero
+  confidence; treat this as an adoption concern, not a Dekzer invariant.
 - Pulse fixtures currently produce low-confidence tempo evidence; they are not correctness proof.
 - Rayon and parallelism determinism need review beyond one-process fixture repeatability.
 - Decoder, mixdown, resampling, and normalization policies are not validated outside controlled fixtures.

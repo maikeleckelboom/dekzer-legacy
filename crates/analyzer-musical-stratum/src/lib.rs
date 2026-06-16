@@ -850,19 +850,14 @@ mod tests {
         ))
         .expect("silence should return a safe non-authoritative result");
 
-        let bpm = result.bpm.expect(
-            "current stratum-dsp 1.0.0 behavior returns a positive BPM candidate for silence",
-        );
+        assert_ne!(result.status, MusicalAnalysisStatus::Accepted);
         assert!(
-            (35.0..=45.0).contains(&bpm),
-            "silence BPM candidate should remain documented as suspicious spike evidence: {result:?}"
+            matches!(
+                result.status,
+                MusicalAnalysisStatus::Advisory | MusicalAnalysisStatus::Inconclusive
+            ),
+            "silence must remain non-authoritative even if upstream behavior changes: {result:?}"
         );
-        assert_eq!(
-            result.bpm_confidence,
-            Some(0.0),
-            "silence BPM confidence must remain exposed as zero confidence: {result:?}"
-        );
-        assert_eq!(result.status, MusicalAnalysisStatus::Inconclusive);
         assert!(
             result
                 .warnings
@@ -874,9 +869,30 @@ mod tests {
             result
                 .warnings
                 .iter()
+                .any(|warning| warning.kind == MusicalAnalysisWarningKind::NonAuthoritativeSpike),
+            "{result:?}"
+        );
+        assert!(
+            result
+                .warnings
+                .iter()
                 .any(|warning| warning.kind == MusicalAnalysisWarningKind::LowBpmConfidence),
             "{result:?}"
         );
+
+        if result.bpm.is_some() {
+            assert!(
+                result
+                    .bpm_confidence
+                    .map_or(true, |confidence| confidence < LOW_BPM_CONFIDENCE_THRESHOLD),
+                "silence BPM candidates must remain low-confidence spike evidence: {result:?}"
+            );
+            assert_ne!(
+                result.status,
+                MusicalAnalysisStatus::Accepted,
+                "silence BPM candidates must not make silence authoritative: {result:?}"
+            );
+        }
     }
 
     #[test]
