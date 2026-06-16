@@ -357,6 +357,29 @@ fn float_wav_is_rejected_with_typed_failure() {
 }
 
 #[test]
+fn non_16_bit_integer_wavs_are_rejected_with_typed_failure() {
+    let temp = TempDir::new().expect("temp dir");
+
+    for bit_depth in [8, 24, 32] {
+        let path = write_int_bit_depth_fixture(temp.path(), bit_depth);
+
+        let error = analyze_wav_file(path)
+            .expect_err(&format!("{bit_depth}-bit integer WAV should be rejected"));
+
+        assert_eq!(
+            error.kind,
+            AnalysisFailureKind::UnsupportedBitDepth,
+            "{bit_depth}-bit integer WAV"
+        );
+        assert_eq!(
+            error.message,
+            "Analyzer V0 slice 1 supports 16-bit integer PCM WAV only",
+            "{bit_depth}-bit integer WAV"
+        );
+    }
+}
+
+#[test]
 fn analyzer_core_manifest_has_no_forbidden_boundary_or_renderer_dependencies() {
     let manifest_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml");
     let manifest = fs::read_to_string(manifest_path).expect("manifest");
@@ -443,6 +466,23 @@ fn write_int_fixture(root: &Path, case: &FixtureCase) -> PathBuf {
         writer.write_sample(*sample).expect("write sample");
     }
     writer.finalize().expect("finalize wav");
+
+    path
+}
+
+fn write_int_bit_depth_fixture(root: &Path, bit_depth: u16) -> PathBuf {
+    let path = root.join(format!("integer_{bit_depth}_bit.wav"));
+    let spec = WavSpec {
+        channels: 1,
+        sample_rate: SAMPLE_RATE_HZ,
+        bits_per_sample: bit_depth,
+        sample_format: SampleFormat::Int,
+    };
+
+    let mut writer = WavWriter::create(&path, spec).expect("create integer wav");
+    writer.write_sample(0_i32).expect("write sample");
+    writer.write_sample(1_i32).expect("write sample");
+    writer.finalize().expect("finalize integer wav");
 
     path
 }

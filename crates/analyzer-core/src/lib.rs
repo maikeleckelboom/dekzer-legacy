@@ -8,6 +8,9 @@ pub const SAMPLE_FORMAT_POLICY: &str = "integer_pcm_wav_hound_slice1";
 pub const NORMALIZATION_POLICY: &str = "integer_pcm_full_scale_v0";
 pub const STEREO_NEAR_ZERO_CHANNEL_RMS: f64 = 1e-12;
 
+const SUPPORTED_INPUT_MESSAGE: &str =
+    "Analyzer V0 slice 1 supports 16-bit integer PCM WAV only";
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct TechnicalSampleAnalysis {
     pub basis: AnalysisBasis,
@@ -100,14 +103,14 @@ fn analyze_hound_reader<R: std::io::Read>(
     if spec.sample_format != hound::SampleFormat::Int {
         return Err(failure(
             AnalysisFailureKind::UnsupportedSampleFormat,
-            "integer PCM WAV is required for analyzer V0 slice 1",
+            SUPPORTED_INPUT_MESSAGE,
         ));
     }
 
-    if !matches!(spec.bits_per_sample, 8 | 16 | 24 | 32) {
+    if spec.bits_per_sample != 16 {
         return Err(failure(
             AnalysisFailureKind::UnsupportedBitDepth,
-            "only 8, 16, 24, and 32 bit integer PCM WAV input is supported",
+            SUPPORTED_INPUT_MESSAGE,
         ));
     }
 
@@ -222,7 +225,7 @@ fn integer_full_scale(bits_per_sample: u16) -> Result<(i64, i64, f64), AnalysisF
     if bits_per_sample == 0 || bits_per_sample > 32 {
         return Err(failure(
             AnalysisFailureKind::UnsupportedBitDepth,
-            "integer PCM bit depth is outside the supported range",
+            SUPPORTED_INPUT_MESSAGE,
         ));
     }
 
@@ -317,11 +320,11 @@ fn map_open_error(error: hound::Error) -> AnalysisFailure {
         ),
         hound::Error::InvalidSampleFormat => failure(
             AnalysisFailureKind::UnsupportedSampleFormat,
-            "integer PCM WAV is required for analyzer V0 slice 1",
+            SUPPORTED_INPUT_MESSAGE,
         ),
         hound::Error::TooWide => failure(
             AnalysisFailureKind::UnsupportedBitDepth,
-            "integer PCM bit depth is too wide",
+            SUPPORTED_INPUT_MESSAGE,
         ),
         hound::Error::UnfinishedSample => failure(
             AnalysisFailureKind::MalformedWav,
@@ -334,11 +337,11 @@ fn map_decode_error(error: hound::Error) -> AnalysisFailure {
     match error {
         hound::Error::InvalidSampleFormat => failure(
             AnalysisFailureKind::UnsupportedSampleFormat,
-            "integer PCM WAV is required for analyzer V0 slice 1",
+            SUPPORTED_INPUT_MESSAGE,
         ),
         hound::Error::TooWide | hound::Error::Unsupported => failure(
             AnalysisFailureKind::UnsupportedBitDepth,
-            "integer PCM bit depth cannot be decoded deterministically",
+            SUPPORTED_INPUT_MESSAGE,
         ),
         hound::Error::FormatError(message) => failure(AnalysisFailureKind::MalformedWav, message),
         hound::Error::IoError(_) => failure(
