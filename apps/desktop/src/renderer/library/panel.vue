@@ -30,7 +30,6 @@ import {
 import { useRead as useIntegrityRead } from './sourceIntegrity/read'
 import { useRead as useMaintenanceRead } from './sourceMaintenance/read'
 import { useRead as useActivityRead } from './sourceActivity/read'
-import ContentsTable from './contents/table.vue'
 import { projectContents, type ContentRow } from './contents/projection'
 import { projectSearchFilterContents } from './searchFilter/contentsProjection'
 import {
@@ -73,7 +72,7 @@ import {
 import type { BrowserState, RowBinding } from './state'
 import { createViewStateStore } from './runtime/viewState'
 import { projectState } from './tree/projection'
-import TreeRoot from './tree/treeRoot.vue'
+import WorkstationShell from './workstation/shell.vue'
 import type { BrowserTreeNodeId } from './tree/types'
 import type { LibraryPanelSurface } from '../../shared/library/viewState/persistence'
 
@@ -1491,184 +1490,168 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
 </script>
 
 <template>
-  <section
-    class="flex h-[80svh] min-h-0 flex-col overflow-hidden border border-(--color-border) bg-(--color-surface)"
-    role="region"
-    aria-label="Library panel"
+  <WorkstationShell
+    :title="activeSurfaceTitle"
+    :tree="treeRootProps"
+    :contents="{
+      projection: contentsProjection,
+      statusView: sourceStatusView,
+      sourceAdmissionHandoff: sourceAdmissionHandoffView,
+      activateRowAction: activateContentRowAction,
+      activateStatusAction: handleStatusAction,
+      activateSourceAdmissionHandoffAction: activateSourceAdmissionHandoffAction
+    }"
+    :inspector="{
+      selection: sourceStatusContext,
+      status: sourceStatusView
+    }"
+    @select="selectNode"
+    @toggle="toggleNode"
+    @activate-action="activateNodeAction"
+    @prepare="prepareNodeContents"
+    @cancel-prepare="cancelPrepareNodeContents"
   >
-    <header class="flex shrink-0 items-center justify-between gap-4">
-      <h2 id="library-hierarchy-title" class="text-xl font-bold leading-none text-(--color-text)">
-        {{ activeSurfaceTitle }}
-      </h2>
+    <template #bar-controls>
+      <button
+        v-if="activeSurface === 'addSource' && hasAdmittedLibraryRowsVisible"
+        type="button"
+        :class="iconButtonClass"
+        aria-label="Library Browse"
+        title="Library Browse"
+        @click="openLibraryBrowseSurface"
+      >
+        <Icon role="folder.plain" size="md" />
+      </button>
 
-      <div class="flex flex-wrap items-center justify-end gap-2">
-        <button
-          v-if="activeSurface === 'addSource' && hasAdmittedLibraryRowsVisible"
-          type="button"
-          :class="iconButtonClass"
-          aria-label="Library Browse"
-          title="Library Browse"
-          @click="openLibraryBrowseSurface"
-        >
-          <Icon role="folder.plain" size="md" />
-        </button>
+      <button
+        v-if="toolbarModel.search.visible && !librarySearch.searchOpen.value"
+        ref="searchOpenButtonRef"
+        type="button"
+        :class="iconButtonClass"
+        :aria-label="toolbarModel.search.label"
+        :title="toolbarModel.search.title"
+        :disabled="!toolbarModel.search.enabled"
+        @click="openSearch"
+      >
+        <Icon role="action.search" size="md" />
+      </button>
 
-        <button
-          v-if="toolbarModel.search.visible && !librarySearch.searchOpen.value"
-          ref="searchOpenButtonRef"
-          type="button"
-          :class="iconButtonClass"
+      <div v-else-if="toolbarModel.search.visible" class="inline-flex items-center gap-1">
+        <input
+          ref="searchInputRef"
+          v-model="librarySearch.searchText.value"
+          type="search"
+          :class="`${toolbarControlClass} h-9 w-44 rounded-sm px-3 py-2 text-sm font-semibold outline-none transition placeholder:text-(--color-text-muted) focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background)`"
           :aria-label="toolbarModel.search.label"
-          :title="toolbarModel.search.title"
-          :disabled="!toolbarModel.search.enabled"
-          @click="openSearch"
-        >
-          <Icon role="action.search" size="md" />
-        </button>
-
-        <div v-else-if="toolbarModel.search.visible" class="inline-flex items-center gap-1">
-          <input
-            ref="searchInputRef"
-            v-model="librarySearch.searchText.value"
-            type="search"
-            :class="`${toolbarControlClass} h-9 w-44 rounded-sm px-3 py-2 text-sm font-semibold outline-none transition placeholder:text-(--color-text-muted) focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background)`"
-            :aria-label="toolbarModel.search.label"
-            :placeholder="toolbarModel.search.placeholder"
-            @keydown.escape.stop.prevent="handleSearchEscape"
-          />
-          <button
-            v-if="librarySearch.searchText.value.length > 0"
-            type="button"
-            :class="iconButtonClass"
-            aria-label="Clear search"
-            title="Clear search"
-            @click="clearSearchAndReturnToScope"
-          >
-            <Icon role="action.clear" size="md" />
-          </button>
-        </div>
-
-        <div
-          v-if="toolbarModel.libraryBrowseProfile.visible"
-          ref="libraryBrowseProfileMenuRef"
-          class="relative inline-flex"
-        >
-          <button
-            type="button"
-            :class="iconButtonClass"
-            :aria-label="toolbarModel.libraryBrowseProfile.label"
-            :aria-expanded="libraryBrowseProfileMenuOpen"
-            aria-haspopup="listbox"
-            :title="toolbarModel.libraryBrowseProfile.title"
-            :disabled="!toolbarModel.libraryBrowseProfile.enabled"
-            @click="toggleLibraryBrowseProfileMenu"
-            @keydown.escape.stop.prevent="closeLibraryBrowseProfileMenu"
-          >
-            <Icon role="action.browseView" size="md" />
-          </button>
-
-          <div
-            v-if="libraryBrowseProfileMenuOpen"
-            class="absolute right-0 top-full z-20 mt-1 min-w-40 border border-(--color-border) bg-(--color-background) py-1 shadow-lg"
-            role="listbox"
-            :aria-label="toolbarModel.libraryBrowseProfile.label"
-            tabindex="-1"
-            @keydown.escape.stop.prevent="closeLibraryBrowseProfileMenu"
-          >
-            <button
-              v-for="option in libraryBrowseProfileOptions"
-              :key="option.key"
-              type="button"
-              class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm text-(--color-text) hover:bg-(--color-surface) focus-visible:bg-(--color-surface) focus-visible:outline-none"
-              :class="
-                libraryBrowseProfile.profile.value === option.key ? 'font-bold' : 'font-normal'
-              "
-              role="option"
-              :aria-selected="libraryBrowseProfile.profile.value === option.key"
-              @click="selectLibraryBrowseProfile(option.key)"
-            >
-              <span>{{ option.label }}</span>
-            </button>
-          </div>
-        </div>
-
-        <div
-          v-if="toolbarModel.addSourceView.visible"
-          ref="addSourceViewMenuRef"
-          class="relative inline-flex"
-        >
-          <button
-            type="button"
-            :class="iconButtonClass"
-            :aria-label="toolbarModel.addSourceView.label"
-            :aria-expanded="addSourceViewMenuOpen"
-            aria-haspopup="listbox"
-            :title="toolbarModel.addSourceView.title"
-            :disabled="!toolbarModel.addSourceView.enabled"
-            @click="toggleAddSourceViewMenu"
-            @keydown.escape.stop.prevent="closeAddSourceViewMenu"
-          >
-            <Icon role="action.browseView" size="md" />
-          </button>
-
-          <div
-            v-if="addSourceViewMenuOpen"
-            class="absolute right-0 top-full z-20 mt-1 min-w-48 border border-(--color-border) bg-(--color-background) py-1 shadow-lg"
-            role="listbox"
-            :aria-label="toolbarModel.addSourceView.label"
-            tabindex="-1"
-            @keydown.escape.stop.prevent="closeAddSourceViewMenu"
-          >
-            <button
-              v-for="option in addSourceViewOptions"
-              :key="option.key"
-              type="button"
-              class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm text-(--color-text) hover:bg-(--color-surface) focus-visible:bg-(--color-surface) focus-visible:outline-none"
-              :class="addSourceView.view.value === option.key ? 'font-bold' : 'font-normal'"
-              role="option"
-              :aria-selected="addSourceView.view.value === option.key"
-              @click="selectAddSourceView(option.key)"
-            >
-              <span>{{ option.label }}</span>
-            </button>
-          </div>
-        </div>
-
+          :placeholder="toolbarModel.search.placeholder"
+          @keydown.escape.stop.prevent="handleSearchEscape"
+        />
         <button
-          v-if="toolbarModel.addMusicFolder.visible"
+          v-if="librarySearch.searchText.value.length > 0"
           type="button"
-          :class="primaryButtonClass"
-          :disabled="!toolbarModel.addMusicFolder.enabled"
-          :title="toolbarModel.addMusicFolder.reason"
-          @click="activateToolbarAddMusicFolder"
+          :class="iconButtonClass"
+          aria-label="Clear search"
+          title="Clear search"
+          @click="clearSearchAndReturnToScope"
         >
-          {{ toolbarModel.addMusicFolder.label }}
+          <Icon role="action.clear" size="md" />
         </button>
       </div>
-    </header>
 
-    <div class="grid min-h-0 flex-1 grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)] overflow-hidden">
-      <aside
-        class="min-h-0 min-w-0 overflow-y-auto border-r border-(--color-border) p-1 scrollbar-gutter-stable scrollbar-track-transparent scrollbar-thumb-gray-200"
+      <div
+        v-if="toolbarModel.libraryBrowseProfile.visible"
+        ref="libraryBrowseProfileMenuRef"
+        class="relative inline-flex"
       >
-        <TreeRoot
-          v-bind="treeRootProps"
-          @select="selectNode"
-          @toggle="toggleNode"
-          @activate-action="activateNodeAction"
-          @prepare="prepareNodeContents"
-          @cancel-prepare="cancelPrepareNodeContents"
-        />
-      </aside>
+        <button
+          type="button"
+          :class="iconButtonClass"
+          :aria-label="toolbarModel.libraryBrowseProfile.label"
+          :aria-expanded="libraryBrowseProfileMenuOpen"
+          aria-haspopup="listbox"
+          :title="toolbarModel.libraryBrowseProfile.title"
+          :disabled="!toolbarModel.libraryBrowseProfile.enabled"
+          @click="toggleLibraryBrowseProfileMenu"
+          @keydown.escape.stop.prevent="closeLibraryBrowseProfileMenu"
+        >
+          <Icon role="action.browseView" size="md" />
+        </button>
 
-      <ContentsTable
-        :projection="contentsProjection"
-        :status-view="sourceStatusView"
-        :source-admission-handoff="sourceAdmissionHandoffView"
-        :activate-row-action="activateContentRowAction"
-        :activate-status-action="handleStatusAction"
-        :activate-source-admission-handoff-action="activateSourceAdmissionHandoffAction"
-      />
-    </div>
-  </section>
+        <div
+          v-if="libraryBrowseProfileMenuOpen"
+          class="absolute right-0 top-full z-20 mt-1 min-w-40 border border-(--color-border) bg-(--color-background) py-1 shadow-lg"
+          role="listbox"
+          :aria-label="toolbarModel.libraryBrowseProfile.label"
+          tabindex="-1"
+          @keydown.escape.stop.prevent="closeLibraryBrowseProfileMenu"
+        >
+          <button
+            v-for="option in libraryBrowseProfileOptions"
+            :key="option.key"
+            type="button"
+            class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm text-(--color-text) hover:bg-(--color-surface) focus-visible:bg-(--color-surface) focus-visible:outline-none"
+            :class="libraryBrowseProfile.profile.value === option.key ? 'font-bold' : 'font-normal'"
+            role="option"
+            :aria-selected="libraryBrowseProfile.profile.value === option.key"
+            @click="selectLibraryBrowseProfile(option.key)"
+          >
+            <span>{{ option.label }}</span>
+          </button>
+        </div>
+      </div>
+
+      <div
+        v-if="toolbarModel.addSourceView.visible"
+        ref="addSourceViewMenuRef"
+        class="relative inline-flex"
+      >
+        <button
+          type="button"
+          :class="iconButtonClass"
+          :aria-label="toolbarModel.addSourceView.label"
+          :aria-expanded="addSourceViewMenuOpen"
+          aria-haspopup="listbox"
+          :title="toolbarModel.addSourceView.title"
+          :disabled="!toolbarModel.addSourceView.enabled"
+          @click="toggleAddSourceViewMenu"
+          @keydown.escape.stop.prevent="closeAddSourceViewMenu"
+        >
+          <Icon role="action.browseView" size="md" />
+        </button>
+
+        <div
+          v-if="addSourceViewMenuOpen"
+          class="absolute right-0 top-full z-20 mt-1 min-w-48 border border-(--color-border) bg-(--color-background) py-1 shadow-lg"
+          role="listbox"
+          :aria-label="toolbarModel.addSourceView.label"
+          tabindex="-1"
+          @keydown.escape.stop.prevent="closeAddSourceViewMenu"
+        >
+          <button
+            v-for="option in addSourceViewOptions"
+            :key="option.key"
+            type="button"
+            class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm text-(--color-text) hover:bg-(--color-surface) focus-visible:bg-(--color-surface) focus-visible:outline-none"
+            :class="addSourceView.view.value === option.key ? 'font-bold' : 'font-normal'"
+            role="option"
+            :aria-selected="addSourceView.view.value === option.key"
+            @click="selectAddSourceView(option.key)"
+          >
+            <span>{{ option.label }}</span>
+          </button>
+        </div>
+      </div>
+
+      <button
+        v-if="toolbarModel.addMusicFolder.visible"
+        type="button"
+        :class="primaryButtonClass"
+        :disabled="!toolbarModel.addMusicFolder.enabled"
+        :title="toolbarModel.addMusicFolder.reason"
+        @click="activateToolbarAddMusicFolder"
+      >
+        {{ toolbarModel.addMusicFolder.label }}
+      </button>
+    </template>
+  </WorkstationShell>
 </template>
