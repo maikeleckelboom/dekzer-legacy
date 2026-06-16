@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "crates/analyzer-core",
     "crates/library-domain",
     "crates/library-store-sqlite",
     "crates/library-boundary-protocol",

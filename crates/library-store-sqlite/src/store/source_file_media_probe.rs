@@ -2,12 +2,13 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 
 use rusqlite::{OptionalExtension, params_from_iter, types::Value};
-use symphonia::core::codecs::{CODEC_TYPE_NULL, CodecParameters};
+use symphonia::core::codecs::CodecParameters;
+use symphonia::core::codecs::audio::{AudioCodecParameters, CODEC_ID_NULL_AUDIO};
 use symphonia::core::errors::Error as SymphoniaError;
-use symphonia::core::formats::FormatOptions;
+use symphonia::core::formats::probe::Hint;
+use symphonia::core::formats::{FormatOptions, Track, TrackType};
 use symphonia::core::io::{MediaSourceStream, MediaSourceStreamOptions};
 use symphonia::core::meta::MetadataOptions;
-use symphonia::core::probe::Hint;
 use thiserror::Error;
 
 use crate::authority::promotion::{InspectSourceFilePromotionInput, InspectSourceFilePromotionTx};
@@ -672,36 +673,47 @@ fn probe_audio_metadata(
     }
 
     let probed = symphonia::default::get_probe()
-        .format(
+        .probe(
             &hint,
             mss,
-            &FormatOptions::default(),
-            &MetadataOptions::default(),
+            FormatOptions::default(),
+            MetadataOptions::default(),
         )
         .map_err(|source| map_symphonia_probe_error(path, source))?;
-    let format = probed.format;
+    let format = probed;
     let container_name = container_name_for_path(relative_path);
     let track = format
-        .default_track()
+        .default_track(TrackType::Audio)
         .or_else(|| {
-            format
-                .tracks()
-                .iter()
-                .find(|track| track.codec_params.codec != CODEC_TYPE_NULL)
+            format.tracks().iter().find(|track| {
+                track
+                    .codec_params
+                    .as_ref()
+                    .and_then(CodecParameters::audio)
+                    .is_some_and(|params| params.codec != CODEC_ID_NULL_AUDIO)
+            })
         })
         .ok_or_else(|| ProbeSourceFileMediaError::UnsupportedFormat {
             path: path.to_path_buf(),
             detail: "no supported audio track".to_string(),
         })?;
-    let params = &track.codec_params;
+    let params = track
+        .codec_params
+        .as_ref()
+        .and_then(CodecParameters::audio)
+        .ok_or_else(|| ProbeSourceFileMediaError::UnsupportedFormat {
+            path: path.to_path_buf(),
+            detail: "no supported audio track".to_string(),
+        })?;
 
     Ok(SourceFileMediaProbeObservations {
         media_kind: "audio".to_string(),
         mime_type: mime_type_for_format(&container_name, relative_path).map(str::to_string),
-        duration_ms: duration_ms_from_codec_params(params),
+        duration_ms: duration_ms_from_track(track),
         sample_rate_hz: params.sample_rate.map(i64::from),
         channels: params
             .channels
+            .as_ref()
             .and_then(|channels| i64::try_from(channels.count()).ok()),
         bit_depth: params.bits_per_sample.map(i64::from),
         codec: codec_label_for_format(&container_name, params),
@@ -725,13 +737,14 @@ fn map_symphonia_probe_error(path: &Path, source: SymphoniaError) -> ProbeSource
     }
 }
 
-fn duration_ms_from_codec_params(params: &CodecParameters) -> Option<i64> {
-    let frames = params.n_frames?;
-    let time_base = params.time_base?;
-    let time = time_base.calc_time(frames);
-    let seconds_ms = i64::try_from(time.seconds).ok()?.checked_mul(1000)?;
-    let fraction_ms = (time.frac * 1000.0).round() as i64;
-    seconds_ms.checked_add(fraction_ms)
+fn duration_ms_from_track(track: &Track) -> Option<i64> {
+    let duration = track
+        .duration
+        .or_else(|| track.num_frames.map(symphonia::core::units::Duration::new))?;
+    let time_base = track.time_base?;
+    let timestamp = symphonia::core::units::Timestamp::try_from(duration.get()).ok()?;
+    let time = time_base.calc_time(timestamp)?;
+    i64::try_from(time.as_millis()).ok()
 }
 
 fn mime_type_for_format(format_name: &str, relative_path: &str) -> Option<&'static str> {
@@ -771,14 +784,14 @@ fn mime_type_for_extension(relative_path: &str) -> Option<&'static str> {
     }
 }
 
-fn codec_label_for_format(format_name: &str, params: &CodecParameters) -> Option<String> {
+fn codec_label_for_format(format_name: &str, params: &AudioCodecParameters) -> Option<String> {
     let label = match format_name {
         "aiff" | "wav" | "wave" => "pcm",
         "flac" => "flac",
         "isomp4" | "mp4" => "isomp4",
         "mp3" => "mp3",
         "ogg" => "ogg",
-        _ if params.codec != CODEC_TYPE_NULL => return Some(format!("{:?}", params.codec)),
+        _ if params.codec != CODEC_ID_NULL_AUDIO => return Some(format!("{:?}", params.codec)),
         _ => return None,
     };
     Some(label.to_string())

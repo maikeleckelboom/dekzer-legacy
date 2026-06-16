@@ -234,13 +234,23 @@ fn artifact_fingerprint(artifacts: &[(&str, &str)]) -> String {
         hasher.update(contents.as_bytes());
         hasher.update([0]);
     }
-    format!("{:x}", hasher.finalize())
+    lower_hex(hasher.finalize().as_ref())
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(bytes);
-    format!("{:x}", hasher.finalize())
+    lower_hex(hasher.finalize().as_ref())
+}
+
+fn lower_hex(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut output = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        output.push(HEX[(byte >> 4) as usize] as char);
+        output.push(HEX[(byte & 0x0f) as usize] as char);
+    }
+    output
 }
 
 struct Artifact {
