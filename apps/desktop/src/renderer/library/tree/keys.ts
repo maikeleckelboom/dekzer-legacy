@@ -1,9 +1,7 @@
 import {
-  getFirstChildVisibleNodeId,
   getFirstVisibleNodeId,
   getLastVisibleNodeId,
   getNextVisibleNodeId,
-  getParentVisibleNodeId,
   getPreviousVisibleNodeId
 } from './listProjection'
 import type { BrowserTreeNodeId, BrowserTreeVisibleItem } from './types'
@@ -102,7 +100,7 @@ export function resolveTreeKeyboardIntent(
         return handledNoop()
       }
 
-      if (!activeItem.isExpanded || activeItem.canActivateAction || activeItem.isActionLoading) {
+      if (!activeItem.isExpanded) {
         return {
           kind: 'revealNode',
           nodeId: activeItem.id,
@@ -110,15 +108,11 @@ export function resolveTreeKeyboardIntent(
         }
       }
 
-      return resolveFocusIntent(getFirstChildVisibleNodeId(options.visibleItems, activeItem.id))
+      return handledNoop()
 
     case treeKeyboardKeys.arrowLeft:
       if (activeItem === undefined) {
         return handledNoop()
-      }
-
-      if (activeItem.isActionItem) {
-        return resolveFocusIntent(getParentVisibleNodeId(options.visibleItems, activeItem.id))
       }
 
       if (activeItem.canRevealChildren && activeItem.isExpanded) {
@@ -133,7 +127,7 @@ export function resolveTreeKeyboardIntent(
         return handledNoop()
       }
 
-      return resolveFocusIntent(getParentVisibleNodeId(options.visibleItems, activeItem.id))
+      return handledNoop()
 
     case treeKeyboardKeys.enter:
       if (activeItem === undefined) {

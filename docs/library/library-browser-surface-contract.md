@@ -15,7 +15,7 @@ viewport hints, and geometry exchange. Query mechanics remain owned by the conte
 The library surface is one continuous field with this applied structure:
 
 ```text
-Library substrate -> Browse roots -> Active scope -> Projection -> Contents -> Selection -> Inspector / Preview / Actions
+Library substrate -> Browse roots -> Active scope -> Projection -> View mode -> Contents -> Selection -> Inspector / Preview / Actions
 ```
 
 These are not sibling product domains. They are stages in one library workflow.
@@ -37,28 +37,42 @@ scope origins. They do not own the contents rows they reveal.
 The currently selected library scope. Its identity includes:
 
 - selected browse root or scope
-- projection mode
+- projection
 - filters
 - browse profile
 - scope depth policy
 
 ### Projection
 
-The presentation mode used to read the active scope. Projection changes how contents are represented; it does not
-change durable library state.
+The result family or query interpretation applied to the active scope. Projection changes what kind of result is being
+asked for; it does not change source provenance, durable library state, or renderer form.
 
-Legal projection modes:
+Examples:
+
+- Tracks
+- Source Inventory
+- Collection Objects
+- History Objects
+
+### View Mode
+
+The renderer form used to present Contents. View mode changes presentation only. It must not change membership
+semantics, source identity, collection membership, or backend facts.
+
+Legal view modes include:
 
 - List
 - Tree
 - Columns
 - Covers
+- Grid
+- Compact
 
 ### Contents
 
-The main browsable result field for the active scope. Contents are read from substrate-owned facts through the accepted
-contents/read boundary and browse policy contracts. Contents may present tracks, folders, collections, crates, or other
-allowed row universes depending on active scope and policy.
+The main browsable result field for the active scope, projection, view mode, filters, search, sort, and cursor. Contents
+are read from substrate-owned facts through the accepted contents/read boundary and browse policy contracts. Contents may
+present tracks, folders, collections, crates, or other allowed row universes depending on active scope and policy.
 
 ### Selection
 
@@ -95,12 +109,13 @@ Collections may reference media or scopes, but they do not replace source proven
 
 ## Ownership
 
-| Owner              | Owns                                                                                   | Must not own                                                                  |
-| ------------------ | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| Backend/store      | Substrate state, source lifecycle, durable evidence, accepted objects, work artifacts. | Renderer presentation state, workspace placement, local projection cosmetics. |
-| Renderer           | Presentation state, active projection UI state, selection affordance, visual density.  | Durable library facts, source lifecycle, artifact ownership.                  |
-| Workspace topology | Placement, resize, visibility, docking/parking of the library surface.                 | Source meaning, selected scope, contents query mechanics, projection meaning. |
-| Projection mode    | How the active scope is represented inside Contents.                                   | Durable library state, source identity, collection membership, backend facts. |
+| Owner              | Owns                                                                                           | Must not own                                                                  |
+| ------------------ | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Backend/store      | Substrate state, source lifecycle, durable evidence, accepted objects, work artifacts.         | Renderer presentation state, workspace placement, local projection cosmetics. |
+| Renderer           | Presentation state, active projection and view UI state, selection affordance, visual density. | Durable library facts, source lifecycle, artifact ownership.                  |
+| Workspace topology | Placement, resize, visibility, docking/parking of the library surface.                         | Source meaning, selected scope, contents query mechanics, projection meaning. |
+| Projection         | Result family or query interpretation over the active scope.                                   | View layout, source identity, collection membership, backend facts.           |
+| View mode          | How Contents is rendered: List, Tree, Columns, Covers, Grid, or Compact.                       | Membership semantics, durable library state, source identity, backend facts.  |
 
 ## Perform Bench And Library Bench
 
@@ -156,6 +171,11 @@ Browse roots / Contents / Inspector
 ```
 
 Use that structure when reviewing library UI proposals, especially generated or exploratory screens.
+
+## Rejection Cases
+
+Reject any design or implementation that lets a view mode change membership. List, Tree, Columns, Covers, Grid, and
+Compact are renderer forms, not projection modes.
 
 ## Cross References
 

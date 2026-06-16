@@ -15,7 +15,7 @@ scope:
   - library-representation-composition
   - representation-root-realization
   - unified-library-sidebar
-  - browse-column-projection
+  - browse-column-view
   - independent-library-panels
   - grouped-library-panels
   - topology-hosted-library-surfaces
@@ -381,12 +381,12 @@ The unified sidebar is not the library model.
 
 It is a composition shell over representation roots.
 
-### Browse Column Projection
+### Column View
 
-A representation root may support a column-browser realization.
+Column view is v1-seeded as a first-class view mode. A representation root may support a column-browser realization.
 
-A browse column projection presents the current path as adjacent child-window columns. Each column represents one
-path segment and projects the readable children for that segment.
+A column view presents the current path as adjacent child-window columns. Each column represents one path segment and
+projects the readable children for that segment.
 
 Example:
 
@@ -417,13 +417,16 @@ House
 - Afro House;
 - Progressive House.
 
-A browse column projection is useful for fast source digging, deep folder navigation, external drive browsing,
-import review, and preparation workflows where sibling scopes need to remain visible.
+Column view is useful for fast source digging, deep folder navigation, external drive browsing, import review, and
+preparation workflows where sibling scopes need to remain visible.
 
 It is a realization of the same representation and hierarchy contracts. It is not a second hierarchy model.
+It must not create a second source truth.
 
-For Local Files, a browse column projection uses the same source readiness, child-readiness, hierarchy coverage,
-child-window, retained-pending, blocked, failed, incomplete, and empty-state contracts as the tree realization.
+Column view may start narrow in v1, but it must remain first-class in architecture.
+
+For Local Files, Column view uses the same source readiness, child-readiness, hierarchy coverage, child-window,
+retained-pending, blocked, failed, incomplete, and empty-state contracts as the tree realization.
 
 Each column projects an accepted read result for one path segment. A column must not infer durable hierarchy observations from
 an empty child array, a stale cache, a visible row count, or another panel’s projected rows.
@@ -434,8 +437,8 @@ Column selection must not mutate the representation root’s meaning.
 
 Column selection must not mutate another panel instance unless an explicit linked-panel model is designed.
 
-A browse column projection may render counts, readiness, loading, retained, blocked, failed, incomplete, or empty states
-only from the same read contracts that authorize those states in the tree realization.
+Column view may render counts, readiness, loading, retained, blocked, failed, incomplete, or empty states only from the
+same read contracts that authorize those states in the tree realization.
 
 Filter and browse-policy changes affect contents projection. They must not change column containment,
 child-readiness, source structure, or leaf/disclosure meaning.
@@ -444,8 +447,7 @@ A composition shell may place a column browser beside a contents table, details 
 comparison panel. The placement does not change source ownership, row capability, external provenance, or authored
 semantics.
 
-Browse column projection is future-supported. It is not a Library V0 implementation requirement unless a sprint
-explicitly scopes it.
+Column view is v1-seeded. It is not built by this contract change unless a sprint explicitly scopes implementation.
 
 ### Independent Workspace Panel
 
@@ -575,7 +577,7 @@ A preparation-forward layout may show:
 This supports fast navigation through deep source hierarchies without making the tree realization the only serious
 source-browsing surface.
 
-The column browser and tree browser must remain different projections over the same source/hierarchy read contracts.
+The column browser and tree browser must remain different views over the same source/hierarchy read contracts.
 
 ### Organization Layout
 

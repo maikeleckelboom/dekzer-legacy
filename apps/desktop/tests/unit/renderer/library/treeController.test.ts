@@ -176,7 +176,26 @@ describe('useTreeController', () => {
     expect(harness.events.toggle).toEqual([])
   })
 
-  it('keeps existing keyboard primary activation contract separate from pointer selection', () => {
+  it('selects focused branches on Enter without changing expansion', () => {
+    const harness = treeHarness({
+      expandedNodeIds: new Set(['branch-a'])
+    })
+    const branch = visibleItem(harness, 'branch-a')
+    const intent = harness.controller.resolveKeyboardIntent(branch, 'Enter')
+
+    expect(intent).toMatchObject({ kind: 'select', nodeId: 'branch-a' })
+    if (intent.kind === 'select') {
+      harness.controller.selectNode(intent.nodeId)
+    }
+
+    expect(harness.selectedNodeId.value).toBe('branch-a')
+    expect(harness.expandedNodeIds.value.has('branch-a')).toBe(true)
+    expect(harness.events.select).toEqual(['branch-a'])
+    expect(harness.events.toggle).toEqual([])
+    expect(harness.events.activateAction).toEqual([])
+  })
+
+  it('keeps primary activation select-only for non-action rows', () => {
     const harness = treeHarness({
       expandedNodeIds: new Set(['branch-a'])
     })
@@ -184,9 +203,24 @@ describe('useTreeController', () => {
     harness.controller.activatePrimary('branch-a')
 
     expect(harness.selectedNodeId.value).toBe('branch-a')
-    expect(harness.expandedNodeIds.value.has('branch-a')).toBe(false)
-    expect(harness.events.select).toEqual(['branch-a'])
-    expect(harness.events.toggle).toEqual(['branch-a'])
+    expect(harness.expandedNodeIds.value.has('branch-a')).toBe(true)
+    expect(harness.events.log).toEqual(['select:branch-a'])
+  })
+
+  it('keeps Enter activation for explicit action rows', () => {
+    const harness = treeHarness({
+      nodes: [actionNode('action-a', 'Load more')]
+    })
+    const action = visibleItem(harness, 'action-a')
+    const intent = harness.controller.resolveKeyboardIntent(action, 'Enter')
+
+    expect(intent).toMatchObject({ kind: 'activateAction', nodeId: 'action-a' })
+    if (intent.kind === 'activateAction') {
+      harness.controller.activateAction(intent.nodeId)
+    }
+
+    expect(harness.selectedNodeId.value).toBeUndefined()
+    expect(harness.events.log).toEqual(['activateAction:action-a'])
   })
 
   it('keeps ArrowRight and ArrowLeft expansion intents on the reveal and toggle paths', () => {
@@ -201,6 +235,14 @@ describe('useTreeController', () => {
     expect(harness.expandedNodeIds.value.has('branch-a')).toBe(true)
 
     const expandedBranch = visibleItem(harness, 'branch-a')
+    const expandedRightIntent = harness.controller.resolveKeyboardIntent(
+      expandedBranch,
+      'ArrowRight'
+    )
+
+    expect(expandedRightIntent).toEqual({ kind: 'none', shouldPreventDefault: true })
+    expect(harness.controller.activeNodeId.value).toBe('branch-a')
+
     const collapseIntent = harness.controller.resolveKeyboardIntent(expandedBranch, 'ArrowLeft')
 
     expect(collapseIntent).toMatchObject({ kind: 'collapse', nodeId: 'branch-a' })
@@ -210,6 +252,17 @@ describe('useTreeController', () => {
     expect(harness.expandedNodeIds.value.has('branch-a')).toBe(false)
     expect(harness.events.select).toEqual([])
     expect(harness.events.toggle).toEqual(['branch-a', 'branch-a'])
+  })
+
+  it('keeps ArrowLeft on collapsed branches as a no-op', () => {
+    const harness = treeHarness()
+    const branch = visibleItem(harness, 'branch-a')
+    const intent = harness.controller.resolveKeyboardIntent(branch, 'ArrowLeft')
+
+    expect(intent).toEqual({ kind: 'none', shouldPreventDefault: true })
+    expect(harness.controller.activeNodeId.value).toBe('branch-a')
+    expect(harness.expandedNodeIds.value.has('branch-a')).toBe(false)
+    expect(harness.events.log).toEqual([])
   })
 
   it('does not introduce Space as tree selection or activation', () => {
@@ -414,6 +467,17 @@ function leafNode(id: BrowserTreeNodeId): BrowserTreeNode {
     role: 'literalDirectory',
     icon: 'folder',
     children: { kind: 'none' }
+  }
+}
+
+function actionNode(id: BrowserTreeNodeId, label: string): BrowserTreeNode {
+  return {
+    id,
+    label,
+    role: 'action',
+    icon: 'more',
+    children: { kind: 'none' },
+    action: { kind: 'loadMore', state: { kind: 'idle' } }
   }
 }
 

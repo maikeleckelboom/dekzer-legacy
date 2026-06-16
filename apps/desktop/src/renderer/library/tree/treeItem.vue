@@ -34,11 +34,6 @@ function focusItem(): void {
   tree.focusNode(props.item.id)
 }
 
-function activatePrimaryAction(): void {
-  focusItem()
-  tree.activatePrimary(props.item.id)
-}
-
 function handleRowClick(): void {
   focusItem()
 
@@ -68,12 +63,6 @@ function handlePointerLeave(): void {
 }
 
 function handleKeydown(event: KeyboardEvent): void {
-  if (event.key === 'Enter') {
-    event.preventDefault()
-    activatePrimaryAction()
-    return
-  }
-
   const intent = tree.resolveKeyboardIntent(props.item, event.key)
 
   if (intent.shouldPreventDefault) {
@@ -103,6 +92,10 @@ function applyKeyboardIntent(intent: ReturnType<typeof tree.resolveKeyboardInten
       return
 
     case 'select':
+      focusItem()
+      tree.selectNode(intent.nodeId)
+      return
+
     case 'none':
       return
   }

@@ -193,25 +193,6 @@ export function useTreeController(options: UseTreeControllerOptions): TreeContex
     }
 
     options.selectNode(nodeId)
-
-    if (!item.isBranch) {
-      return
-    }
-
-    if (item.isExpanded) {
-      options.toggleNode(nodeId)
-      return
-    }
-
-    if (item.canActivateAction) {
-      options.activateAction(nodeId)
-      return
-    }
-
-    if (item.canRevealChildren) {
-      options.toggleNode(nodeId)
-      return
-    }
   }
 
   return {
