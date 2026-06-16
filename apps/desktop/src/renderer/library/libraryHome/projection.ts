@@ -41,7 +41,7 @@ export type LibraryHomeRow = {
   readonly id: string
   readonly label: string
   readonly detail: string
-  readonly state: 'empty' | 'loading' | 'failed' | 'unsupported'
+  readonly state: 'empty' | 'loading' | 'attention' | 'failed' | 'unsupported'
   readonly action?: LibraryHomeAction
 }
 
@@ -634,7 +634,7 @@ function rowStateForTone(tone: LibraryHomeTone): LibraryHomeRow['state'] {
     case 'danger':
       return 'failed'
     case 'warning':
-      return 'unsupported'
+      return 'attention'
     case 'ready':
     case 'muted':
       return 'empty'

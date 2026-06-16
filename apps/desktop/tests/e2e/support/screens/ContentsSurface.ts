@@ -21,6 +21,10 @@ export class ContentsSurface {
     return this.table.getByRole('row').filter({ hasNotText: 'Name' })
   }
 
+  loadMoreButton(): Locator {
+    return this.table.getByRole('button', { name: /Load more/i })
+  }
+
   async expectVisible(): Promise<void> {
     await expect(this.root).toBeVisible()
     await expect(this.title).toBeVisible()
@@ -35,6 +39,13 @@ export class ContentsSurface {
     for (const name of names) {
       await expect(this.row(name)).toBeVisible()
     }
+  }
+
+  async loadMoreOnce(): Promise<void> {
+    const button = this.loadMoreButton()
+
+    await expect(button).toBeVisible()
+    await button.click()
   }
 
   async expectRowsHidden(names: readonly (string | RegExp)[]): Promise<void> {

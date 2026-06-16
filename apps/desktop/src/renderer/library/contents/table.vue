@@ -24,6 +24,7 @@ function formatContentDetail(row: ContentRow): string {
   if (row.state === 'empty') return row.detail ?? 'Empty'
   if (row.state === 'notLoaded') return 'Not loaded'
   if (row.state === 'loading') return 'Loading'
+  if (row.state === 'attention') return row.detail ?? 'Needs attention'
   if (row.state === 'failed') return 'Unavailable'
   if (row.state === 'unsupported') return 'Unsupported'
   if (row.state === 'file' && row.kind === 'state') return row.detail ?? ''
@@ -74,6 +75,8 @@ function formatContentKind(row: ContentRow): string {
         return 'Pending'
       case 'loading':
         return 'Loading'
+      case 'attention':
+        return 'Attention'
       case 'failed':
         return 'Unavailable'
       case 'unsupported':
@@ -108,6 +111,7 @@ function formatContentState(row: ContentRow): string {
     if (row.state === 'empty') return 'Empty'
     if (row.state === 'notLoaded') return 'Not loaded'
     if (row.state === 'loading') return 'Loading'
+    if (row.state === 'attention') return 'Needs attention'
     if (row.state === 'failed') return 'Unavailable'
     if (row.state === 'unsupported') return 'Unavailable'
     if (row.state === 'file') return 'Selected'
@@ -150,7 +154,8 @@ function resolveContentRowIcon(icon: ContentRowIcon | undefined): IconRole | und
 function iconToneForRow(row: ContentRow): IconTone {
   if (row.kind === 'state') {
     if (row.state === 'empty' || row.state === 'notLoaded') return 'muted'
-    if (row.state === 'failed' || row.state === 'unsupported') return 'warning'
+    if (row.state === 'attention' || row.state === 'failed' || row.state === 'unsupported')
+      return 'warning'
     return 'muted'
   }
 
@@ -174,7 +179,9 @@ function iconToneForRow(row: ContentRow): IconTone {
 }
 
 function labelClassForRow(row: ContentRow): string {
-  if (row.kind === 'state') return 'text-(--color-text-muted)'
+  if (row.kind === 'state') {
+    return row.state === 'attention' ? 'text-(--color-warning)' : 'text-(--color-text-muted)'
+  }
   if (row.presence === 'missing') return 'text-(--color-warning)'
   if (row.presence === 'removed') return 'text-(--color-danger)'
 
@@ -403,7 +410,9 @@ function resolveHandoffActionIcon(action: SourceAdmissionHandoffAction): IconRol
             v-for="row in projection.rows"
             :key="row.id"
             :class="
-              row.state === 'failed' || row.state === 'unsupported' ? 'text-(--color-warning)' : ''
+              row.state === 'attention' || row.state === 'failed' || row.state === 'unsupported'
+                ? 'text-(--color-warning)'
+                : ''
             "
             :data-content-row-kind="row.kind"
           >

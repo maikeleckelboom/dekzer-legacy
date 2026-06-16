@@ -48,4 +48,25 @@ export class LibraryBrowseSurface {
 
     await item.getByRole('button', { name: 'Expand' }).click()
   }
+
+  async expectExpansionShowsChildWithin(
+    parentName: string | RegExp,
+    childName: string | RegExp,
+    maxMs: number
+  ): Promise<number> {
+    const parent = this.item(parentName)
+
+    if ((await parent.getAttribute('aria-expanded')) === 'true') {
+      await expect(this.item(childName)).toBeVisible()
+      return 0
+    }
+
+    const startedAt = performance.now()
+    await parent.getByRole('button', { name: 'Expand' }).click()
+    await expect(this.item(childName)).toBeVisible()
+    const elapsedMs = performance.now() - startedAt
+
+    expect(elapsedMs).toBeLessThan(maxMs)
+    return elapsedMs
+  }
 }

@@ -26,6 +26,10 @@ export type LibraryFilesystem = {
   readonly sourceA: LibrarySourceAFixture
   readonly sourceB: LibrarySourceBFixture
   readonly createTinyWav: (path: string) => Promise<void>
+  readonly createPagedAudioSource: (
+    sourceName: string,
+    trackCount: number
+  ) => Promise<{ readonly rootPath: string }>
   readonly moveSourceOffline: (sourceRootPath: string) => Promise<string>
   readonly restoreOfflineSource: (sourceRootPath: string, offlinePath: string) => Promise<void>
 }
@@ -61,6 +65,8 @@ export const test = base.extend<FilesystemFixtures>({
       sourceA,
       sourceB,
       createTinyWav,
+      createPagedAudioSource: (sourceName, trackCount) =>
+        createPagedAudioSource(mediaRootPath, sourceName, trackCount),
       moveSourceOffline,
       restoreOfflineSource
     })
@@ -86,6 +92,23 @@ async function createSourceAFixture(sourceA: LibrarySourceAFixture): Promise<voi
 
 async function createSourceBFixture(sourceB: LibrarySourceBFixture): Promise<void> {
   await createTinyWav(sourceB.rootTrackPath)
+}
+
+async function createPagedAudioSource(
+  mediaRootPath: string,
+  sourceName: string,
+  trackCount: number
+): Promise<{ readonly rootPath: string }> {
+  const rootPath = join(mediaRootPath, sourceName)
+
+  await rm(rootPath, { recursive: true, force: true })
+  await mkdir(rootPath, { recursive: true })
+
+  for (let index = 1; index <= trackCount; index += 1) {
+    await createTinyWav(join(rootPath, `Track ${String(index).padStart(3, '0')}.wav`))
+  }
+
+  return { rootPath }
 }
 
 async function moveSourceOffline(sourceRootPath: string): Promise<string> {

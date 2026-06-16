@@ -114,7 +114,14 @@ export type ContentRow = {
   readonly presence?: Presence
   readonly detail?: string
   readonly icon?: ContentRowIcon
-  readonly state?: 'empty' | 'notLoaded' | 'loading' | 'failed' | 'unsupported' | 'file'
+  readonly state?:
+    | 'empty'
+    | 'notLoaded'
+    | 'loading'
+    | 'attention'
+    | 'failed'
+    | 'unsupported'
+    | 'file'
   readonly fileClass?: 'audio' | 'video' | 'image' | 'unsupported'
   readonly action?: ContentRowAction
 }
@@ -129,6 +136,8 @@ export type ContentScopeHealth = {
     | 'Blocked'
     | 'Partial'
     | 'Empty'
+    | 'Needs scan'
+    | 'Maintenance needed'
   readonly tone: 'ready' | 'active' | 'warning' | 'danger' | 'muted'
 }
 
@@ -491,8 +500,38 @@ function contentProjectionFromLibraryHome(
 
   return contentProjection(libraryHomeSurface, {
     ...content,
-    header: libraryBrowseHeader(content, profile)
+    header: libraryBrowseHeaderWithHealth(
+      content,
+      profile,
+      libraryHomeHealthFromProductState(projection.productState)
+    )
   })
+}
+
+function libraryHomeHealthFromProductState(
+  productState: LibraryHomeProjection['productState']
+): ContentScopeHealth {
+  switch (productState) {
+    case 'noSources':
+    case 'chooseSource':
+      return { label: 'Empty', tone: 'muted' }
+    case 'indexing':
+      return { label: 'Loading', tone: 'active' }
+    case 'ready':
+      return { label: 'Ready', tone: 'ready' }
+    case 'needsScan':
+      return { label: 'Needs scan', tone: 'warning' }
+    case 'maintenanceNeeded':
+      return { label: 'Maintenance needed', tone: 'warning' }
+    case 'emptyCurrentView':
+      return { label: 'Empty', tone: 'warning' }
+    case 'missing':
+      return { label: 'Missing', tone: 'danger' }
+    case 'blocked':
+      return { label: 'Blocked', tone: 'danger' }
+    case 'unavailable':
+      return { label: 'Unavailable', tone: 'danger' }
+  }
 }
 
 function contentRowFromLibraryHome(row: LibraryHomeRow): ContentRow {
@@ -505,7 +544,7 @@ function contentRowFromLibraryHome(row: LibraryHomeRow): ContentRow {
     icon:
       row.state === 'loading'
         ? 'loading'
-        : row.state === 'failed' || row.state === 'unsupported'
+        : row.state === 'attention' || row.state === 'failed' || row.state === 'unsupported'
           ? 'warning'
           : 'state',
     ...(row.action === undefined ? {} : { action: contentActionFromLibraryHome(row.action) })
@@ -921,7 +960,10 @@ function projectContentsState(options: {
     ...(allowContinuation && state.nextCursor !== undefined
       ? { nextCursor: state.nextCursor }
       : {}),
-    ...(state.accumulatedRows !== undefined ? { accumulatedRows: state.accumulatedRows } : {})
+    ...(state.accumulatedRows !== undefined ? { accumulatedRows: state.accumulatedRows } : {}),
+    ...(state.pending?.requestKey === state.requestKey && state.pending.cursor !== undefined
+      ? { loadingCursor: state.pending.cursor }
+      : {})
   })
 
   if (state.pending?.presentation === 'visible') {
@@ -1050,6 +1092,7 @@ function projectContentsReadResult(options: {
   readonly allowContinuation?: boolean
   readonly nextCursor?: string
   readonly accumulatedRows?: readonly ContentsFileRow[]
+  readonly loadingCursor?: string
 }): ContentProjection {
   if (options.result.state !== 'ready') {
     return withLibraryBrowseHeader(
@@ -1074,7 +1117,8 @@ function projectContentsReadResult(options: {
       ? {}
       : { allowContinuation: options.allowContinuation }),
     ...(options.nextCursor !== undefined ? { nextCursor: options.nextCursor } : {}),
-    ...(options.accumulatedRows !== undefined ? { accumulatedRows: options.accumulatedRows } : {})
+    ...(options.accumulatedRows !== undefined ? { accumulatedRows: options.accumulatedRows } : {}),
+    ...(options.loadingCursor !== undefined ? { loadingCursor: options.loadingCursor } : {})
   })
 }
 
@@ -1086,6 +1130,7 @@ function projectContentsResult(options: {
   readonly allowContinuation?: boolean
   readonly nextCursor?: string
   readonly accumulatedRows?: readonly ContentsFileRow[]
+  readonly loadingCursor?: string
 }): ContentProjection {
   const result = options.result
   const rows = (options.accumulatedRows ?? result.rows).map(contentsRow)
@@ -1098,7 +1143,7 @@ function projectContentsResult(options: {
       kind: contentsProjectionKind(result),
       title: options.title,
       detail: contentsDetailWithContinuation(result, hasMore, options.accumulatedRows),
-      rows: [loadMoreRow(options.projectionId, result, nextCursor)]
+      rows: [loadMoreRow(options.projectionId, result, nextCursor, options.loadingCursor)]
     } satisfies Omit<ContentProjection, 'surfaceKind' | 'surfaceLabel' | 'header'>
 
     return contentProjection(indexedContentsSurface, {
@@ -1138,7 +1183,7 @@ function projectContentsResult(options: {
 
   const contentRows =
     nextCursor !== undefined
-      ? [...rows, loadMoreRow(options.projectionId, result, nextCursor)]
+      ? [...rows, loadMoreRow(options.projectionId, result, nextCursor, options.loadingCursor)]
       : rows
 
   const projection = {
@@ -1485,21 +1530,27 @@ function indexingDetail(result: ContentsResult): string {
 function loadMoreRow(
   selectedNodeId: BrowserTreeNodeId,
   result: ContentsResult,
-  nextCursor: string
+  nextCursor: string,
+  loadingCursor?: string
 ): ContentRow {
   const subject = contentsCountSubject(result, result.rows.length)
+  const isLoading = loadingCursor === nextCursor
   return {
     id: `contents-load-more:${selectedNodeId}`,
     kind: 'more',
-    label: `More ${subject} available`,
-    detail: `Load more`,
-    icon: 'more',
-    action: {
-      kind: 'loadContentsPage',
-      nodeId: selectedNodeId,
-      label: `Load more ${subject}`,
-      cursor: nextCursor
-    }
+    label: isLoading ? `Loading more ${subject}` : `More ${subject} available`,
+    detail: isLoading ? 'Loading more' : 'Load more',
+    icon: isLoading ? 'loading' : 'more',
+    ...(isLoading
+      ? {}
+      : {
+          action: {
+            kind: 'loadContentsPage' as const,
+            nodeId: selectedNodeId,
+            label: `Load more ${subject}`,
+            cursor: nextCursor
+          }
+        })
   }
 }
 
@@ -1697,6 +1748,7 @@ function contentStateIcon(state: Exclude<ContentRow['state'], undefined>): Conte
       return 'loading'
     case 'failed':
     case 'unsupported':
+    case 'attention':
       return 'warning'
     case 'empty':
     case 'notLoaded':

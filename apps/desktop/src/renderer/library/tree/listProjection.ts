@@ -166,7 +166,8 @@ function appendVisibleNodes(options: {
       hasStableLocalBrowseTerminalState
     const canActivate = canActivateBrowserTreeAction(node)
     const isActionLoading = isBrowserTreeActionLoading(node)
-    const isExpanded = isBranch && options.expandedNodeIds.has(node.id)
+    const isExpanded =
+      isBranch && options.expandedNodeIds.has(node.id) && hasMaterializedVisibleChildren(node)
     const isActionItem = node.action !== undefined && !isBranch
     const childReadinessNode = getBrowserTreeVisibleChildReadiness(node)
 
@@ -201,6 +202,10 @@ function appendVisibleNodes(options: {
       })
     }
   })
+}
+
+function hasMaterializedVisibleChildren(node: BrowserTreeNode): boolean {
+  return getBrowserTreeChildRows(node).length > 0
 }
 
 function hasOnlyStateChildren(node: BrowserTreeNode): boolean {

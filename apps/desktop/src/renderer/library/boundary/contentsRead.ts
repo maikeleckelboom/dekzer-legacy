@@ -211,6 +211,15 @@ export function createContentsReadController(
       return false
     }
 
+    const activePending = pendingRead(currentState)
+    if (
+      activePending?.requestKey === requestKey &&
+      activePending.cursor !== undefined &&
+      (cursor === undefined || cursor === activePending.cursor)
+    ) {
+      return false
+    }
+
     if (!options.force && cursor === undefined) {
       const warmSnapshot = freshWarmSnapshot(requestKey)
       if (warmSnapshot !== undefined) {
@@ -265,7 +274,7 @@ export function createContentsReadController(
       const readyResult = result.state === 'ready' ? result.result : undefined
       const previousRows = currentAcceptedRows(requestKey)
       if (isSameRequest && previousRows !== undefined && readyResult !== undefined) {
-        rows = [...previousRows, ...(readyResult.rows ?? [])]
+        rows = appendUniqueRows(previousRows, readyResult.rows ?? [])
       } else if (
         options.retainAccumulatedRows === true &&
         cursor === undefined &&
@@ -534,6 +543,14 @@ export function createContentsReadController(
 
     const refreshedIds = new Set(refreshedRows.map((row) => row.id))
     return [...refreshedRows, ...priorRows.filter((row) => !refreshedIds.has(row.id))]
+  }
+
+  function appendUniqueRows(
+    priorRows: readonly ContentsFileRow[],
+    nextRows: readonly ContentsFileRow[]
+  ): readonly ContentsFileRow[] {
+    const priorIds = new Set(priorRows.map((row) => row.id))
+    return [...priorRows, ...nextRows.filter((row) => !priorIds.has(row.id))]
   }
 
   function retainedRefreshCursor(

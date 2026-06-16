@@ -502,6 +502,7 @@ describe('createContentsReadController', () => {
     contentsApi.resolveNext(readyContents(requestAt(contentsApi, 0), [contentsRow('a', 'A.wav')]))
     await flushPromises()
 
+    await expect(controller.readForBinding(directoryBinding())).resolves.toBe(true)
     const read = controller.readForBinding(directoryBinding(), { cursor: 'cursor-a' })
 
     expect(contentsApi.requests).toHaveLength(2)
@@ -513,7 +514,67 @@ describe('createContentsReadController', () => {
     })
     contentsApi.resolveNext(readyContents(requestAt(contentsApi, 1), [contentsRow('a2', 'A2.wav')]))
     await expect(read).resolves.toBe(true)
-    expect(visibleLabels(controller.state.value)).toEqual(['A2.wav'])
+    expect(visibleLabels(controller.state.value)).toEqual(['A.wav', 'A2.wav'])
+  })
+
+  it('keeps one load-more request active when duplicate clicks and same-scope refreshes race it', async () => {
+    const contentsApi = deferredContentsApi()
+    const controller = createContentsReadController(contentsApi)
+
+    controller.start()
+    const initial = controller.readForBinding(directoryBinding())
+    contentsApi.resolveNext(
+      readyContents(requestAt(contentsApi, 0), [contentsRow('a', 'A.wav')], 'ready', 'cursor-a')
+    )
+    await initial
+
+    const loadMore = controller.readForBinding(directoryBinding(), { cursor: 'cursor-a' })
+    await expect(
+      controller.readForBinding(directoryBinding(), { cursor: 'cursor-a' })
+    ).resolves.toBe(false)
+    await expect(
+      controller.readForBinding(directoryBinding(), {
+        force: true,
+        retainAccumulatedRows: true
+      })
+    ).resolves.toBe(false)
+
+    expect(contentsApi.requests).toHaveLength(2)
+    expect(contentsApi.requests[1]).toMatchObject({ cursor: 'cursor-a' })
+
+    contentsApi.resolveNext(
+      readyContents(requestAt(contentsApi, 1), [contentsRow('b', 'B.wav')], 'ready', 'cursor-b')
+    )
+    await expect(loadMore).resolves.toBe(true)
+
+    expect(visibleLabels(controller.state.value)).toEqual(['A.wav', 'B.wav'])
+    expect(controller.state.value).toMatchObject({
+      kind: 'ready',
+      nextCursor: 'cursor-b'
+    })
+  })
+
+  it('appends load-more rows once when a cursor page overlaps accepted rows', async () => {
+    const contentsApi = deferredContentsApi()
+    const controller = createContentsReadController(contentsApi)
+
+    controller.start()
+    const initial = controller.readForBinding(directoryBinding())
+    contentsApi.resolveNext(
+      readyContents(requestAt(contentsApi, 0), [contentsRow('a', 'A.wav')], 'ready', 'cursor-a')
+    )
+    await initial
+
+    const loadMore = controller.readForBinding(directoryBinding(), { cursor: 'cursor-a' })
+    contentsApi.resolveNext(
+      readyContents(requestAt(contentsApi, 1), [
+        contentsRow('a', 'A.wav'),
+        contentsRow('b', 'B.wav')
+      ])
+    )
+    await expect(loadMore).resolves.toBe(true)
+
+    expect(visibleLabels(controller.state.value)).toEqual(['A.wav', 'B.wav'])
   })
 
   it('contents pagination uses the committed profile after a profile switch', async () => {

@@ -4,6 +4,7 @@ export type LibraryV0ScenarioId =
   | 'launch'
   | 'golden-smoke'
   | 'scoped-search'
+  | 'contents-pagination'
   | 'restart-persistence'
   | 'missing-source-health'
   | 'remove-readd-freshness'
@@ -59,6 +60,15 @@ export const libraryV0Scenarios = {
       'Search results respect the active source or folder scope and do not leak rows from other admitted sources.',
     fixtureRequirements: ['Source A generated fixture', 'Source B generated fixture'],
     failureEvidence: [...commonFailureEvidence, 'current search query and visible result state'],
+    acceptanceGate: true
+  }),
+  'contents-pagination': scenario({
+    id: 'contents-pagination',
+    title: 'Library V0 contents pagination',
+    invariant:
+      'A generated source with more than one contents page appends rows on the first Load More activation.',
+    fixtureRequirements: ['generated source with more than 100 audio tracks'],
+    failureEvidence: [...commonFailureEvidence, 'visible Load More row and page cursor behavior'],
     acceptanceGate: true
   }),
   'restart-persistence': scenario({

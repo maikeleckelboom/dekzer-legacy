@@ -135,12 +135,16 @@ export class LibraryV0 {
 
   async expectPersistedHierarchyDisclosure(source: LibraryV0GoldenSource): Promise<void> {
     await this.panel.openLibraryBrowseIfNeeded()
-    await this.panel.browse.expand(source.sourceName)
+    await this.panel.browse.expectExpansionShowsChildWithin(source.sourceName, /nested\b/i, 1000)
     await this.panel.browse.expectNoRegisteredHierarchyPendingRows()
     await expect(this.panel.browse.item(/nested\b/i)).toBeVisible()
     await expect(this.panel.browse.item(/descendants-only\b/i)).toBeVisible()
 
-    await this.panel.browse.expand(/descendants-only\b/i)
+    await this.panel.browse.expectExpansionShowsChildWithin(
+      /descendants-only\b/i,
+      /deeper\b/i,
+      1000
+    )
     await this.panel.browse.expectNoRegisteredHierarchyPendingRows()
     await expect(this.panel.browse.item(/deeper\b/i)).toBeVisible()
   }

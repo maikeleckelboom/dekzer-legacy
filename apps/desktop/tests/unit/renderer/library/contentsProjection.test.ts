@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { ReadSourceMaintenanceReply } from '@dekzer/library-boundary-contract'
 
 import { type ContentsBoundaryState } from '../../../../src/renderer/library/boundary/contentsRead'
 import type {
@@ -46,6 +47,47 @@ import type { LibraryBrowseProfile } from '../../../../src/renderer/library/libr
 import type { AddSourceView } from '../../../../src/renderer/library/addSource/view'
 
 describe('projectContents', () => {
+  it('projects Library Home maintenance as warning health and attention rows', () => {
+    const state = browserState({
+      sourceReadinessByNodeId: new Map([
+        [
+          'navigation-row:7',
+          {
+            kind: 'ready',
+            sourceNodeId: 'navigation-row:7',
+            detail: 'The source hierarchy is ready.'
+          }
+        ]
+      ])
+    })
+    const projection = browserProjection(state)
+    const contents = projectContents({
+      surface: 'libraryBrowse',
+      state,
+      bindingsById: projection.bindingsById,
+      sourceMaintenanceBySourceId: new Map([
+        [
+          '7',
+          maintenance({
+            remainingHashCandidates: 2
+          })
+        ]
+      ])
+    })
+
+    expect(contents.surfaceKind).toBe('libraryHome')
+    expect(contents.title).toBe('Library maintenance pending')
+    expect(contents.header.health).toEqual({ label: 'Maintenance needed', tone: 'warning' })
+    expect(contents.rows).toEqual([
+      expect.objectContaining({
+        label: 'Maintenance needed',
+        state: 'attention',
+        icon: 'warning'
+      })
+    ])
+    expect(contents.rows[0]).not.toMatchObject({ state: 'unsupported' })
+  })
+
   it('projects selected source contents from contents state', () => {
     const contents = projectForSelection(
       browserState({}),
@@ -784,6 +826,30 @@ describe('projectContents', () => {
         cursor: 'same-profile-cursor'
       }
     })
+  })
+
+  it('disables the load-more row while the cursor request is pending', () => {
+    const requestKey = 'source:7:audioBrowse:recursive'
+    const contents = projectForSelection(
+      browserState({}),
+      'navigation-row:7',
+      readyContents({
+        rows: [sourceFileRow('old', 'old.wav', 'audio')],
+        profile: { kind: 'audioBrowse' },
+        requestKey,
+        pendingRequestKey: requestKey,
+        pendingCursor: 'same-profile-cursor',
+        nextCursor: 'same-profile-cursor'
+      })
+    )
+
+    const row = contents.rows.find((candidate) => candidate.kind === 'more')
+    expect(row).toMatchObject({
+      label: 'Loading more audio track',
+      detail: 'Loading more',
+      icon: 'loading'
+    })
+    expect(row).not.toHaveProperty('action')
   })
 
   it('projects zero rows plus nextCursor as continuation instead of empty', () => {
@@ -1647,6 +1713,21 @@ function projectForSelection(
   })
 }
 
+function maintenance(
+  overrides: Partial<ReadSourceMaintenanceReply> = {}
+): ReadSourceMaintenanceReply {
+  return {
+    sourceId: '7',
+    status: 'idle',
+    remainingHashCandidates: 0,
+    remainingProbeCandidates: 0,
+    remainingPlayableMediaPromotionCandidates: 0,
+    remainingTrackIdentityCandidateProductionCandidates: 0,
+    remainingTrackIdentityDecisionProductionCandidates: 0,
+    ...overrides
+  }
+}
+
 function browserProjection(state: BrowserState): BrowserProjection {
   const projection =
     state.localBrowseEntryPointsState === undefined
@@ -1957,6 +2038,7 @@ function readyContents(options: {
   readonly requestKey?: string
   readonly pendingRequestKey?: string
   readonly pendingPresentation?: 'deferred' | 'visible'
+  readonly pendingCursor?: string
   readonly refreshError?: string
   readonly nextCursor?: string
 }): ContentsBoundaryState {
@@ -1975,7 +2057,8 @@ function readyContents(options: {
             requestKey: options.pendingRequestKey,
             sequence: 2,
             detail: 'Loading contents.',
-            presentation: options.pendingPresentation ?? 'visible'
+            presentation: options.pendingPresentation ?? 'visible',
+            ...(options.pendingCursor === undefined ? {} : { cursor: options.pendingCursor })
           }
         }),
     ...(options.refreshError === undefined ? {} : { refreshError: options.refreshError })

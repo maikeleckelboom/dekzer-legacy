@@ -245,6 +245,11 @@ describe('projectState', () => {
     })
 
     expect(childItemsFor(visibleItems, 'source-directory:12')).toEqual([])
+    expect(visibleItems.find((item) => item.id === 'source-directory:12')).toMatchObject({
+      isBranch: true,
+      canRevealChildren: true,
+      isExpanded: false
+    })
   })
 
   it('loading directory with known child scopes remains a branch', () => {
@@ -304,6 +309,11 @@ describe('projectState', () => {
     const childRows = childItemsFor(visibleItems, 'source-directory:12')
 
     expect(childRows).toEqual([])
+    expect(visibleItems.find((item) => item.id === 'source-directory:12')).toMatchObject({
+      isBranch: true,
+      canRevealChildren: true,
+      isExpanded: false
+    })
   })
 
   it('failed directory exposes error state node when expanded', () => {
