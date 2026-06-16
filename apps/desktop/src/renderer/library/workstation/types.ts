@@ -49,4 +49,7 @@ export type WorkstationContentsProps = {
 export type WorkstationInspectorProps = {
   readonly selection: PrimarySelection
   readonly status?: StatusView | undefined
+  readonly sourceAdmissionHandoff?: SourceAdmissionHandoffProjection | undefined
+  readonly activateStatusAction?: (action: StatusAction) => void
+  readonly activateSourceAdmissionHandoffAction?: (action: SourceAdmissionHandoffAction) => void
 }

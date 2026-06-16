@@ -51,6 +51,14 @@ The Preview lane is a single-slot Hot Table v0 expression. It is not a disposabl
 
 Preview and load actions must route through the shared slot dispatch model. Library must not create a Library-only deck/load path.
 
+## Compact Visual Acceptance
+
+- Contents must remain the visually dominant Library Workstation surface.
+- Empty or deferred metadata columns must not create visible table noise.
+- Source and status actions should collapse or move to Inspector when they would dominate Contents.
+- Preview lane stays compact when empty.
+- Column View terminal content must use a compact terminal presentation, not the full v1 List table when width is constrained.
+
 ## Workspace-Host Boundary
 
 Workspace topology may host the Library surface later. It may provide bounds, visibility, and viewport hints only.

@@ -44,7 +44,7 @@ defineEmits<{
     </Bar>
 
     <div
-      class="grid min-h-0 flex-1 grid-cols-[minmax(14rem,18rem)_minmax(0,1fr)_minmax(15rem,19rem)] grid-rows-[minmax(0,1fr)_5rem] overflow-hidden"
+      class="grid min-h-0 flex-1 grid-cols-[minmax(13rem,16rem)_minmax(0,1fr)_minmax(14rem,18rem)] grid-rows-[minmax(0,1fr)_3.25rem] overflow-hidden"
     >
       <Browse
         :tree="tree"

@@ -44,6 +44,8 @@ export type List = {
   readonly rows: readonly ListRow[]
 }
 
+export type ListMode = 'compact' | 'full'
+
 export const listCols = [
   { key: 'index', label: '#' },
   { key: 'title', label: 'Title' },
@@ -62,6 +64,24 @@ export function projectList(projection: ContentProjection): List {
     columns: listCols,
     rows: projection.rows.map((row, index) => projectRow(projection, row, index))
   }
+}
+
+export function visibleCols(list: List, mode: ListMode = 'full'): readonly ListCol[] {
+  if (mode === 'compact') {
+    return list.columns.filter((col) => compactColKeys.has(col.key))
+  }
+
+  return list.columns.filter((col) => {
+    if (col.key === 'index') {
+      return hasUsefulText(list, col.key)
+    }
+
+    if (musicalColKeys.has(col.key)) {
+      return hasUsefulCells(list, col.key)
+    }
+
+    return true
+  })
 }
 
 export function rowSubject(row: ListRow): ContentRowSubject | undefined {
@@ -83,6 +103,20 @@ function projectRow(projection: ContentProjection, row: ContentRow, index: numbe
     ...(row.subject === undefined ? {} : { subject: row.subject }),
     cells
   }
+}
+
+const compactColKeys = new Set<colKey>(['title', 'ready', 'source'])
+const musicalColKeys = new Set<colKey>(['artist', 'album', 'bpm', 'key', 'time', 'rating'])
+
+function hasUsefulCells(list: List, key: colKey): boolean {
+  return list.rows.some((row) => {
+    const cell = row.cells[key]
+    return cell.text.trim().length > 0 || cell.deferred !== true
+  })
+}
+
+function hasUsefulText(list: List, key: colKey): boolean {
+  return list.rows.some((row) => row.cells[key].text.trim().length > 0)
 }
 
 function rowFamily(projection: ContentProjection, row: ContentRow): ListRow['family'] {

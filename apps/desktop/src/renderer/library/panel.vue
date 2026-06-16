@@ -99,12 +99,13 @@ const maxRestoreAttempts = 10
 const maintenanceRunningRefreshMs = 1500
 
 const buttonBaseClass =
-  'inline-flex min-h-9 items-center justify-center gap-2 rounded-sm px-3 py-2 text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background) disabled:cursor-not-allowed disabled:opacity-60'
+  'inline-flex min-h-8 items-center justify-center gap-2 rounded-sm px-2.5 py-1.5 text-xs font-bold transition focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background) disabled:cursor-not-allowed disabled:opacity-60'
 
-const primaryButtonClass = `${buttonBaseClass} min-w-38.5 border border-(--color-accent) bg-(--color-accent) text-(--color-background) hover:brightness-110`
+const primaryButtonClass = `${buttonBaseClass} border border-(--color-accent) bg-(--color-accent) text-(--color-background) hover:brightness-110`
 const toolbarControlClass =
   'border border-(--color-text-muted) bg-(--color-background) text-(--color-text) shadow-[inset_0_0_0_1px_var(--color-border)] hover:border-(--color-accent) hover:bg-(--color-surface) hover:text-(--color-accent) focus-visible:border-(--color-accent)'
-const iconButtonClass = `${buttonBaseClass} h-9 w-9 min-w-0 ${toolbarControlClass} p-0`
+const secondaryButtonClass = `${buttonBaseClass} ${toolbarControlClass}`
+const iconButtonClass = `${buttonBaseClass} h-8 w-8 min-w-0 ${toolbarControlClass} p-0`
 
 const viewStateStore = createViewStateStore()
 const libraryBrowseProfile = createLibraryBrowseProfileController()
@@ -489,6 +490,9 @@ const sourceStatusView = computed(() => {
 const inspectorStatusView = computed(() =>
   primarySelection.value.kind === 'source' ? sourceStatusView.value : undefined
 )
+const contentsStatusView = computed(() =>
+  primarySelection.value.kind === 'source' ? undefined : sourceStatusView.value
+)
 
 watch(
   [
@@ -587,6 +591,12 @@ const sourceAdmissionHandoffView = computed(() =>
         ? false
         : rootLifecycle.canScanSourceRoot(sourceAdmissionHandoff.value.sourceId)
   })
+)
+const inspectorSourceAdmissionHandoffView = computed(() =>
+  primarySelection.value.kind === 'source' ? sourceAdmissionHandoffView.value : undefined
+)
+const contentsSourceAdmissionHandoffView = computed(() =>
+  primarySelection.value.kind === 'source' ? undefined : sourceAdmissionHandoffView.value
 )
 
 watch([scanProgressForActiveScan, () => rootActions.activeScanRunId.value], ([progress]) => {
@@ -1610,8 +1620,8 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
       projection: contentsProjection,
       columnProjection: activeProjection,
       selectedNodeId: activeSelectedNodeId,
-      statusView: sourceStatusView,
-      sourceAdmissionHandoff: sourceAdmissionHandoffView,
+      statusView: contentsStatusView,
+      sourceAdmissionHandoff: contentsSourceAdmissionHandoffView,
       selectedRowId: selectedContentRowId,
       selectNode: selectNode,
       selectRow: selectContentRow,
@@ -1621,7 +1631,10 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
     }"
     :inspector="{
       selection: primarySelection,
-      status: inspectorStatusView
+      status: inspectorStatusView,
+      sourceAdmissionHandoff: inspectorSourceAdmissionHandoffView,
+      activateStatusAction: handleStatusAction,
+      activateSourceAdmissionHandoffAction: activateSourceAdmissionHandoffAction
     }"
     @select="selectNode"
     @toggle="toggleNode"
@@ -1645,13 +1658,13 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
         v-if="toolbarModel.search.visible && !librarySearch.searchOpen.value"
         ref="searchOpenButtonRef"
         type="button"
-        :class="iconButtonClass"
+        :class="secondaryButtonClass"
         :aria-label="toolbarModel.search.label"
         :title="toolbarModel.search.title"
         :disabled="!toolbarModel.search.enabled"
         @click="openSearch"
       >
-        <Icon role="action.search" size="md" />
+        Search
       </button>
 
       <div v-else-if="toolbarModel.search.visible" class="inline-flex items-center gap-1">
@@ -1659,7 +1672,7 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
           ref="searchInputRef"
           v-model="librarySearch.searchText.value"
           type="search"
-          :class="`${toolbarControlClass} h-9 w-44 rounded-sm px-3 py-2 text-sm font-semibold outline-none transition placeholder:text-(--color-text-muted) focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background)`"
+          :class="`${toolbarControlClass} h-8 w-40 rounded-sm px-2.5 py-1.5 text-xs font-semibold outline-none transition placeholder:text-(--color-text-muted) focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background)`"
           :aria-label="toolbarModel.search.label"
           :placeholder="toolbarModel.search.placeholder"
           @keydown.escape.stop.prevent="handleSearchEscape"
@@ -1679,7 +1692,7 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
       <div v-if="toolbarModel.viewMode.visible" ref="viewModeMenuRef" class="relative inline-flex">
         <button
           type="button"
-          :class="iconButtonClass"
+          :class="secondaryButtonClass"
           :aria-label="toolbarModel.viewMode.label"
           :aria-expanded="viewModeMenuOpen"
           aria-haspopup="listbox"
@@ -1688,7 +1701,7 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
           @click="toggleViewModeMenu"
           @keydown.escape.stop.prevent="closeViewModeMenu"
         >
-          <Icon role="action.browseView" size="md" />
+          View: {{ selectedViewModeLabel }}
         </button>
 
         <div
@@ -1721,7 +1734,7 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
       >
         <button
           type="button"
-          :class="iconButtonClass"
+          :class="secondaryButtonClass"
           :aria-label="toolbarModel.libraryBrowseProfile.label"
           :aria-expanded="libraryBrowseProfileMenuOpen"
           aria-haspopup="listbox"
@@ -1730,7 +1743,7 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
           @click="toggleLibraryBrowseProfileMenu"
           @keydown.escape.stop.prevent="closeLibraryBrowseProfileMenu"
         >
-          <Icon role="action.browseView" size="md" />
+          Profile: {{ selectedLibraryBrowseProfileLabel }}
         </button>
 
         <div
@@ -1763,7 +1776,7 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
       >
         <button
           type="button"
-          :class="iconButtonClass"
+          :class="secondaryButtonClass"
           :aria-label="toolbarModel.addSourceView.label"
           :aria-expanded="addSourceViewMenuOpen"
           aria-haspopup="listbox"
@@ -1772,7 +1785,7 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
           @click="toggleAddSourceViewMenu"
           @keydown.escape.stop.prevent="closeAddSourceViewMenu"
         >
-          <Icon role="action.browseView" size="md" />
+          View: {{ selectedAddSourceViewLabel }}
         </button>
 
         <div
@@ -1801,7 +1814,7 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
       <button
         v-if="toolbarModel.addMusicFolder.visible"
         type="button"
-        :class="primaryButtonClass"
+        :class="hasAdmittedLibraryRowsVisible ? secondaryButtonClass : primaryButtonClass"
         :disabled="!toolbarModel.addMusicFolder.enabled"
         :title="toolbarModel.addMusicFolder.reason"
         @click="activateToolbarAddMusicFolder"

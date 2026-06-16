@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest'
 import {
   projectList,
   rowSubject as listRowSubject,
-  shouldSelectRowForKey
+  shouldSelectRowForKey,
+  visibleCols
 } from '../../../../src/renderer/library/contents/listModel'
 import {
   isValidSelection,
@@ -56,6 +57,48 @@ describe('contents list model', () => {
     expect(row.cells.title.text).toBe('Track One.wav')
     expect(row.cells.ready.text).toBe('Ready')
     expect(row.cells.source.text).toBe('Music/Track One.wav')
+  })
+
+  it('hides deferred blank metadata columns from the visible table', () => {
+    const list = projectList(
+      projection([
+        playableRow({
+          id: 'playable-1',
+          label: 'Track One.wav',
+          relativePath: 'Music/Track One.wav'
+        })
+      ])
+    )
+
+    expect(visibleCols(list).map((col) => col.key)).toEqual(['index', 'title', 'ready', 'source'])
+  })
+
+  it('omits the index column when it has no useful values', () => {
+    const list = projectList(
+      projection([
+        sourceFileRow({
+          id: 'source-file:1',
+          label: 'Loose Audio.wav',
+          relativePath: 'Incoming/Loose Audio.wav'
+        })
+      ])
+    )
+
+    expect(visibleCols(list).map((col) => col.key)).toEqual(['title', 'ready', 'source'])
+  })
+
+  it('uses compact visible columns for constrained terminal panes', () => {
+    const list = projectList(
+      projection([
+        playableRow({
+          id: 'playable-1',
+          label: 'Track One.wav',
+          relativePath: 'Music/Track One.wav'
+        })
+      ])
+    )
+
+    expect(visibleCols(list, 'compact').map((col) => col.key)).toEqual(['title', 'ready', 'source'])
   })
 
   it('keeps source-file rows source-file-like instead of displaying them as tracks', () => {

@@ -44,6 +44,7 @@ const view = computed(() =>
 
 const tableProps = computed(() => ({
   projection: props.projection,
+  mode: 'compact' as const,
   sourceAdmissionHandoff: props.sourceAdmissionHandoff,
   ...(props.selectedRowId === undefined ? {} : { selectedRowId: props.selectedRowId }),
   activateRowAction: props.activateRowAction,
@@ -90,7 +91,7 @@ function rowIcon(row: ColRow): IconRole | undefined {
         <section
           v-for="column in view.columns"
           :key="column.id"
-          class="flex min-h-0 w-56 shrink-0 flex-col border-r border-(--color-border) last:border-r-0"
+          class="flex min-h-0 w-40 shrink-0 flex-col border-r border-(--color-border) last:border-r-0"
           :aria-label="column.title"
         >
           <header
@@ -128,7 +129,7 @@ function rowIcon(row: ColRow): IconRole | undefined {
         </section>
       </div>
 
-      <div class="min-h-0 min-w-[28rem] flex-1 overflow-hidden p-2">
+      <div class="min-h-0 min-w-[20rem] flex-1 overflow-hidden p-1.5">
         <ContentsTable v-bind="tableProps" @select-row="emit('select-row', $event)" />
       </div>
     </div>

@@ -7,8 +7,11 @@ import {
   projectList,
   rowSubject,
   shouldSelectRowForKey,
+  visibleCols,
   type Cell,
   type colKey,
+  type ListCol,
+  type ListMode,
   type ListRow
 } from './listModel'
 import { type StatusAction, type StatusView } from '../sourceStatus/projection'
@@ -26,6 +29,7 @@ const props = defineProps<{
   statusView?: StatusView
   sourceAdmissionHandoff: SourceAdmissionHandoffProjection | undefined
   selectedRowId?: string
+  mode?: ListMode
   activateRowAction: (row: ContentRow) => void
   activateStatusAction?: (action: StatusAction) => void
   activateSourceAdmissionHandoffAction?: (action: SourceAdmissionHandoffAction) => void
@@ -36,7 +40,7 @@ const emit = defineEmits<{
 }>()
 
 const list = computed(() => projectList(props.projection))
-const musicalKeys = ['artist', 'album', 'bpm', 'key', 'time', 'rating'] satisfies readonly colKey[]
+const cols = computed(() => visibleCols(list.value, props.mode ?? 'full'))
 
 function canSelectRow(row: ListRow): boolean {
   return rowSubject(row) !== undefined
@@ -152,7 +156,7 @@ function colClass(key: colKey): string {
     case 'index':
       return 'w-12 text-right'
     case 'title':
-      return 'w-[30%]'
+      return 'w-auto'
     case 'artist':
       return 'w-[14%]'
     case 'album':
@@ -170,6 +174,10 @@ function colClass(key: colKey): string {
     case 'source':
       return 'w-[18%]'
   }
+}
+
+function cellFor(row: ListRow, col: ListCol): Cell {
+  return row.cells[col.key]
 }
 
 function resolveContentActionIcon(action: ContentRow['action']): IconRole {
@@ -252,7 +260,7 @@ function resolveHandoffActionIcon(action: SourceAdmissionHandoffAction): IconRol
     aria-labelledby="library-contents-region-label library-contents-title"
     aria-live="polite"
   >
-    <header class="shrink-0 border-b border-(--color-border) px-4 py-3">
+    <header class="shrink-0 border-b border-(--color-border) px-3 py-2">
       <span id="library-contents-region-label" class="sr-only">Library contents</span>
       <div class="flex min-w-0 items-start justify-between gap-3">
         <div class="min-w-0">
@@ -264,14 +272,14 @@ function resolveHandoffActionIcon(action: SourceAdmissionHandoffAction): IconRol
           </p>
           <h3
             id="library-contents-title"
-            class="mt-1 truncate text-base font-bold leading-6 text-(--color-text)"
+            class="mt-0.5 truncate text-sm font-bold leading-5 text-(--color-text)"
             :title="projection.header.scopeLabel"
           >
             {{ projection.header.scopeLabel }}
           </h3>
           <p
             v-if="projection.detail !== undefined || projection.header.searchLabel !== undefined"
-            class="mt-1 min-w-0 text-xs leading-5 text-(--color-text-muted)"
+            class="mt-0.5 min-w-0 text-xs leading-4 text-(--color-text-muted)"
           >
             <span
               v-if="projection.header.searchLabel !== undefined"
@@ -298,7 +306,7 @@ function resolveHandoffActionIcon(action: SourceAdmissionHandoffAction): IconRol
           </p>
         </div>
         <span
-          class="inline-flex min-h-7 shrink-0 items-center rounded-sm border px-2 py-1 text-xs font-bold"
+          class="inline-flex min-h-6 shrink-0 items-center rounded-sm border px-2 py-0.5 text-xs font-bold"
           :class="scopeHealthClass(projection.header.health.tone)"
         >
           {{ projection.header.health.label }}
@@ -306,11 +314,11 @@ function resolveHandoffActionIcon(action: SourceAdmissionHandoffAction): IconRol
       </div>
       <div
         v-if="sourceAdmissionHandoff !== undefined"
-        class="mt-3 border border-(--color-border) bg-(--color-surface) px-3 py-2"
+        class="mt-2 border-t border-(--color-border) pt-2"
         aria-label="Source added"
       >
         <div class="flex min-w-0 flex-wrap items-center gap-2">
-          <span class="text-sm font-bold text-(--color-text)">
+          <span class="text-xs font-bold text-(--color-text)">
             {{ sourceAdmissionHandoff.title }}
           </span>
           <span class="min-w-0 flex-1 truncate text-xs leading-5 text-(--color-text-muted)">
@@ -321,7 +329,7 @@ function resolveHandoffActionIcon(action: SourceAdmissionHandoffAction): IconRol
             v-for="action in sourceAdmissionHandoff.actions"
             :key="action.kind"
             type="button"
-            class="inline-flex min-h-7 shrink-0 items-center justify-center gap-1.5 rounded-sm border border-(--color-border) bg-(--color-background) px-2 py-1 text-xs font-bold text-(--color-text) transition hover:border-(--color-accent) hover:text-(--color-accent) focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background) disabled:cursor-not-allowed disabled:opacity-60"
+            class="inline-flex min-h-6 shrink-0 items-center justify-center gap-1.5 rounded-sm border border-(--color-border) bg-(--color-surface) px-2 py-0.5 text-xs font-bold text-(--color-text) transition hover:border-(--color-accent) hover:text-(--color-accent) focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background) disabled:cursor-not-allowed disabled:opacity-60"
             :disabled="!action.enabled"
             :title="action.reason"
             @click="activateSourceAdmissionHandoffAction?.(action)"
@@ -333,12 +341,12 @@ function resolveHandoffActionIcon(action: SourceAdmissionHandoffAction): IconRol
       </div>
       <div
         v-if="statusView !== undefined && statusView.badge !== undefined"
-        class="mt-2 flex min-w-0 flex-wrap items-center gap-2"
+        class="mt-2 flex min-w-0 flex-wrap items-center gap-2 border-t border-(--color-border) pt-2"
         role="group"
         aria-label="Source status"
       >
         <span
-          class="inline-flex min-h-7 items-center rounded-sm border px-2 py-1 text-xs font-bold"
+          class="inline-flex min-h-6 items-center rounded-sm border px-2 py-0.5 text-xs font-bold"
           :class="statusBadgeClass(statusView)"
         >
           {{ statusView.badge }}
@@ -354,7 +362,7 @@ function resolveHandoffActionIcon(action: SourceAdmissionHandoffAction): IconRol
           v-for="action in statusView.actions"
           :key="`${action.kind}:${'sourceId' in action ? action.sourceId : action.resolvedPath}`"
           type="button"
-          class="inline-flex min-h-7 shrink-0 items-center justify-center gap-1.5 rounded-sm border border-(--color-border) bg-(--color-surface) px-2 py-1 text-xs font-bold text-(--color-text) transition hover:border-(--color-accent) hover:text-(--color-accent) focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background) disabled:cursor-not-allowed disabled:opacity-60"
+          class="inline-flex min-h-6 shrink-0 items-center justify-center gap-1.5 rounded-sm border border-(--color-border) bg-(--color-surface) px-2 py-0.5 text-xs font-bold text-(--color-text) transition hover:border-(--color-accent) hover:text-(--color-accent) focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background) disabled:cursor-not-allowed disabled:opacity-60"
           :disabled="!action.enabled"
           :title="action.reason"
           @click="activateStatusAction?.(action)"
@@ -374,7 +382,7 @@ function resolveHandoffActionIcon(action: SourceAdmissionHandoffAction): IconRol
         >
           <tr>
             <th
-              v-for="col in list.columns"
+              v-for="col in cols"
               :key="col.key"
               class="px-3 py-2 font-bold"
               :class="colClass(col.key)"
@@ -408,79 +416,67 @@ function resolveHandoffActionIcon(action: SourceAdmissionHandoffAction): IconRol
             @click="selectRow(row)"
             @keydown="selectRowByKey($event, row)"
           >
-            <td class="px-3 py-2 align-middle text-right text-xs font-semibold">
-              <span
-                class="block truncate"
-                :class="cellClass(row.cells.index)"
-                :title="row.cells.index.text"
-              >
-                {{ row.cells.index.text }}
-              </span>
-            </td>
-            <td class="px-3 py-2 align-middle">
-              <div class="flex min-w-0 items-center gap-2">
-                <span class="grid h-7 w-7 shrink-0 place-items-center" aria-hidden="true">
-                  <Icon
-                    v-if="row.cells.title.icon !== undefined"
-                    :role="resolveContentRowIcon(row.cells.title.icon) ?? 'state.unknown'"
-                    size="sm"
-                    :tone="iconToneForRow(row.base)"
-                  />
-                </span>
-                <span
-                  class="min-w-0 flex-1 truncate font-semibold"
-                  :class="labelClassForRow(row.base)"
-                  :title="row.cells.title.text"
-                >
-                  {{ row.cells.title.text }}
-                </span>
-              </div>
-              <span
-                v-if="row.cells.title.detail !== undefined"
-                class="mt-0.5 block truncate pl-9 text-xs leading-5 text-(--color-text-muted)"
-                :title="row.cells.title.detail"
-              >
-                {{ row.cells.title.detail }}
-              </span>
-            </td>
             <td
-              v-for="key in musicalKeys"
-              :key="key"
+              v-for="col in cols"
+              :key="col.key"
               class="px-3 py-2 align-middle text-xs font-semibold"
-              :class="colClass(key)"
+              :class="colClass(col.key)"
             >
-              <span class="block truncate" :class="cellClass(row.cells[key])">
-                {{ row.cells[key].text }}
-              </span>
-            </td>
-            <td class="px-3 py-2 align-middle" :class="colClass('ready')">
-              <div class="flex min-w-0 items-center justify-between gap-2">
+              <template v-if="col.key === 'title'">
+                <div class="flex min-w-0 items-center gap-2">
+                  <span class="grid h-7 w-7 shrink-0 place-items-center" aria-hidden="true">
+                    <Icon
+                      v-if="row.cells.title.icon !== undefined"
+                      :role="resolveContentRowIcon(row.cells.title.icon) ?? 'state.unknown'"
+                      size="sm"
+                      :tone="iconToneForRow(row.base)"
+                    />
+                  </span>
+                  <span
+                    class="min-w-0 flex-1 truncate font-semibold"
+                    :class="labelClassForRow(row.base)"
+                    :title="row.cells.title.text"
+                  >
+                    {{ row.cells.title.text }}
+                  </span>
+                </div>
                 <span
-                  class="min-w-0 truncate text-xs leading-5 text-(--color-text-muted)"
-                  :class="cellClass(row.cells.ready)"
-                  :title="row.cells.ready.text"
+                  v-if="row.cells.title.detail !== undefined"
+                  class="mt-0.5 block truncate pl-9 text-xs leading-5 text-(--color-text-muted)"
+                  :title="row.cells.title.detail"
                 >
-                  {{ row.cells.ready.text }}
+                  {{ row.cells.title.detail }}
                 </span>
-                <button
-                  v-if="row.base.action !== undefined"
-                  type="button"
-                  class="inline-flex min-h-8 shrink-0 items-center justify-center gap-2 rounded-sm border border-(--color-border) bg-(--color-surface) px-2.5 py-1 text-xs font-bold text-(--color-text) transition hover:border-(--color-accent) hover:text-(--color-accent) focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background)"
-                  @click.stop="activateRowAction(row.base)"
+              </template>
+              <template v-else-if="col.key === 'ready'">
+                <div class="flex min-w-0 items-center justify-between gap-2">
+                  <span
+                    class="min-w-0 truncate text-xs leading-5 text-(--color-text-muted)"
+                    :class="cellClass(row.cells.ready)"
+                    :title="row.cells.ready.text"
+                  >
+                    {{ row.cells.ready.text }}
+                  </span>
+                  <button
+                    v-if="row.base.action !== undefined"
+                    type="button"
+                    class="inline-flex min-h-7 shrink-0 items-center justify-center gap-1.5 rounded-sm border border-(--color-border) bg-(--color-surface) px-2 py-1 text-xs font-bold text-(--color-text) transition hover:border-(--color-accent) hover:text-(--color-accent) focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background)"
+                    @click.stop="activateRowAction(row.base)"
+                  >
+                    <Icon :role="resolveContentActionIcon(row.base.action)" size="xs" />
+                    <span>{{ row.base.action.label }}</span>
+                  </button>
+                </div>
+              </template>
+              <template v-else>
+                <span
+                  class="block truncate"
+                  :class="cellClass(cellFor(row, col))"
+                  :title="cellFor(row, col).text"
                 >
-                  <Icon :role="resolveContentActionIcon(row.base.action)" size="xs" />
-                  <span>{{ row.base.action.label }}</span>
-                </button>
-              </div>
-            </td>
-            <td class="px-3 py-2 align-middle text-xs font-semibold" :class="colClass('source')">
-              <span
-                class="block truncate"
-                :class="cellClass(row.cells.source)"
-                :title="row.cells.source.text"
-              >
-                {{ row.cells.source.text }}
-              </span>
+                  {{ cellFor(row, col).text }}
+                </span>
+              </template>
             </td>
           </tr>
         </tbody>
