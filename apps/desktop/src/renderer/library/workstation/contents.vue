@@ -13,6 +13,7 @@ const props = defineProps<WorkstationContentsProps>()
 const tableProps = computed(() => ({
   projection: props.projection,
   sourceAdmissionHandoff: props.sourceAdmissionHandoff,
+  ...(props.selectedRowId === undefined ? {} : { selectedRowId: props.selectedRowId }),
   activateRowAction: props.activateRowAction,
   ...(props.statusView === undefined ? {} : { statusView: props.statusView }),
   ...(props.activateStatusAction === undefined
@@ -26,6 +27,6 @@ const tableProps = computed(() => ({
 
 <template>
   <main class="min-h-0 min-w-0 overflow-hidden p-2" aria-label="Contents">
-    <ContentsTable v-bind="tableProps" />
+    <ContentsTable v-bind="tableProps" @select-row="props.selectRow" />
   </main>
 </template>

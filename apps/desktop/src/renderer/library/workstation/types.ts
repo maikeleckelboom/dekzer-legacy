@@ -3,7 +3,7 @@ import type {
   SourceAdmissionHandoffAction,
   SourceAdmissionHandoffProjection
 } from '../runtime/sourceAdmissionHandoff'
-import type { StatusContext } from '../sourceStatus/context'
+import type { PrimarySelection } from '../selection/model'
 import type { StatusAction, StatusView } from '../sourceStatus/projection'
 import type { BrowserTreeNode, BrowserTreeNodeId } from '../tree/types'
 
@@ -31,14 +31,16 @@ export type WorkstationBrowseEvents = {
 
 export type WorkstationContentsProps = {
   readonly projection: ContentProjection
-  readonly statusView?: StatusView
+  readonly statusView?: StatusView | undefined
   readonly sourceAdmissionHandoff: SourceAdmissionHandoffProjection | undefined
+  readonly selectedRowId?: string | undefined
+  readonly selectRow: (row: ContentRow) => void
   readonly activateRowAction: (row: ContentRow) => void
   readonly activateStatusAction?: (action: StatusAction) => void
   readonly activateSourceAdmissionHandoffAction?: (action: SourceAdmissionHandoffAction) => void
 }
 
 export type WorkstationInspectorProps = {
-  readonly selection: StatusContext
-  readonly status?: StatusView
+  readonly selection: PrimarySelection
+  readonly status?: StatusView | undefined
 }

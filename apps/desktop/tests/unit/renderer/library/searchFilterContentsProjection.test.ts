@@ -51,6 +51,13 @@ describe('search/filter contents projection', () => {
     })
     expect(contents.rows.map((projected) => projected.label)).toEqual(['Amen.wav', 'Clip.mp4'])
     expect(contents.rows.map((projected) => projected.icon)).toEqual(['music', 'video'])
+    expect(contents.rows[0]).toMatchObject({
+      subject: {
+        kind: 'sourceFile',
+        sourceId: '7',
+        sourceFileId: '1'
+      }
+    })
   })
 
   it('uses existing search next-page path for load more rows', () => {
@@ -76,6 +83,7 @@ describe('search/filter contents projection', () => {
         label: 'Load more search results'
       }
     })
+    expect(contents.rows.at(-1)).not.toHaveProperty('subject')
   })
 
   it('retains prior rows while a refreshed search is pending', () => {

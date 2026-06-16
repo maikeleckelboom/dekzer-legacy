@@ -69,6 +69,13 @@ import {
   type ActiveSourceOperation,
   type StatusAction
 } from './sourceStatus/projection'
+import {
+  clearSelection,
+  isValidSelection,
+  rowSubject,
+  sourceSubject,
+  type PrimarySelection
+} from './selection/model'
 import type { BrowserState, RowBinding } from './state'
 import { createViewStateStore } from './runtime/viewState'
 import { projectState } from './tree/projection'
@@ -107,6 +114,7 @@ const pendingLibraryRestoreIds = ref<ReadonlySet<BrowserTreeNodeId>>(new Set())
 const pendingAddSourceRestoreIds = ref<ReadonlySet<BrowserTreeNodeId>>(new Set())
 const pendingSourceRegistration = ref<SourceRegistrationIntent>()
 const sourceAdmissionHandoff = ref<SourceAdmissionHandoffState>()
+const primarySelection = ref<PrimarySelection>(clearSelection())
 const sourceRevealRequest = ref<{
   readonly nodeId: BrowserTreeNodeId
   readonly sequence: number
@@ -353,6 +361,10 @@ const contentsProjection = computed(() => {
     : selectedLibraryContentsProjection.value
 })
 
+const selectedContentRowId = computed(() =>
+  primarySelection.value.kind === 'row' ? primarySelection.value.rowId : undefined
+)
+
 const sourceStatusContext = computed(() =>
   projectStatusContext({
     projection: activeProjection.value,
@@ -460,6 +472,10 @@ const sourceStatusView = computed(() => {
   })
 })
 
+const inspectorStatusView = computed(() =>
+  primarySelection.value.kind === 'source' ? sourceStatusView.value : undefined
+)
+
 watch(
   [
     sourceStatusContext,
@@ -510,6 +526,28 @@ watch(
       })
     )
   }
+)
+
+watch(sourceStatusContext, (context) => {
+  if (primarySelection.value.kind !== 'source') {
+    return
+  }
+
+  primarySelection.value = sourceSubject(context)
+})
+
+watch(
+  [contentsProjection, () => contentSelectionRowsAreCurrent()],
+  ([projection, rowsAreCurrent]) => {
+    if (primarySelection.value.kind !== 'row') {
+      return
+    }
+
+    if (!rowsAreCurrent || !isValidSelection(primarySelection.value, projection)) {
+      primarySelection.value = clearSelection()
+    }
+  },
+  { immediate: true }
 )
 
 function traceLocalBrowseBranchWarmup(trace: LocalBrowseBranchWarmupTrace): void {
@@ -826,6 +864,7 @@ async function restoreViewState(): Promise<void> {
     )
     libraryBrowseProfile.restoreProfile(result.viewState.libraryBrowseProfile)
     addSourceView.restoreView(result.viewState.addSourceView)
+    primarySelection.value = sourceSubject(sourceStatusContext.value)
   } catch {
     restoreState.readCompleted = true
   }
@@ -837,6 +876,7 @@ function toggleLibraryBrowseProfileMenu(): void {
 
 function selectLibraryBrowseProfile(profile: LibraryBrowseProfile): void {
   libraryBrowseProfile.setProfile(profile)
+  clearContentSelection()
   libraryBrowseProfileMenuOpen.value = false
 }
 
@@ -850,6 +890,7 @@ function toggleAddSourceViewMenu(): void {
 
 function selectAddSourceView(mode: AddSourceView): void {
   addSourceView.setView(mode)
+  clearContentSelection()
   addSourceViewMenuOpen.value = false
 }
 
@@ -879,6 +920,7 @@ function handleSearchEscape(): void {
 
 function clearSearchAndReturnToScope(): void {
   librarySearch.clearSearch()
+  clearContentSelection()
   requestContentsForCurrentSelection()
   void nextTick(() => {
     searchOpenButtonRef.value?.focus()
@@ -888,6 +930,7 @@ function clearSearchAndReturnToScope(): void {
 function openLibraryBrowseSurface(): void {
   markUserInteraction()
   activeSurface.value = 'libraryBrowse'
+  primarySelection.value = sourceSubject(sourceStatusContext.value)
   requestContentsForCurrentSelection()
   saveViewState()
 }
@@ -897,6 +940,7 @@ function openAddSourceIntake(): void {
   sourceAdmissionHandoff.value = undefined
   activeSurface.value = 'addSource'
   selectedAddSourceNodeId.value = undefined
+  primarySelection.value = clearSelection()
   saveViewState()
 }
 
@@ -1056,6 +1100,7 @@ function applyPendingSourceRegistration(projection: ReturnType<typeof projectSta
 
   activeSurface.value = 'libraryBrowse'
   selectedLibraryNodeId.value = visibleRegistration.nodeId
+  primarySelection.value = sourceSubject(sourceStatusContext.value)
   restoreState.initialNodeApplied = true
   requestContentsForCurrentSelection()
   saveViewState()
@@ -1099,6 +1144,7 @@ function selectNode(nodeId: BrowserTreeNodeId): void {
     requestContentsForCurrentSelection()
   }
 
+  primarySelection.value = sourceSubject(sourceStatusContext.value)
   saveViewState()
 }
 
@@ -1231,6 +1277,7 @@ function showAdmittedSource(sourceId: string): void {
   }
   activeSurface.value = 'libraryBrowse'
   selectedLibraryNodeId.value = nodeId
+  primarySelection.value = sourceSubject(sourceStatusContext.value)
   restoreState.initialNodeApplied = true
   requestContentsForCurrentSelection()
   saveViewState()
@@ -1381,6 +1428,7 @@ function requestAddSourceNodeChildren(nodeId: BrowserTreeNodeId): Promise<boolea
 
 function clearBrowserView(): void {
   selectedLibraryNodeId.value = undefined
+  primarySelection.value = clearSelection()
   contentsRead.clear()
   localBrowse.clearItemWindows()
   expandedLibraryNodeIds.value = new Set()
@@ -1404,6 +1452,36 @@ function clearBrowserView(): void {
       ? {}
       : { selectedAddSourceNodeId: selectedAddSourceNodeId.value })
   })
+}
+
+function selectContentRow(row: ContentRow): void {
+  markUserInteraction()
+  const selection = rowSubject(row)
+
+  if (!isValidSelection(selection, contentsProjection.value)) {
+    return
+  }
+
+  primarySelection.value = selection
+}
+
+function clearContentSelection(): void {
+  if (primarySelection.value.kind === 'row') {
+    primarySelection.value = clearSelection()
+  }
+}
+
+function contentSelectionRowsAreCurrent(): boolean {
+  if (activeSurface.value === 'libraryBrowse' && librarySearch.searchActive.value) {
+    return searchFilterRead.state.value.kind !== 'Pending'
+  }
+
+  const state = contentsRead.state.value
+  return (
+    state?.kind !== 'ready' ||
+    state.pending === undefined ||
+    state.pending.requestKey === state.requestKey
+  )
 }
 
 function activateContentRowAction(row: ContentRow): void {
@@ -1497,13 +1575,15 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
       projection: contentsProjection,
       statusView: sourceStatusView,
       sourceAdmissionHandoff: sourceAdmissionHandoffView,
+      selectedRowId: selectedContentRowId,
+      selectRow: selectContentRow,
       activateRowAction: activateContentRowAction,
       activateStatusAction: handleStatusAction,
       activateSourceAdmissionHandoffAction: activateSourceAdmissionHandoffAction
     }"
     :inspector="{
-      selection: sourceStatusContext,
-      status: sourceStatusView
+      selection: primarySelection,
+      status: inspectorStatusView
     }"
     @select="selectNode"
     @toggle="toggleNode"

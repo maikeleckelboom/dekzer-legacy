@@ -3,6 +3,7 @@ import type {
   ContentProjection,
   ContentRow,
   ContentRowIcon,
+  ContentRowSubject,
   ContentScopeHealth,
   ContentScopeHeader
 } from '../contents/projection'
@@ -188,6 +189,7 @@ function emptyOrPendingSearchRow(
 function searchResultContentRow(row: SearchFilterResultRow): ContentRow {
   const detail = searchRowDetail(row)
   const fileClass = contentFileClass(row.fileClass)
+  const subject = searchRowSubject(row, detail)
   return {
     id: `search-result:${row.stableKey}`,
     kind: row.resultKind === 'directory' ? 'directory' : 'file',
@@ -195,7 +197,27 @@ function searchResultContentRow(row: SearchFilterResultRow): ContentRow {
     icon: searchRowIcon(row),
     ...(detail === undefined ? {} : { detail }),
     ...(row.presenceState === undefined ? {} : { presence: row.presenceState }),
-    ...(fileClass === undefined ? {} : { fileClass })
+    ...(fileClass === undefined ? {} : { fileClass }),
+    ...(subject === undefined ? {} : { subject })
+  }
+}
+
+function searchRowSubject(
+  row: SearchFilterResultRow,
+  detail: string | undefined
+): ContentRowSubject | undefined {
+  if (row.resultKind !== 'sourceFile' || row.sourceId === null || row.sourceFileId === null) {
+    return undefined
+  }
+
+  return {
+    kind: 'sourceFile',
+    sourceId: row.sourceId,
+    sourceFileId: row.sourceFileId,
+    label: row.displayLabel,
+    ...(detail === undefined ? {} : { detail }),
+    ...(row.relativePath === undefined ? {} : { relativePath: row.relativePath }),
+    presence: row.presenceState ?? 'present'
   }
 }
 

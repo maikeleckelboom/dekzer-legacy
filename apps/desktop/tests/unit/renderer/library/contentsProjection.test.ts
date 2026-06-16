@@ -129,6 +129,15 @@ describe('projectContents', () => {
         fileClass: 'video'
       }
     ])
+    expect(contents.rows[0]).toMatchObject({
+      subject: {
+        kind: 'playableMedia',
+        sourceId: '7',
+        sourceFileId: 'file-asset-1',
+        playableMediaId: 'asset-1',
+        attachmentId: 'attachment-asset-1'
+      }
+    })
   })
 
   it('projects playable-media rows with distinct stable IDs', () => {
@@ -198,7 +207,12 @@ describe('projectContents', () => {
     expect(contents.rows[0]).toMatchObject({
       kind: 'file',
       fileClass: 'image',
-      label: 'front.jpg'
+      label: 'front.jpg',
+      subject: {
+        kind: 'sourceFile',
+        sourceId: '7',
+        sourceFileId: 'file-cover-1'
+      }
     })
   })
 
@@ -217,7 +231,12 @@ describe('projectContents', () => {
       kind: 'file',
       fileClass: 'unsupported',
       icon: 'cueSheet',
-      label: 'album.cue'
+      label: 'album.cue',
+      subject: {
+        kind: 'sourceFile',
+        sourceId: '7',
+        sourceFileId: 'file-cue-1'
+      }
     })
   })
 
@@ -874,6 +893,7 @@ describe('projectContents', () => {
         cursor: 'c2Y6...'
       }
     })
+    expect(contents.rows[0]).not.toHaveProperty('subject')
     expect(contents.rows[0]).not.toMatchObject({ state: 'empty' })
   })
 

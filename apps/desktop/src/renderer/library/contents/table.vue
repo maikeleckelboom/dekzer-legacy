@@ -15,10 +15,27 @@ defineProps<{
   projection: ContentProjection
   statusView?: StatusView
   sourceAdmissionHandoff: SourceAdmissionHandoffProjection | undefined
+  selectedRowId?: string
   activateRowAction: (row: ContentRow) => void
   activateStatusAction?: (action: StatusAction) => void
   activateSourceAdmissionHandoffAction?: (action: SourceAdmissionHandoffAction) => void
 }>()
+
+const emit = defineEmits<{
+  'select-row': [row: ContentRow]
+}>()
+
+function canSelectRow(row: ContentRow): boolean {
+  return row.subject !== undefined
+}
+
+function selectRow(row: ContentRow): void {
+  if (!canSelectRow(row)) {
+    return
+  }
+
+  emit('select-row', row)
+}
 
 function formatContentDetail(row: ContentRow): string {
   if (row.state === 'empty') return row.detail ?? 'Empty'
@@ -409,12 +426,24 @@ function resolveHandoffActionIcon(action: SourceAdmissionHandoffAction): IconRol
           <tr
             v-for="row in projection.rows"
             :key="row.id"
-            :class="
+            :class="[
               row.state === 'attention' || row.state === 'failed' || row.state === 'unsupported'
                 ? 'text-(--color-warning)'
-                : ''
-            "
+                : '',
+              selectedRowId === row.id && canSelectRow(row)
+                ? 'bg-(--color-surface) shadow-[inset_3px_0_0_var(--color-accent)]'
+                : canSelectRow(row)
+                  ? 'cursor-default hover:bg-(--color-surface)'
+                  : ''
+            ]"
             :data-content-row-kind="row.kind"
+            :data-content-row-selected="
+              selectedRowId === row.id && canSelectRow(row) ? 'true' : undefined
+            "
+            :tabindex="canSelectRow(row) ? 0 : undefined"
+            @click="selectRow(row)"
+            @keydown.enter.prevent="selectRow(row)"
+            @keydown.space.prevent="selectRow(row)"
           >
             <td class="px-4 py-2 align-middle">
               <div class="flex min-w-0 items-center gap-2">
@@ -455,7 +484,7 @@ function resolveHandoffActionIcon(action: SourceAdmissionHandoffAction): IconRol
                   v-if="row.action !== undefined"
                   type="button"
                   class="inline-flex min-h-8 shrink-0 items-center justify-center gap-2 rounded-sm border border-(--color-border) bg-(--color-surface) px-2.5 py-1 text-xs font-bold text-(--color-text) transition hover:border-(--color-accent) hover:text-(--color-accent) focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background)"
-                  @click="activateRowAction(row)"
+                  @click.stop="activateRowAction(row)"
                 >
                   <Icon :role="resolveContentActionIcon(row.action)" size="xs" />
                   <span>{{ row.action.label }}</span>

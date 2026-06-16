@@ -10,45 +10,82 @@ defineOptions({
 const props = defineProps<WorkstationInspectorProps>()
 
 const label = computed<WorkstationContextLabel>(() => {
-  switch (props.selection.kind) {
-    case 'registeredFile':
-      return 'TRACK'
-    case 'registeredSource':
-    case 'registeredDirectory':
-    case 'localBrowse':
-      return 'SOURCE'
-    case 'none':
-    case 'navigation':
-    case 'readState':
-      return 'NO SELECTION'
+  if (props.selection.kind === 'row') {
+    return props.selection.subject.kind === 'playableMedia' ? 'TRACK' : 'NO SELECTION'
+  }
+
+  if (props.selection.kind === 'source') {
+    switch (props.selection.context.kind) {
+      case 'registeredSource':
+      case 'registeredDirectory':
+      case 'localBrowse':
+        return 'SOURCE'
+    }
   }
 
   return 'NO SELECTION'
 })
 
 const title = computed(() => {
-  if (props.status?.title !== undefined) {
-    return props.status.title
+  if (props.selection.kind === 'row') {
+    return props.selection.subject.kind === 'sourceFile'
+      ? 'Source file selected'
+      : props.selection.subject.label
   }
 
-  if ('title' in props.selection) {
-    return props.selection.title
+  if (props.selection.kind === 'source') {
+    if (props.status?.title !== undefined) {
+      return props.status.title
+    }
+
+    return props.selection.context.title
   }
 
   return 'Nothing selected'
 })
 
 const detail = computed(() => {
-  if (props.status?.detail !== undefined) {
-    return props.status.detail
+  if (props.selection.kind === 'row') {
+    const subject = props.selection.subject
+
+    if (subject.kind === 'sourceFile') {
+      return `${subject.label} is a source file. Track inspection is deferred until playable media identity is available.`
+    }
+
+    const observations = [subject.mimeType, subject.codec]
+      .filter((value): value is string => value !== undefined && value.trim().length > 0)
+      .join(' - ')
+    return observations.length > 0
+      ? observations
+      : (subject.detail ?? 'Playable media identity is available.')
   }
 
-  if ('detail' in props.selection) {
-    return props.selection.detail
+  if (props.selection.kind === 'source') {
+    if (props.status?.detail !== undefined) {
+      return props.status.detail
+    }
+
+    if ('detail' in props.selection.context) {
+      return props.selection.context.detail
+    }
+
+    return undefined
   }
 
   return undefined
 })
+
+const badge = computed(() => {
+  if (props.selection.kind !== 'source') {
+    return undefined
+  }
+
+  return props.status?.badge
+})
+
+const showNoContextCopy = computed(
+  () => props.selection.kind === 'none' && detail.value === undefined
+)
 </script>
 
 <template>
@@ -63,18 +100,18 @@ const detail = computed(() => {
       {{ title }}
     </h3>
 
-    <div v-if="status?.badge !== undefined" class="mt-3">
+    <div v-if="badge !== undefined" class="mt-3">
       <span
         class="inline-flex min-h-7 items-center rounded-sm border border-(--color-border) px-2 py-1 text-xs font-bold text-(--color-text)"
       >
-        {{ status.badge }}
+        {{ badge }}
       </span>
     </div>
 
     <p v-if="detail !== undefined" class="mt-3 text-xs leading-5 text-(--color-text-muted)">
       {{ detail }}
     </p>
-    <p v-else class="mt-3 text-xs leading-5 text-(--color-text-muted)">
+    <p v-else-if="showNoContextCopy" class="mt-3 text-xs leading-5 text-(--color-text-muted)">
       No inspectable context selected.
     </p>
   </aside>

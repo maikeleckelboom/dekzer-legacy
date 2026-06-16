@@ -107,6 +107,31 @@ export type ContentRowAction =
       readonly label: string
     }
 
+export type ContentRowSubject =
+  | {
+      readonly kind: 'sourceFile'
+      readonly sourceId: string
+      readonly sourceFileId: string
+      readonly label: string
+      readonly detail?: string
+      readonly relativePath?: string
+      readonly presence: Presence
+    }
+  | {
+      readonly kind: 'playableMedia'
+      readonly sourceId: string
+      readonly sourceFileId: string
+      readonly playableMediaId: string
+      readonly attachmentId: string
+      readonly label: string
+      readonly detail?: string
+      readonly relativePath?: string
+      readonly mediaKind: PlayableMedia['mediaKind']
+      readonly mimeType?: string
+      readonly codec?: string
+      readonly presence: Presence
+    }
+
 export type ContentRow = {
   readonly id: string
   readonly kind: ContentRowKind
@@ -124,6 +149,7 @@ export type ContentRow = {
     | 'file'
   readonly fileClass?: 'audio' | 'video' | 'image' | 'unsupported'
   readonly action?: ContentRowAction
+  readonly subject?: ContentRowSubject
 }
 
 export type ContentScopeHealth = {
@@ -1239,7 +1265,39 @@ function contentsRow(row: ContentsFileRow): ContentRow {
     presence: row.presence,
     detail,
     icon,
-    fileClass: row.fileClass
+    fileClass: row.fileClass,
+    subject: contentRowSubject(row, detail)
+  }
+}
+
+function contentRowSubject(row: ContentsFileRow, detail: string): ContentRowSubject {
+  const playableMedia = row.playableMedia
+
+  if (playableMedia !== undefined) {
+    return {
+      kind: 'playableMedia',
+      sourceId: row.sourceId,
+      sourceFileId: row.sourceFileId,
+      playableMediaId: playableMedia.playableMediaId,
+      attachmentId: playableMedia.attachmentId,
+      label: row.label,
+      detail,
+      ...(row.relativePath === undefined ? {} : { relativePath: row.relativePath }),
+      mediaKind: playableMedia.mediaKind,
+      ...(playableMedia.mimeType === undefined ? {} : { mimeType: playableMedia.mimeType }),
+      ...(playableMedia.codec === undefined ? {} : { codec: playableMedia.codec }),
+      presence: row.presence
+    }
+  }
+
+  return {
+    kind: 'sourceFile',
+    sourceId: row.sourceId,
+    sourceFileId: row.sourceFileId,
+    label: row.label,
+    detail,
+    ...(row.relativePath === undefined ? {} : { relativePath: row.relativePath }),
+    presence: row.presence
   }
 }
 
