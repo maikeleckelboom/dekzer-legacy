@@ -22,6 +22,11 @@ describe('library toolbar projection', () => {
     })
     expect(toolbar.search.visible).toBe(true)
     expect(toolbar.search.placeholder).toBe('Search library-wide')
+    expect(toolbar.viewMode).toMatchObject({
+      visible: true,
+      label: 'View',
+      title: 'View: List'
+    })
     expect(toolbar.libraryBrowseProfile.visible).toBe(true)
     expect(toolbar.addSourceView.visible).toBe(false)
   })
@@ -39,6 +44,7 @@ describe('library toolbar projection', () => {
     expect(toolbar.addMusicFolder.visible).toBe(true)
     expect(toolbar.addMusicFolder.kind).toBe('chooseMusicFolder')
     expect(toolbar.search.visible).toBe(false)
+    expect(toolbar.viewMode.visible).toBe(false)
     expect(toolbar.libraryBrowseProfile.visible).toBe(false)
     expect(toolbar.addSourceView).toMatchObject({
       visible: true,
@@ -61,6 +67,7 @@ describe('library toolbar projection', () => {
     expect(toolbar.scope).toBe('addSource')
     expect(toolbar.addMusicFolder.visible).toBe(false)
     expect(toolbar.search.visible).toBe(false)
+    expect(toolbar.viewMode.visible).toBe(false)
     expect(toolbar.libraryBrowseProfile.visible).toBe(false)
     expect(toolbar.addSourceView).toMatchObject({
       visible: true,
@@ -128,6 +135,10 @@ describe('library toolbar projection', () => {
       label: 'Search indexed library',
       placeholder: 'Search inside selected source'
     })
+    expect(toolbar.viewMode).toMatchObject({
+      visible: true,
+      title: 'View: List'
+    })
     expect(toolbar.libraryBrowseProfile).toMatchObject({
       visible: true,
       label: 'Indexed contents view'
@@ -173,6 +184,7 @@ describe('library toolbar projection', () => {
     expect(toolbar.scope).toBe('addSource')
     expect(toolbar.addMusicFolder.visible).toBe(true)
     expect(toolbar.search.visible).toBe(false)
+    expect(toolbar.viewMode.visible).toBe(false)
     expect(toolbar.libraryBrowseProfile.visible).toBe(false)
     expect(toolbar.addSourceView.visible).toBe(true)
   })
@@ -188,6 +200,7 @@ function input(
       overrides.binding === undefined ? undefined : projectionForBinding(overrides.binding),
     activeSurface: 'libraryBrowse',
     selectedNodeId: 'selected',
+    selectedViewModeLabel: 'List',
     selectedLibraryBrowseProfileLabel: 'Audio',
     selectedAddSourceViewLabel: 'Preview',
     addSourceView: 'preview',

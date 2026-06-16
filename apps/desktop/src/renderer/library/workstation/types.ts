@@ -5,7 +5,9 @@ import type {
 } from '../runtime/sourceAdmissionHandoff'
 import type { PrimarySelection } from '../selection/model'
 import type { StatusAction, StatusView } from '../sourceStatus/projection'
+import type { BrowserProjection } from '../tree/projection'
 import type { BrowserTreeNode, BrowserTreeNodeId } from '../tree/types'
+import type { ViewMode } from '../viewMode/model'
 
 export type WorkstationContextLabel = 'TRACK' | 'SOURCE' | 'SLOT' | 'WORKSPACE' | 'NO SELECTION'
 
@@ -30,10 +32,14 @@ export type WorkstationBrowseEvents = {
 }
 
 export type WorkstationContentsProps = {
+  readonly view: ViewMode
   readonly projection: ContentProjection
+  readonly columnProjection?: BrowserProjection | undefined
+  readonly selectedNodeId?: BrowserTreeNodeId | undefined
   readonly statusView?: StatusView | undefined
   readonly sourceAdmissionHandoff: SourceAdmissionHandoffProjection | undefined
   readonly selectedRowId?: string | undefined
+  readonly selectNode: (nodeId: BrowserTreeNodeId) => void
   readonly selectRow: (row: ContentRow) => void
   readonly activateRowAction: (row: ContentRow) => void
   readonly activateStatusAction?: (action: StatusAction) => void

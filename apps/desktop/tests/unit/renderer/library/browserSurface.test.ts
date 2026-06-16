@@ -4,14 +4,14 @@ import { describe, expect, it } from 'vitest'
 
 describe('library browser surface containment', () => {
   it('owns panel and contents scrolling inside the library surface', () => {
-    const panel = readRendererSource('panel.vue')
+    const shell = readRendererSource('workstation/shell.vue')
     const table = readRendererSource('contents/table.vue')
 
-    expect(panel).toContain(
+    expect(shell).toContain(
       'h-[80svh] min-h-0 flex-col overflow-hidden border border-(--color-border)'
     )
-    expect(panel).toContain(
-      'grid min-h-0 flex-1 grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)] overflow-hidden'
+    expect(shell).toContain(
+      'grid min-h-0 flex-1 grid-cols-[minmax(14rem,18rem)_minmax(0,1fr)_minmax(15rem,19rem)] grid-rows-[minmax(0,1fr)_5rem] overflow-hidden'
     )
     expect(table).toContain('min-h-0 flex-1 overflow-auto scrollbar-gutter-stable')
     expect(table).toContain(
@@ -65,7 +65,7 @@ describe('library browser surface containment', () => {
     expect(panel).toContain("activeSurface.value === 'addSource' ? 'Add Source' : 'Library Browse'")
     expect(panel).toContain('sourceAdmissionHandoffFromRoot(root)')
     expect(panel).toContain('projectSourceAdmissionHandoff({')
-    expect(panel).toContain(':source-admission-handoff="sourceAdmissionHandoffView"')
+    expect(panel).toContain('sourceAdmissionHandoff: sourceAdmissionHandoffView')
     expect(panel).toContain("action.kind === 'viewSource'")
     expect(panel).toContain('showAdmittedSource(action.sourceId)')
     expect(panel).toContain("action.kind === 'scanSource'")

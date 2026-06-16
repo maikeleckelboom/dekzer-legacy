@@ -22,6 +22,12 @@ import {
   addSourceViewOptions,
   type AddSourceView
 } from './addSource/view'
+import {
+  createViewModeController,
+  viewModeLabel,
+  viewModeOptions,
+  type ViewMode
+} from './viewMode/model'
 import { useBoundaryEvents } from './boundary/boundaryEvents'
 import {
   sourceLifecycleIdsForBrowserContext,
@@ -103,6 +109,7 @@ const iconButtonClass = `${buttonBaseClass} h-9 w-9 min-w-0 ${toolbarControlClas
 const viewStateStore = createViewStateStore()
 const libraryBrowseProfile = createLibraryBrowseProfileController()
 const addSourceView = createAddSourceViewController()
+const viewMode = createViewModeController()
 const activeSurface = ref<LibraryPanelSurface>('libraryBrowse')
 const selectedLibraryNodeId = ref<BrowserTreeNodeId>()
 const selectedAddSourceNodeId = ref<BrowserTreeNodeId>()
@@ -156,6 +163,8 @@ const scanProgressForActiveScan = computed(() => {
 
 const libraryBrowseProfileMenuOpen = ref(false)
 const libraryBrowseProfileMenuRef = ref<HTMLElement>()
+const viewModeMenuOpen = ref(false)
+const viewModeMenuRef = ref<HTMLElement>()
 const addSourceViewMenuOpen = ref(false)
 const addSourceViewMenuRef = ref<HTMLElement>()
 const searchOpenButtonRef = ref<HTMLButtonElement>()
@@ -212,9 +221,13 @@ const browserState = computed<BrowserState>(() => ({
 const selectedLibraryBrowseProfileLabel = computed(() =>
   libraryBrowseProfileLabel(libraryBrowseProfile.profile.value)
 )
+const selectedViewModeLabel = computed(() => viewModeLabel(viewMode.view.value))
 const selectedAddSourceViewLabel = computed(() => addSourceViewLabel(addSourceView.view.value))
 const activeSurfaceTitle = computed(() =>
   activeSurface.value === 'addSource' ? 'Add Source' : 'Library Browse'
+)
+const contentsView = computed(() =>
+  activeSurface.value === 'libraryBrowse' ? viewMode.view.value : 'list'
 )
 
 const libraryBrowseProjection = computed(() => projectState(browserState.value))
@@ -257,6 +270,7 @@ const toolbarModel = computed(() =>
     activeSurface: activeSurface.value,
     projection: activeProjection.value,
     selectedNodeId: activeSelectedNodeId.value,
+    selectedViewModeLabel: selectedViewModeLabel.value,
     selectedLibraryBrowseProfileLabel: selectedLibraryBrowseProfileLabel.value,
     selectedAddSourceViewLabel: selectedAddSourceViewLabel.value,
     addSourceView: addSourceView.view.value,
@@ -884,6 +898,19 @@ function closeLibraryBrowseProfileMenu(): void {
   libraryBrowseProfileMenuOpen.value = false
 }
 
+function toggleViewModeMenu(): void {
+  viewModeMenuOpen.value = !viewModeMenuOpen.value
+}
+
+function selectView(nextView: ViewMode): void {
+  viewMode.setView(nextView)
+  viewModeMenuOpen.value = false
+}
+
+function closeViewModeMenu(): void {
+  viewModeMenuOpen.value = false
+}
+
 function toggleAddSourceViewMenu(): void {
   addSourceViewMenuOpen.value = !addSourceViewMenuOpen.value
 }
@@ -965,6 +992,13 @@ function handleLibraryBrowseProfileOutsidePointerDown(event: PointerEvent): void
     (!(target instanceof Node) || !libraryBrowseProfileMenuRef.value?.contains(target))
   ) {
     libraryBrowseProfileMenuOpen.value = false
+  }
+
+  if (
+    viewModeMenuOpen.value &&
+    (!(target instanceof Node) || !viewModeMenuRef.value?.contains(target))
+  ) {
+    viewModeMenuOpen.value = false
   }
 
   if (
@@ -1572,10 +1606,14 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
     :title="activeSurfaceTitle"
     :tree="treeRootProps"
     :contents="{
+      view: contentsView,
       projection: contentsProjection,
+      columnProjection: activeProjection,
+      selectedNodeId: activeSelectedNodeId,
       statusView: sourceStatusView,
       sourceAdmissionHandoff: sourceAdmissionHandoffView,
       selectedRowId: selectedContentRowId,
+      selectNode: selectNode,
       selectRow: selectContentRow,
       activateRowAction: activateContentRowAction,
       activateStatusAction: handleStatusAction,
@@ -1636,6 +1674,44 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
         >
           <Icon role="action.clear" size="md" />
         </button>
+      </div>
+
+      <div v-if="toolbarModel.viewMode.visible" ref="viewModeMenuRef" class="relative inline-flex">
+        <button
+          type="button"
+          :class="iconButtonClass"
+          :aria-label="toolbarModel.viewMode.label"
+          :aria-expanded="viewModeMenuOpen"
+          aria-haspopup="listbox"
+          :title="toolbarModel.viewMode.title"
+          :disabled="!toolbarModel.viewMode.enabled"
+          @click="toggleViewModeMenu"
+          @keydown.escape.stop.prevent="closeViewModeMenu"
+        >
+          <Icon role="action.browseView" size="md" />
+        </button>
+
+        <div
+          v-if="viewModeMenuOpen"
+          class="absolute right-0 top-full z-20 mt-1 min-w-40 border border-(--color-border) bg-(--color-background) py-1 shadow-lg"
+          role="listbox"
+          :aria-label="toolbarModel.viewMode.label"
+          tabindex="-1"
+          @keydown.escape.stop.prevent="closeViewModeMenu"
+        >
+          <button
+            v-for="option in viewModeOptions"
+            :key="option.key"
+            type="button"
+            class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm text-(--color-text) hover:bg-(--color-surface) focus-visible:bg-(--color-surface) focus-visible:outline-none"
+            :class="viewMode.view.value === option.key ? 'font-bold' : 'font-normal'"
+            role="option"
+            :aria-selected="viewMode.view.value === option.key"
+            @click="selectView(option.key)"
+          >
+            <span>{{ option.label }}</span>
+          </button>
+        </div>
       </div>
 
       <div

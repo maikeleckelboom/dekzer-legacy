@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
+import ContentsColumns from '../contents/columns.vue'
 import ContentsTable from '../contents/table.vue'
 import type { WorkstationContentsProps } from './types'
 
@@ -23,10 +24,22 @@ const tableProps = computed(() => ({
     ? {}
     : { activateSourceAdmissionHandoffAction: props.activateSourceAdmissionHandoffAction })
 }))
+
+const columnProps = computed(() => ({
+  ...tableProps.value,
+  columnProjection: props.columnProjection,
+  ...(props.selectedNodeId === undefined ? {} : { selectedNodeId: props.selectedNodeId }),
+  selectNode: props.selectNode
+}))
 </script>
 
 <template>
   <main class="min-h-0 min-w-0 overflow-hidden p-2" aria-label="Contents">
-    <ContentsTable v-bind="tableProps" @select-row="props.selectRow" />
+    <ContentsColumns
+      v-if="props.view === 'columns'"
+      v-bind="columnProps"
+      @select-row="props.selectRow"
+    />
+    <ContentsTable v-else v-bind="tableProps" @select-row="props.selectRow" />
   </main>
 </template>

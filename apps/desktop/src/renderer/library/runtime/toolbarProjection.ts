@@ -10,6 +10,7 @@ export type LibraryToolbarScope = LibraryPanelSurface | 'neutral'
 export type LibraryToolbarModel = {
   readonly scope: LibraryToolbarScope
   readonly search: ToolbarControl
+  readonly viewMode: ToolbarControl
   readonly libraryBrowseProfile: ToolbarControl
   readonly addSourceView: ToolbarControl
   readonly addMusicFolder: ToolbarAction
@@ -35,6 +36,7 @@ export type LibraryToolbarInput = {
   readonly activeSurface: LibraryPanelSurface
   readonly projection: BrowserProjection | undefined
   readonly selectedNodeId: BrowserTreeNodeId | undefined
+  readonly selectedViewModeLabel: string
   readonly selectedLibraryBrowseProfileLabel: string
   readonly selectedAddSourceViewLabel: string
   readonly addSourceView: AddSourceView
@@ -65,6 +67,12 @@ export function projectLibraryToolbar(input: LibraryToolbarInput): LibraryToolba
       label: 'Search indexed library',
       title: `Search indexed library ${searchScope.titleSuffix}`,
       placeholder: `Search ${searchScope.placeholder}`
+    },
+    viewMode: {
+      visible: scope === 'libraryBrowse',
+      enabled: scope === 'libraryBrowse',
+      label: 'View',
+      title: `View: ${input.selectedViewModeLabel}`
     },
     libraryBrowseProfile: {
       visible: scope === 'libraryBrowse',

@@ -29,9 +29,11 @@ describe('persisted library view state', () => {
     const malformedDir = tempRootFor('dekzer-desktop-view-state-malformed-')
     await expect(
       writeViewStateToHost(fakeHost(malformedDir), {
-        version: 1,
-        selectedNodeId: 'valid-node',
-        expandedNodeIds: ['valid-node']
+        version: 3,
+        activeSurface: 'libraryBrowse',
+        selectedLibraryNodeId: 'valid-node',
+        expandedLibraryNodeIds: ['valid-node'],
+        expandedAddSourceNodeIds: []
       })
     ).resolves.toEqual({ state: 'written' })
 
@@ -47,20 +49,28 @@ describe('persisted library view state', () => {
 
     await expect(
       writeViewStateToHost(fakeHost(dir), {
-        version: 1,
-        selectedNodeId: 'navigation-row:7',
-        expandedNodeIds: ['navigation-row:7', 'source-directory:12', 'navigation-row:7'],
-        profile: 'playable'
+        version: 3,
+        activeSurface: 'libraryBrowse',
+        selectedLibraryNodeId: 'navigation-row:7',
+        selectedAddSourceNodeId: 'add-source:section',
+        expandedLibraryNodeIds: ['navigation-row:7', 'source-directory:12', 'navigation-row:7'],
+        expandedAddSourceNodeIds: ['add-source:section', 'add-source:section'],
+        libraryBrowseProfile: 'playable',
+        addSourceView: 'inventory'
       })
     ).resolves.toEqual({ state: 'written' })
 
     await expect(readViewStateFromHost(fakeHost(dir))).resolves.toEqual({
       state: 'ready',
       viewState: {
-        version: 1,
-        selectedNodeId: 'navigation-row:7',
-        expandedNodeIds: ['navigation-row:7', 'source-directory:12'],
-        profile: 'playable'
+        version: 3,
+        activeSurface: 'libraryBrowse',
+        selectedLibraryNodeId: 'navigation-row:7',
+        selectedAddSourceNodeId: 'add-source:section',
+        expandedLibraryNodeIds: ['navigation-row:7', 'source-directory:12'],
+        expandedAddSourceNodeIds: ['add-source:section'],
+        libraryBrowseProfile: 'playable',
+        addSourceView: 'inventory'
       }
     })
   })
@@ -68,16 +78,59 @@ describe('persisted library view state', () => {
   it('validates write payloads before touching persistence', async () => {
     const dir = tempRootFor('dekzer-desktop-view-state-ipc-')
 
-    expect(isValidViewState({ version: 1, expandedNodeIds: [] })).toBe(true)
-    expect(isValidViewState({ version: 2, expandedNodeIds: [] })).toBe(false)
-    expect(isValidViewState({ version: 1, selectedNodeId: 42, expandedNodeIds: [] })).toBe(false)
-    expect(isValidViewState({ version: 1, expandedNodeIds: ['valid', 42] })).toBe(false)
-    expect(isValidViewState({ version: 1, expandedNodeIds: [], profile: 'allFiles' })).toBe(true)
-    expect(isValidViewState({ version: 1, expandedNodeIds: [], profile: 'invalidProfile' })).toBe(
-      false
-    )
+    expect(
+      isValidViewState({
+        version: 3,
+        activeSurface: 'libraryBrowse',
+        expandedLibraryNodeIds: [],
+        expandedAddSourceNodeIds: []
+      })
+    ).toBe(true)
+    expect(
+      isValidViewState({
+        version: 2,
+        activeSurface: 'libraryBrowse',
+        expandedLibraryNodeIds: [],
+        expandedAddSourceNodeIds: []
+      })
+    ).toBe(false)
+    expect(
+      isValidViewState({
+        version: 3,
+        activeSurface: 'libraryBrowse',
+        selectedLibraryNodeId: 42,
+        expandedLibraryNodeIds: [],
+        expandedAddSourceNodeIds: []
+      })
+    ).toBe(false)
+    expect(
+      isValidViewState({
+        version: 3,
+        activeSurface: 'libraryBrowse',
+        expandedLibraryNodeIds: ['valid', 42],
+        expandedAddSourceNodeIds: []
+      })
+    ).toBe(false)
+    expect(
+      isValidViewState({
+        version: 3,
+        activeSurface: 'libraryBrowse',
+        expandedLibraryNodeIds: [],
+        expandedAddSourceNodeIds: [],
+        libraryBrowseProfile: 'allFiles'
+      })
+    ).toBe(true)
+    expect(
+      isValidViewState({
+        version: 3,
+        activeSurface: 'libraryBrowse',
+        expandedLibraryNodeIds: [],
+        expandedAddSourceNodeIds: [],
+        libraryBrowseProfile: 'invalidProfile'
+      })
+    ).toBe(false)
 
-    expect(writeViewStateThroughHost(fakeHost(dir), { version: 1 })).toEqual({
+    expect(writeViewStateThroughHost(fakeHost(dir), { version: 3 })).toEqual({
       state: 'failed',
       detail: 'Invalid view state payload.'
     })
@@ -90,8 +143,10 @@ describe('persisted library view state', () => {
 
     await expect(
       writeViewStateToHost(fakeHost(path), {
-        version: 1,
-        expandedNodeIds: []
+        version: 3,
+        activeSurface: 'libraryBrowse',
+        expandedLibraryNodeIds: [],
+        expandedAddSourceNodeIds: []
       })
     ).resolves.toMatchObject({
       state: 'failed'
