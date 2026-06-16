@@ -1,6 +1,16 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+
 import { Icon, type IconRole, type IconTone } from '../../icons'
 import { type ContentProjection, type ContentRow, type ContentRowIcon } from './projection'
+import {
+  projectList,
+  rowSubject,
+  shouldSelectRowForKey,
+  type Cell,
+  type colKey,
+  type ListRow
+} from './listModel'
 import { type StatusAction, type StatusView } from '../sourceStatus/projection'
 import {
   type SourceAdmissionHandoffAction,
@@ -11,7 +21,7 @@ defineOptions({
   name: 'ContentsTable'
 })
 
-defineProps<{
+const props = defineProps<{
   projection: ContentProjection
   statusView?: StatusView
   sourceAdmissionHandoff: SourceAdmissionHandoffProjection | undefined
@@ -25,120 +35,28 @@ const emit = defineEmits<{
   'select-row': [row: ContentRow]
 }>()
 
-function canSelectRow(row: ContentRow): boolean {
-  return row.subject !== undefined
+const list = computed(() => projectList(props.projection))
+const musicalKeys = ['artist', 'album', 'bpm', 'key', 'time', 'rating'] satisfies readonly colKey[]
+
+function canSelectRow(row: ListRow): boolean {
+  return rowSubject(row) !== undefined
 }
 
-function selectRow(row: ContentRow): void {
+function selectRow(row: ListRow): void {
   if (!canSelectRow(row)) {
     return
   }
 
-  emit('select-row', row)
+  emit('select-row', row.base)
 }
 
-function formatContentDetail(row: ContentRow): string {
-  if (row.state === 'empty') return row.detail ?? 'Empty'
-  if (row.state === 'notLoaded') return 'Not loaded'
-  if (row.state === 'loading') return 'Loading'
-  if (row.state === 'attention') return row.detail ?? 'Needs attention'
-  if (row.state === 'failed') return 'Unavailable'
-  if (row.state === 'unsupported') return 'Unsupported'
-  if (row.state === 'file' && row.kind === 'state') return row.detail ?? ''
-
-  if (row.kind === 'state') return row.detail ?? ''
-  if (row.kind === 'more') return ''
-
-  if (row.kind === 'directory') {
-    if (row.presence === 'missing') return 'Missing'
-    if (row.presence === 'removed') return 'Removed'
-    return 'Folder'
+function selectRowByKey(event: KeyboardEvent, row: ListRow): void {
+  if (!shouldSelectRowForKey(event.key)) {
+    return
   }
 
-  if (row.kind === 'file') {
-    if (row.presence === 'missing') return 'Missing'
-    if (row.presence === 'removed') return 'Removed'
-    if (row.detail !== undefined) return row.detail
-    if (row.fileClass === 'audio') return 'Audio'
-    if (row.fileClass === 'video') return 'Video'
-    if (row.fileClass === 'image') return 'Image'
-    const icon = row.icon
-    switch (icon) {
-      case 'music':
-        return 'Audio'
-      case 'video':
-        return 'Video'
-      case 'cueSheet':
-        return 'Cue sheet'
-      case 'metadata':
-        return 'Metadata'
-      default:
-        return 'File'
-    }
-  }
-
-  return ''
-}
-
-function formatContentKind(row: ContentRow): string {
-  if (row.kind === 'directory') return 'Folder'
-  if (row.kind === 'more') return 'More'
-
-  if (row.kind === 'state') {
-    switch (row.state) {
-      case 'empty':
-        return 'Empty'
-      case 'notLoaded':
-        return 'Pending'
-      case 'loading':
-        return 'Loading'
-      case 'attention':
-        return 'Attention'
-      case 'failed':
-        return 'Unavailable'
-      case 'unsupported':
-        return 'Unavailable'
-      case 'file':
-        return 'File'
-      default:
-        return 'State'
-    }
-  }
-
-  if (row.fileClass === 'audio') return 'Audio'
-  if (row.fileClass === 'video') return 'Video'
-  if (row.fileClass === 'image') return 'Image'
-
-  switch (row.icon) {
-    case 'cueSheet':
-      return 'Cue sheet'
-    case 'metadata':
-      return 'Metadata'
-    default:
-      return 'File'
-  }
-}
-
-function formatContentState(row: ContentRow): string {
-  if (row.presence === 'missing') return 'Missing'
-  if (row.presence === 'removed') return 'Removed'
-  if (row.kind === 'more') return row.action === undefined ? 'Loading' : 'More available'
-
-  if (row.kind === 'state') {
-    if (row.state === 'empty') return 'Empty'
-    if (row.state === 'notLoaded') return 'Not loaded'
-    if (row.state === 'loading') return 'Loading'
-    if (row.state === 'attention') return 'Needs attention'
-    if (row.state === 'failed') return 'Unavailable'
-    if (row.state === 'unsupported') return 'Unavailable'
-    if (row.state === 'file') return 'Selected'
-  }
-
-  if (row.detail === 'Indexing') return 'Indexing'
-  if (row.detail === 'Source missing' || row.detail === 'File missing') return 'Missing'
-  if (row.detail === 'Source blocked') return 'Blocked'
-  if (row.detail === 'Source file removed' || row.detail === 'File removed') return 'Removed'
-  return 'Available'
+  event.preventDefault()
+  selectRow(row)
 }
 
 function resolveContentRowIcon(icon: ContentRowIcon | undefined): IconRole | undefined {
@@ -213,6 +131,44 @@ function labelClassForRow(row: ContentRow): string {
       return 'text-(--color-text-muted)'
     default:
       return 'text-(--color-text)'
+  }
+}
+
+function cellClass(cell: Cell): string {
+  switch (cell.tone) {
+    case 'warning':
+      return 'text-(--color-warning)'
+    case 'danger':
+      return 'text-(--color-danger)'
+    case 'muted':
+      return 'text-(--color-text-muted)'
+    case 'normal':
+      return 'text-(--color-text)'
+  }
+}
+
+function colClass(key: colKey): string {
+  switch (key) {
+    case 'index':
+      return 'w-12 text-right'
+    case 'title':
+      return 'w-[30%]'
+    case 'artist':
+      return 'w-[14%]'
+    case 'album':
+      return 'w-[14%]'
+    case 'bpm':
+      return 'w-16 text-right'
+    case 'key':
+      return 'w-16'
+    case 'time':
+      return 'w-16 text-right'
+    case 'rating':
+      return 'w-20'
+    case 'ready':
+      return 'w-32'
+    case 'source':
+      return 'w-[18%]'
   }
 }
 
@@ -417,17 +373,24 @@ function resolveHandoffActionIcon(action: SourceAdmissionHandoffAction): IconRol
           class="sticky top-0 z-10 border-b border-(--color-border) bg-(--color-background) text-xs uppercase text-(--color-text-muted)"
         >
           <tr>
-            <th class="w-[58%] px-4 py-2 font-bold">Name</th>
-            <th class="w-[16%] px-4 py-2 font-bold">Kind</th>
-            <th class="w-[26%] px-4 py-2 font-bold">State</th>
+            <th
+              v-for="col in list.columns"
+              :key="col.key"
+              class="px-3 py-2 font-bold"
+              :class="colClass(col.key)"
+            >
+              {{ col.label }}
+            </th>
           </tr>
         </thead>
         <tbody class="divide-y divide-(--color-border)">
           <tr
-            v-for="row in projection.rows"
+            v-for="row in list.rows"
             :key="row.id"
             :class="[
-              row.state === 'attention' || row.state === 'failed' || row.state === 'unsupported'
+              row.base.state === 'attention' ||
+              row.base.state === 'failed' ||
+              row.base.state === 'unsupported'
                 ? 'text-(--color-warning)'
                 : '',
               selectedRowId === row.id && canSelectRow(row)
@@ -436,60 +399,88 @@ function resolveHandoffActionIcon(action: SourceAdmissionHandoffAction): IconRol
                   ? 'cursor-default hover:bg-(--color-surface)'
                   : ''
             ]"
-            :data-content-row-kind="row.kind"
+            :data-content-row-kind="row.base.kind"
+            :data-content-list-family="row.family"
             :data-content-row-selected="
               selectedRowId === row.id && canSelectRow(row) ? 'true' : undefined
             "
             :tabindex="canSelectRow(row) ? 0 : undefined"
             @click="selectRow(row)"
-            @keydown.enter.prevent="selectRow(row)"
-            @keydown.space.prevent="selectRow(row)"
+            @keydown="selectRowByKey($event, row)"
           >
-            <td class="px-4 py-2 align-middle">
+            <td class="px-3 py-2 align-middle text-right text-xs font-semibold">
+              <span
+                class="block truncate"
+                :class="cellClass(row.cells.index)"
+                :title="row.cells.index.text"
+              >
+                {{ row.cells.index.text }}
+              </span>
+            </td>
+            <td class="px-3 py-2 align-middle">
               <div class="flex min-w-0 items-center gap-2">
                 <span class="grid h-7 w-7 shrink-0 place-items-center" aria-hidden="true">
                   <Icon
-                    v-if="row.icon !== undefined"
-                    :role="resolveContentRowIcon(row.icon) ?? 'state.unknown'"
+                    v-if="row.cells.title.icon !== undefined"
+                    :role="resolveContentRowIcon(row.cells.title.icon) ?? 'state.unknown'"
                     size="sm"
-                    :tone="iconToneForRow(row)"
+                    :tone="iconToneForRow(row.base)"
                   />
                 </span>
-                <span class="min-w-0 flex-1 truncate font-semibold" :class="labelClassForRow(row)">
-                  {{ row.label }}
+                <span
+                  class="min-w-0 flex-1 truncate font-semibold"
+                  :class="labelClassForRow(row.base)"
+                  :title="row.cells.title.text"
+                >
+                  {{ row.cells.title.text }}
                 </span>
               </div>
               <span
-                v-if="formatContentDetail(row).length > 0"
+                v-if="row.cells.title.detail !== undefined"
                 class="mt-0.5 block truncate pl-9 text-xs leading-5 text-(--color-text-muted)"
-                :title="formatContentDetail(row)"
+                :title="row.cells.title.detail"
               >
-                {{ formatContentDetail(row) }}
+                {{ row.cells.title.detail }}
               </span>
             </td>
-            <td class="px-4 py-2 align-middle text-xs font-semibold text-(--color-text-muted)">
-              <span class="block truncate" :title="formatContentKind(row)">
-                {{ formatContentKind(row) }}
+            <td
+              v-for="key in musicalKeys"
+              :key="key"
+              class="px-3 py-2 align-middle text-xs font-semibold"
+              :class="colClass(key)"
+            >
+              <span class="block truncate" :class="cellClass(row.cells[key])">
+                {{ row.cells[key].text }}
               </span>
             </td>
-            <td class="px-4 py-2 align-middle">
+            <td class="px-3 py-2 align-middle" :class="colClass('ready')">
               <div class="flex min-w-0 items-center justify-between gap-2">
                 <span
                   class="min-w-0 truncate text-xs leading-5 text-(--color-text-muted)"
-                  :title="formatContentState(row)"
+                  :class="cellClass(row.cells.ready)"
+                  :title="row.cells.ready.text"
                 >
-                  {{ formatContentState(row) }}
+                  {{ row.cells.ready.text }}
                 </span>
                 <button
-                  v-if="row.action !== undefined"
+                  v-if="row.base.action !== undefined"
                   type="button"
                   class="inline-flex min-h-8 shrink-0 items-center justify-center gap-2 rounded-sm border border-(--color-border) bg-(--color-surface) px-2.5 py-1 text-xs font-bold text-(--color-text) transition hover:border-(--color-accent) hover:text-(--color-accent) focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background)"
-                  @click.stop="activateRowAction(row)"
+                  @click.stop="activateRowAction(row.base)"
                 >
-                  <Icon :role="resolveContentActionIcon(row.action)" size="xs" />
-                  <span>{{ row.action.label }}</span>
+                  <Icon :role="resolveContentActionIcon(row.base.action)" size="xs" />
+                  <span>{{ row.base.action.label }}</span>
                 </button>
               </div>
+            </td>
+            <td class="px-3 py-2 align-middle text-xs font-semibold" :class="colClass('source')">
+              <span
+                class="block truncate"
+                :class="cellClass(row.cells.source)"
+                :title="row.cells.source.text"
+              >
+                {{ row.cells.source.text }}
+              </span>
             </td>
           </tr>
         </tbody>
