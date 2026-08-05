@@ -1,120 +1,261 @@
 # Dekzer
 
-Dekzer is the product monorepo root.
+> Dekzer is a local-first DJ workstation built to make music libraries trustworthy before performance workflows become ambitious.
 
-Current state:
+DJ software cannot become trustworthy at performance time if its library model is already lying about identity,
+availability, completeness, or provenance. Dekzer builds that foundation first.
 
-- `apps/desktop` is the booting Electron/Vue desktop app.
-- `crates/library-domain` is the first migrated Rust library substrate crate.
-- `crates/library-store-sqlite` is the migrated durable SQLite store crate.
-- `crates/library-boundary-protocol` is the migrated Rust boundary DTO/protocol crate.
-- `crates/library-boundary-service` maps boundary protocol commands to the real SQLite store.
-- `crates/library-boundary-stdio` is the boundary stdio server binary for JSON-lines command transport.
-- `crates/xtask` owns generated boundary contract export/check tooling.
-- `packages/library-boundary-contract` is the generated-only TypeScript boundary contract package.
-- `packages/library-boundary-client` is the hand-authored, transport-agnostic TypeScript client/session package over the generated boundary contract.
-- `packages/library-boundary-stdio-transport` is the Node stdio transport package that implements the boundary client transport seam by spawning the Rust stdio server.
-- `apps/desktop/src/main` owns the lazy desktop library boundary host policy for stdio binary selection, Electron `userData`, environment selection, diagnostics routing, readiness, and shutdown lifecycle.
-- `workspace-host` is not imported.
-- Remaining `music-library-core` slices beyond the domain, SQLite store, boundary protocol, boundary service, stdio transport, generated boundary contract, TypeScript boundary client, and desktop host owner are not imported.
-- Exclave is an external dependency candidate, not vendored into this repo.
+The current V0 is a working Windows desktop application for registering local music sources, indexing them into SQLite,
+browsing source and folder scopes, filtering and searching indexed files, and inspecting readiness without confusing
+incomplete work with an empty library.
 
-Run workspace commands from this directory:
+**Status:** pre-alpha and under active development. Windows is the only supported V0 development path today. The app
+runs from source, and packaged builds do not yet include the Rust backend executable. Dekzer is not ready for live DJ
+performance.
+
+[What works today](#what-works-today) · [Architecture](#architecture) · [Current status](#current-status) ·
+[Run locally](#run-locally) · [Start reading](#start-reading)
+
+## Why Dekzer exists
+
+A DJ library is not just a directory tree with playlists on top.
+
+A path says where one occurrence was observed. It does not establish a lasting musical identity. Drives disconnect,
+folders move, and the same bytes can appear in several locations. Even identical bytes do not automatically prove that
+two occurrences should become one product track.
+
+The same distinction applies to analysis and metadata. A hash is evidence. A media probe is evidence. A BPM or key
+estimate is evidence. None of those observations silently becomes a user decision, a trusted preparation artifact, or a
+canonical track.
+
+Completeness also has to be earned. A read that returns no rows may describe an empty folder, a source that is still
+indexing, a blocked path, an unavailable drive, a stale cursor, or a failed operation. Collapsing those states into
+"nothing here" makes the library fast only by making it unreliable.
+
+Dekzer therefore starts below the deck. It establishes stable references, explicit source health, bounded background
+work, deterministic reads, and provenance-aware identity layers first. Future preparation and performance history can
+then refer to what the system actually knows.
+
+## What works today
+
+- **Local source intake.** The Add Source flow resolves Windows known folders and fixed or removable volumes, supports a
+  native folder picker, previews local contents before admission, and keeps browsing separate from registration and
+  indexing.
+- **Activation before full scan.** Registering a source persists it and establishes a bounded first navigation window.
+  The source and its immediate folders can become browsable before recursive discovery completes.
+- **Durable indexing.** Rust owns source registration, recursive discovery, scan coverage, file observations, and bounded
+  maintenance. SQLite stores the source hierarchy and evidence across desktop restarts.
+- **Library browsing.** The Vue workstation exposes source and folder navigation, recursive selected-scope contents,
+  offset-paginated tree reads, cursor-paginated contents, list and column views, and explicit Load More behavior.
+- **Scoped search and workflow filters.** Search is backed by a SQLite FTS5 projection and stays within the selected
+  library, source, or folder scope. Audio, Audio + Video, and All Files profiles change the contents policy without
+  changing the selected scope. Search uses backend relevance ordering. User-selectable sort controls are not implemented.
+- **Honest availability and coverage.** Missing, unavailable, permission-blocked, failed, probing, incomplete, retained,
+  and verified-empty states remain distinct. A missing source stays registered and can recover when its path returns.
+- **Stable renderer projections.** Pending replacement reads retain accepted tree or contents state for the same identity.
+  Scan and invalidation events refresh projections without taking selection, expansion, focus, or navigation from the
+  user.
+- **Evidence and identity substrate.** BLAKE3 observations, exact-byte attachments, source-file occurrence links, media
+  probe observations, playable-media promotion, exact-content track candidates, and explicit candidate decisions are
+  implemented without claiming canonical track identity.
+- **Rust-owned desktop contract.** Rust protocol definitions generate the TypeScript contract and JSON Schema. Electron
+  communicates with the Rust service through a tested JSON-lines stdio transport and exposes a narrow preload API to
+  the renderer.
+- **Bounded analysis work.** A headless Rust core computes deterministic technical facts for supported integer PCM WAV
+  files. The desktop inspector also exposes a one-shot 16-bit PCM WAV musical-analysis experiment for BPM, key, and
+  beatgrid evidence. Its results are advisory or inconclusive, carry warnings and basis information, and are not saved.
+
+## Design laws
+
+### A path is not an identity
+
+Filesystem location identifies an occurrence. Dekzer keeps source paths, observed file evidence, exact-byte attachment
+identity, playable media, and musical identity candidates in separate layers. Some source identity is still path-based
+in V0, and the model does not pretend that this closes the identity problem.
+
+### Evidence is not a decision
+
+Hashes, probes, imported values, analyzer output, and identity candidates record observation or inference. Acceptance,
+rejection, deferral, override, preference, cleanup, merge, and removal require separate decisions with provenance.
+Recomputation must not silently overwrite an accepted user choice.
+
+### Empty is a proven state
+
+Zero rows are not enough. The requested scope, filter, depth, cursor, access state, and coverage must agree before the UI
+may claim verified empty. Unknown, probing, incomplete, blocked, failed, unavailable, missing, and stale remain visible
+states.
+
+### Background work does not own user intent
+
+Scanning, maintenance, invalidation replay, and lifecycle refresh may update accepted projections. They do not select a
+different source, expand or collapse a branch, move focus, change scroll position, or redirect navigation.
+
+### The renderer projects truth
+
+Vue owns presentation and ephemeral interaction state. It does not invent filesystem completeness, source availability,
+product identity, durable history, or analysis authority. Those observations arrive through typed backend reads.
+
+### Every layer has one owner
+
+Rust domain code owns durable vocabulary. SQLite owns persisted state. The boundary service owns orchestration. Generated
+contracts own cross-language protocol shapes. Electron main owns host lifecycle and IPC. Preload owns the safe renderer
+surface. Vue owns projection and interaction.
+
+## Architecture
+
+```text
+Vue renderer
+    │ narrow typed renderer API
+Electron preload
+    │ grouped command and publication IPC
+Electron main boundary spine and host
+    │ transport-agnostic TypeScript client
+Node stdio transport
+    │ Rust-owned JSON-lines request, reply, and readiness envelopes
+Rust boundary protocol and service
+    │
+Rust domain and SQLite store
+```
+
+The boundaries exist because the desktop has several different kinds of responsibility:
+
+| Layer                                 | Concrete responsibility                                                                                               |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Rust domain and SQLite                | Own source lifecycle, observations, coverage, identity evidence, decisions, revisions, and deterministic reads.       |
+| Rust protocol and service             | Define commands, replies, events, validation vocabulary, and store orchestration. They do not own presentation.       |
+| Generated TypeScript contract         | Reproduce Rust-owned protocol types and schema for TypeScript consumers. Stale checks prevent hand-maintained drift.  |
+| TypeScript client and stdio transport | Keep command semantics independent of process transport, then implement the current cross-process JSON-lines route.   |
+| Electron main                         | Own backend process startup, storage location, readiness, diagnostics, event pumping, IPC registration, and shutdown. |
+| Preload                               | Expose a narrow `contextBridge` API. Raw Electron primitives do not enter feature code.                               |
+| Vue renderer                          | Turn accepted reads into stable tree, contents, status, inspector, and interaction projections.                       |
+
+This split is not a generic layering exercise. Local filesystem work can block, drives can disappear, the database must
+outlive a renderer reload, and the Rust and TypeScript sides must agree on every state that can reach the user. Keeping
+those concerns with explicit owners makes failures testable instead of incidental.
+
+## Domain model
+
+The model progresses from physical evidence toward product meaning:
+
+```text
+Source and source locations                         implemented
+  → observed file evidence                         implemented
+    → exact-byte attachment identity               implemented
+      → playable media                             implemented
+        → exact-content identity candidates
+          and explicit decisions                   implemented substrate
+          → canonical musical identity             planned
+            → preparation facets and artifacts     planned
+              → workflow and performance history  future
+```
+
+Each layer answers a different question:
+
+- Where may music live, and can the source currently be reached?
+- What did the system observe about this file occurrence, and is that evidence still current?
+- Which occurrences contain identical bytes?
+- What is currently supported as playable media?
+- Which musical item might the evidence represent?
+- What did the system or user accept, reject, defer, or override?
+- What preparation is current and trusted for use?
+- How was the material eventually staged and used in a performance?
+
+The current repository implements the foundation through exact-content candidates and decisions. Those records are not
+canonical tracks. Preparation, Prepared Room, Performed Room, and runtime evidence remain downstream work.
+
+## Current status
+
+| Area                                              | Status                         | Current boundary                                                                                                                           |
+| ------------------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Local source registration and activation          | Working V0 slice               | Windows known folders, volumes, folder selection, admission, and pre-scan navigation readiness.                                            |
+| Scanning and durable library substrate            | Working V0 slice               | SQLite-backed hierarchy, inventory, coverage, observations, maintenance, and restart persistence.                                          |
+| Hierarchy and contents browsing                   | Working V0 slice               | Source and folder scopes, recursive contents, retained reads, list and column projections, and pagination.                                 |
+| Scoped search and filters                         | Working V0 slice               | FTS5-backed text search plus Audio, Audio + Video, and All Files profiles. Search order is backend-owned. User sort controls are deferred. |
+| Missing and offline handling                      | Working V0 slice               | Known sources remain visible as unavailable or missing and recover after restore. Blocked and incomplete do not become empty.              |
+| Attachment, playable-media, and identity evidence | Implemented substrate          | Exact bytes, occurrence links, playable media, candidates, decisions, and review reads. No canonical track authority yet.                  |
+| Technical audio analysis                          | Implemented bounded core       | Deterministic technical facts for supported integer PCM WAV. Headless and test-oriented, with no persistence or product authority.         |
+| Musical analysis                                  | Bounded experiment             | Inspector-triggered BPM, key, and beatgrid attempt for 16-bit PCM WAV. Advisory, warning-bearing, and never persisted.                     |
+| Preparation workflow                              | Planned                        | Durable preparation facets, artifact contracts, and readiness decisions are not implemented.                                               |
+| Prepared Room and Performed Room                  | Doctrine-only future direction | The domain model constrains identity and provenance work but has no product-backed UI or persistence.                                      |
+| Waveforms and deck runtime                        | Proposal and future work       | Architecture documents exist. No production waveform artifact pipeline, playback deck, or performance session exists in this repository.   |
+| Hardware and streaming services                   | Outside V0                     | No controller integration, hardware support, or streaming provider support.                                                                |
+
+## Verification
+
+The repository checks behavior at several boundaries:
+
+- Rust-to-TypeScript contract export and stale detection for both the protocol package and stdio readiness envelope
+- TypeScript and Vue type checking across the generated contract, client, transport, main process, preload, and renderer
+- Rust workspace tests for domain, SQLite, service, protocol, transport, scanning, identity, and analyzer behavior
+- Vitest unit and integration coverage for renderer projections, source lifecycle, IPC mappings, host behavior, and real
+  Rust-backed desktop operations
+- TypeScript client validation and cross-process stdio smoke tests against the compiled Rust server
+- Playwright Electron acceptance for launch, source admission and scan, scoped search, contents pagination, restart
+  persistence, missing-source recovery, and remove/re-add freshness
+- Formatting, lint, `git diff --check`, Rust `fmt`, and Clippy gates
+
+`pnpm verify` runs the normal pre-merge gate. The Electron V0 acceptance gate is separate because it builds and launches
+the desktop app. It uses isolated storage and generated WAV fixtures, so it proves the covered workflow but does not
+claim broad real-media compatibility.
+
+## Roadmap
+
+The roadmap follows dependency order rather than feature volume:
+
+1. Harden the current local library workflow and its availability, coverage, search, and projection contracts.
+2. Extend exact-byte and playable-media evidence into durable canonical musical identity without silent merging.
+3. Define and implement provenance-aware preparation, analysis, and waveform artifacts.
+4. Build a basic local preparation and performance workflow on those trusted references.
+5. Introduce Prepared Room, performance instances, and immutable Performed Room history.
+6. Add runtime evidence and further projection surfaces only after their upstream owners exist.
+
+The full sequence, gates, and vetoes live in the
+[product roadmap and substrate authority plan](docs/library/roadmap/product-roadmap-and-substrate-authority.md).
+
+## Run locally
+
+Requirements:
+
+- Windows for the current local-source V0 path
+- Node.js 25 or newer
+- pnpm 10.33.2, pinned in `package.json`
+- a stable Rust toolchain with Rust 2024 edition support
+- an interactive desktop session for Electron end-to-end tests
+
+From the repository root:
 
 ```bash
 pnpm install
-pnpm run desktop:dev
-pnpm run desktop:dev:fresh
-pnpm run library:contract:export
-pnpm run library:contract:check
-pnpm run library:contract:build
-pnpm run library:stdio:contract:export
-pnpm run library:stdio:contract:check
-pnpm run typecheck
-pnpm run verify
-pnpm run library:client:typecheck
-pnpm run library:client:build
-pnpm run library:client:test
-pnpm run library:stdio:typecheck
-pnpm run library:stdio:build
-pnpm run library:stdio:test
-pnpm run desktop:test
-pnpm run desktop:verify
-pnpm run desktop:lint
-pnpm run build
-pnpm run test
-pnpm run lint
-pnpm run test:rust
-pnpm run fmt:rust
-pnpm run lint:rust
-pnpm run build:desktop
-pnpm run fix
-pnpm run fix:ts
-pnpm run fix:rust
-pnpm run desktop:fix
+pnpm desktop:dev:fresh
+pnpm verify
+pnpm --filter @dekzer/desktop verify:e2e:library-v0
 ```
 
-Current root scripts:
+`desktop:dev:fresh` resets only Dekzer's development storage before launch. Use `pnpm desktop:dev` when that state should
+be retained. The development preflight invokes Cargo for storage compatibility and builds the Rust stdio server as
+needed. The focused Electron command builds both the server and desktop app before running the seven V0 acceptance
+scenarios.
 
-- `desktop:dev` starts the desktop app without resetting development storage.
-- `desktop:dev:fresh` resets development storage through the Rust storage reset command, then starts the desktop app.
-- `build:desktop` builds the desktop app.
-- `library:contract:export` regenerates `packages/library-boundary-contract` from `crates/library-boundary-protocol`.
-- `library:contract:check` verifies the generated boundary contract package is current.
-- `library:contract:build` builds the generated boundary contract package.
-- `library:stdio:contract:export` regenerates the Rust-owned stdio transport envelope artifact consumed by the TypeScript stdio transport package.
-- `library:stdio:contract:check` verifies the generated stdio transport envelope artifact is current.
-- `library:client:typecheck` typechecks the hand-authored TypeScript boundary client.
-- `library:client:build` builds the generated boundary contract package, then the TypeScript boundary client.
-- `library:client:test` runs the boundary client/session validation fixture.
-- `library:stdio:typecheck` typechecks the TypeScript stdio transport package.
-- `library:stdio:build` builds the generated boundary contract package, boundary client, and stdio transport package.
-- `library:stdio:test` builds the Rust stdio server and runs the stdio transport validation and cross-process smoke fixtures.
-- `desktop:test` runs the desktop Vitest suite.
-- `desktop:verify` runs desktop typecheck, Vitest, and lint.
-- `desktop:storage:status` prints the resolved development storage target and Rust-owned status JSON.
-- `desktop:storage:doctor` checks the resolved development storage target without resetting it.
-- `desktop:storage:reset` resets the resolved development storage target when called with `-- --confirm-delete`.
-- `typecheck` runs the generated boundary contract package typecheck, boundary client typecheck, stdio transport typecheck, and desktop typecheck.
-- `build` builds the generated boundary contract package, boundary client, stdio transport package, and desktop app.
-- `test` runs desktop Vitest, boundary client/session validation, stdio transport validation and cross-process smoke fixtures, and the Rust workspace test suite.
-- `lint` runs desktop ESLint and Rust clippy.
-- `test:rust` runs `cargo test --workspace`.
-- `fmt:rust` runs `cargo fmt --all --check`.
-- `lint:rust` runs `cargo clippy --workspace --all-targets -- -D warnings`.
-- `verify` runs the pre-merge gate: `git diff --check`, boundary contract stale checks, TypeScript typechecks, desktop tests, library client and stdio transport tests, Rust tests, desktop lint, Rust fmt check, and Rust clippy.
-- `format:check` runs the read-only formatting gate for TypeScript (Prettier) and Rust (cargo fmt --check).
-- `desktop:fix` runs the desktop auto-fix scripts (Prettier and ESLint --fix).
-- `fix:ts` runs the desktop auto-fix scripts.
-- `fix:rust` runs `cargo fmt --all`.
-- `fix` runs `fix:ts` then `fix:rust`.
+## Start reading
 
-## Fix versus verify
+- [Product doctrine](docs/product/product-doctrine.md) explains the V0 product target, trust laws, and the boundary
+  between current work and spatial performance memory.
+- [Product roadmap and substrate authority](docs/library/roadmap/product-roadmap-and-substrate-authority.md) records the
+  layer sequence, implementation gates, and explicit vetoes.
+- [Source activation and navigation readiness](docs/product/source-activation-and-navigation-readiness.md) defines
+  pre-scan browsing, coverage, verified-empty behavior, state retention, and user-intent safety.
+- [Electron boundary spine](docs/decisions/electron-boundary-spine.md) explains command, publication, host failure,
+  readiness, and renderer ownership across the desktop process boundary.
+- [Documentation authority map](docs/docs-authority-map.md) identifies which documents are canonical, companions,
+  proposals, or future architecture.
 
-- `pnpm run fix` mutates files: it runs formatters and auto-fixable lint rules.
-- `pnpm run verify` is the read-only merge gate: it never writes files.
-- If `verify` fails only on deterministic formatting or auto-fixable lint, run `pnpm run fix`, inspect the diff, then rerun `pnpm run verify`.
-- Do not use fix commands to hide type, test, architecture, or behavior failures.
+## Project status and license
 
-Stdio readiness:
+Dekzer is pre-alpha. It is suitable for architecture review, implementation study, and controlled development testing.
+It is not suitable for real DJ performance, library migration, or irreplaceable preparation work.
 
-- `crates/library-boundary-stdio` emits `{"type":"ready","server":"libraryBoundaryStdio"}` on stdout only after CLI parsing and `LibraryBoundaryService::open(...)` succeed.
-- `packages/library-boundary-stdio-transport` consumes that Rust-owned ready envelope contract and exposes `LibraryBoundaryStdioTransport.ready`.
-- The desktop main-process host awaits transport readiness before exposing a `LibraryBoundaryClient`; preload and renderer cross the boundary only through narrow IPC for host status, hierarchy reads, and main-owned local root actions.
+This is an independent product and systems-engineering project. No contribution process or support commitment is
+published yet.
 
-Desktop library storage:
-
-- Production resolves the library user data root from Electron main's `app.getPath("userData")`; the Rust store derives `library.sqlite3` under that root.
-- Development resolves the same host-owned user data root, marks the store environment as `development`, and the Rust store derives `development/library.sqlite3` under that root so renderer HMR does not relocate storage.
-- `DESKTOP_LIBRARY_USER_DATA_PATH` may override the development user data root for local diagnostics. The path must be absolute and is shared by the desktop host and storage wrapper.
-- `library-boundary-stdio storage status --user-data <path>` prints the derived development and production database, sidecar, WAL, and SHM paths, plus development schema compatibility from the Rust store status path. It does not start the boundary service or reset storage.
-- `library-boundary-stdio storage reset --user-data <path> --confirm-delete` deletes only the derived development storage directory. Reset is not automatic and is not exposed through the renderer.
-
-Workspace ownership:
-
-- `apps/*` is for product applications.
-- `packages/*` is for JavaScript and TypeScript packages, starting with the generated-only library boundary contract, transport-agnostic library boundary client, and stdio transport.
-- `crates/*` is for Rust workspace ownership, starting with `crates/library-domain`.
-- `docs/*` is for product canon, decisions, and architecture documents.
-
-Only `apps/desktop`, its main-process library boundary host owner, the migrated Rust library domain, store, boundary protocol, boundary service, stdio server crate, generated TypeScript boundary contract, transport-agnostic TypeScript boundary client, and stdio transport package are present as product code after this slice.
+The Rust workspace manifests declare the project crates as MIT licensed. A repository-level `LICENSE` file is not
+currently present, so repository-wide reuse terms are not fully documented yet.
