@@ -251,11 +251,12 @@ fn invoke_stratum(
 }
 
 fn stratum_config() -> stratum_dsp::AnalysisConfig {
-    let mut config = stratum_dsp::AnalysisConfig::default();
-    config.enable_normalization = false;
-    config.enable_silence_trimming = false;
-    config.emit_tempogram_candidates = true;
-    config
+    stratum_dsp::AnalysisConfig {
+        enable_normalization: false,
+        enable_silence_trimming: false,
+        emit_tempogram_candidates: true,
+        ..stratum_dsp::AnalysisConfig::default()
+    }
 }
 
 fn map_upstream_result(
@@ -774,13 +775,13 @@ mod tests {
                 .zip(next.beat_positions.iter())
                 .enumerate()
             {
+                let label = format!("beat_position[{beat_index}]");
                 assert_f32_close(
-                    "beat_position",
+                    &label,
                     *baseline_beat,
                     *next_beat,
                     0.001,
                     iteration,
-                    beat_index,
                     &baseline,
                     &next,
                 );
@@ -804,7 +805,7 @@ mod tests {
         let surprising = !has_plausible_tempo_evidence(&result, 90.0);
         let low_bpm_confidence = result
             .bpm_confidence
-            .map_or(true, |confidence| confidence < LOW_BPM_CONFIDENCE_THRESHOLD);
+            .is_none_or(|confidence| confidence < LOW_BPM_CONFIDENCE_THRESHOLD);
         assert!(
             surprising || low_bpm_confidence,
             "90 BPM fixture should continue exercising surprising or low-confidence spike evidence: {result:?}"
@@ -939,7 +940,7 @@ mod tests {
             assert!(
                 result
                     .bpm_confidence
-                    .map_or(true, |confidence| confidence < LOW_BPM_CONFIDENCE_THRESHOLD),
+                    .is_none_or(|confidence| confidence < LOW_BPM_CONFIDENCE_THRESHOLD),
                 "silence BPM candidates must remain low-confidence spike evidence: {result:?}"
             );
             assert_ne!(
@@ -1080,7 +1081,11 @@ mod tests {
         let mut beat = 0_usize;
         let mut beat_number = 0_usize;
         while beat < sample_count {
-            let accent = if beat_number % 4 == 0 { 0.90 } else { 0.65 };
+            let accent = if beat_number.is_multiple_of(4) {
+                0.90
+            } else {
+                0.65
+            };
             for offset in 0..click_len {
                 let index = beat + offset;
                 if index >= sample_count {
@@ -1089,7 +1094,7 @@ mod tests {
 
                 let phase = offset as f32 / click_len as f32;
                 let envelope = (1.0 - phase).max(0.0);
-                let polarity = if offset % 2 == 0 { 1.0 } else { -1.0 };
+                let polarity = if offset.is_multiple_of(2) { 1.0 } else { -1.0 };
                 let value = polarity * accent * envelope;
                 samples[index] = (samples[index] + value).clamp(-1.0, 1.0);
             }
@@ -1164,13 +1169,12 @@ mod tests {
         actual: f32,
         tolerance: f32,
         iteration: usize,
-        index: usize,
         baseline: &MusicalAnalysisResult,
         next: &MusicalAnalysisResult,
     ) {
         assert!(
             (expected - actual).abs() <= tolerance,
-            "{label}[{index}] drifted in repeat iteration {iteration}: expected {expected}, got {actual}; baseline={baseline:?}, next={next:?}"
+            "{label} drifted in repeat iteration {iteration}: expected {expected}, got {actual}; baseline={baseline:?}, next={next:?}"
         );
     }
 

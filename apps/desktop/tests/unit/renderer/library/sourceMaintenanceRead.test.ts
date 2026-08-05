@@ -16,7 +16,7 @@ describe('source maintenance read controller', () => {
     const api = maintenanceApi({
       readSourceMaintenance: vi.fn(() => pendingRead.promise),
       runSourceMaintenance: vi.fn(async () => ({
-        state: 'completed',
+        state: 'completed' as const,
         result: runResult({
           remainingHashCandidates: 0
         })
@@ -105,8 +105,11 @@ describe('source maintenance read controller', () => {
           snapshot: maintenanceSnapshot({ sourceId: '7', remainingHashCandidates: 0 })
         }),
       runSourceMaintenance: vi.fn(async () => ({
-        state: 'maintenanceFailed',
-        error: { code: 'maintenanceFailed', message: 'Unable to run source maintenance.' }
+        state: 'maintenanceFailed' as const,
+        error: {
+          code: 'maintenanceFailed' as const,
+          message: 'Unable to run source maintenance.'
+        }
       }))
     })
     const controller = createController(api)
@@ -145,7 +148,8 @@ describe('source maintenance read controller', () => {
   })
 
   it('rejects a late in-flight maintenance run after invalidation', async () => {
-    const pendingRun = deferred<Awaited<ReturnType<ReadApi['sourceMaintenance']['runSourceMaintenance']>>>()
+    const pendingRun =
+      deferred<Awaited<ReturnType<ReadApi['sourceMaintenance']['runSourceMaintenance']>>>()
     const api = maintenanceApi({
       readSourceMaintenance: vi.fn(),
       runSourceMaintenance: vi.fn().mockReturnValueOnce(pendingRun.promise)

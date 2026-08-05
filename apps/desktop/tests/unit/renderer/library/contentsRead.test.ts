@@ -1210,7 +1210,7 @@ function readStateBinding(): RowBinding {
   return {
     kind: 'readState',
     state: 'notLoaded',
-    ownerId: 'navigation-row:7',
+    parentNodeId: 'navigation-row:7',
     detail: 'Contents not loaded yet.'
   }
 }

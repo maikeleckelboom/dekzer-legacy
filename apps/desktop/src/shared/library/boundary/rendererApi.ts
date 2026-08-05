@@ -37,10 +37,7 @@ import type {
   TrackIdentityDecisionRequest
 } from '../trackIdentity/decisions'
 import type { ReadCandidatesRequest, ReadCandidatesResult } from '../trackIdentity/candidates'
-import type {
-  MusicalAnalysisRequest,
-  MusicalAnalysisResult
-} from '../musicalAnalysis/analyze'
+import type { MusicalAnalysisRequest, MusicalAnalysisResult } from '../musicalAnalysis/analyze'
 import type { LocalRootChoiceResult } from '../roots/chooseLocal'
 import type { ReadLocalRootsOutcome } from '../roots/read'
 import type { LocalRootRegistrationRequest, LocalRootRegistrationResult } from '../roots/register'

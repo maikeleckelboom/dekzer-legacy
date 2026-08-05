@@ -8,8 +8,7 @@ pub const SAMPLE_FORMAT_POLICY: &str = "integer_pcm_wav_hound_slice1";
 pub const NORMALIZATION_POLICY: &str = "integer_pcm_full_scale_v0";
 pub const STEREO_NEAR_ZERO_CHANNEL_RMS: f64 = 1e-12;
 
-const SUPPORTED_INPUT_MESSAGE: &str =
-    "Analyzer V0 slice 1 supports 16-bit integer PCM WAV only";
+const SUPPORTED_INPUT_MESSAGE: &str = "Analyzer V0 slice 1 supports 16-bit integer PCM WAV only";
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TechnicalSampleAnalysis {
@@ -146,7 +145,7 @@ fn analyze_hound_reader<R: std::io::Read>(
         }
 
         if channel_count == 2 {
-            if sample_index % 2 == 0 {
+            if sample_index.is_multiple_of(2) {
                 pending_left = normalized;
                 left_sum_squares += square;
             } else {

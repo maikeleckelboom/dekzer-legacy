@@ -707,8 +707,12 @@ describe('local browse tree projection', () => {
 function projectTree(state: BrowserState): BrowserProjection {
   const projection = projectAddSourceState({
     addSourceView: state.addSourceView ?? 'preview',
-    entryPointsState: state.localBrowseEntryPointsState,
-    itemStates: state.localBrowseItemStates
+    ...(state.localBrowseEntryPointsState === undefined
+      ? {}
+      : { entryPointsState: state.localBrowseEntryPointsState }),
+    ...(state.localBrowseItemStates === undefined
+      ? {}
+      : { itemStates: state.localBrowseItemStates })
   })
 
   expect(projection?.kind).toBe('tree')

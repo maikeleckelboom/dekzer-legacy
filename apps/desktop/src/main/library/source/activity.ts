@@ -46,9 +46,7 @@ export async function readSourceActivityThroughHost(
   }
 }
 
-function normalizeRequest(
-  request: unknown
-): ReadSourceActivityRequest | SourceActivityReadResult {
+function normalizeRequest(request: unknown): ReadSourceActivityRequest | SourceActivityReadResult {
   if (!isRecord(request) || !isPositiveOpaqueId(request.sourceId)) {
     return createErrorResult(
       'invalidRequest',

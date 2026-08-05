@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { ReadSourceIntegrityReply } from '@dekzer/library-boundary-contract'
 
-import { createController, type ReadApi } from '../../../../src/renderer/library/sourceIntegrity/read'
+import {
+  createController,
+  type ReadApi
+} from '../../../../src/renderer/library/sourceIntegrity/read'
 import type { SourceIntegrityReadResult } from '../../../../src/shared/library/source/integrity'
 
 describe('source integrity read controller', () => {
@@ -60,7 +63,9 @@ describe('source integrity read controller', () => {
   })
 })
 
-function integrityApi(readSourceIntegrity: ReadApi['sourceIntegrity']['readSourceIntegrity']): ReadApi {
+function integrityApi(
+  readSourceIntegrity: ReadApi['sourceIntegrity']['readSourceIntegrity']
+): ReadApi {
   return {
     sourceIntegrity: {
       readSourceIntegrity

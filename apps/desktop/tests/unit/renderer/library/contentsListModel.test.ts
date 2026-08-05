@@ -32,7 +32,7 @@ describe('contents list model', () => {
         })
       ])
     )
-    const row = list.rows[0]
+    const row = list.rows[0]!
 
     expect(list.columns.map((col) => col.label)).toEqual([
       '#',
@@ -112,7 +112,7 @@ describe('contents list model', () => {
         })
       ])
     )
-    const row = list.rows[0]
+    const row = list.rows[0]!
 
     expect(row.family).toBe('sourceFile')
     expect(row.subject?.kind).toBe('sourceFile')
@@ -129,8 +129,8 @@ describe('contents list model', () => {
 
     expect(list.rows.map((row) => row.family)).toEqual(['state', 'loadMore'])
     expect(list.rows.map((row) => listRowSubject(row))).toEqual([undefined, undefined])
-    expect(list.rows[0].cells.ready.text).toBe('Loading')
-    expect(list.rows[1].cells.ready.text).toBe('More available')
+    expect(list.rows[0]!.cells.ready.text).toBe('Loading')
+    expect(list.rows[1]!.cells.ready.text).toBe('More available')
   })
 
   it('renders source inventory rows without musical promotion', () => {
@@ -148,7 +148,7 @@ describe('contents list model', () => {
         { surfaceKind: 'sourceInventory' }
       )
     )
-    const row = list.rows[0]
+    const row = list.rows[0]!
 
     expect(row.family).toBe('sourceInventory')
     expect(row.subject).toBeUndefined()
@@ -172,7 +172,7 @@ describe('contents list model', () => {
         { title: 'Search results' }
       )
     )
-    const row = list.rows[0]
+    const row = list.rows[0]!
 
     expect(row.family).toBe('searchResult')
     expect(row.subject?.kind).toBe('sourceFile')
@@ -187,7 +187,7 @@ describe('contents list model', () => {
           label: 'Unknown Source.wav'
         })
       ])
-    ).rows[0]
+    ).rows[0]!
 
     for (const key of ['artist', 'album', 'bpm', 'key', 'time', 'rating'] as const) {
       expect(row.cells[key]).toEqual({
@@ -202,7 +202,7 @@ describe('contents list model', () => {
 
   it('keeps selection valid through list projection only while the subject remains valid', () => {
     const first = playableRow({ id: 'playable-1', label: 'Track One.wav' })
-    const selected = selectionRowSubject(projectList(projection([first])).rows[0].base)
+    const selected = selectionRowSubject(projectList(projection([first])).rows[0]!.base)
 
     expect(isValidSelection(selected, projection([first]))).toBe(true)
     expect(

@@ -304,8 +304,11 @@ function beatgridValue(beatgrid: TrackBeatgridEvidence): string {
 }
 
 function beatgridDetail(beatgrid: TrackBeatgridEvidence): string {
-  const preview = beatgrid.previewSeconds.slice(0, 4).map((seconds) => `${formatDecimal(seconds, 2)}s`)
-  const previewText = preview.length === 0 ? 'No beat preview returned' : `Preview ${preview.join(', ')}`
+  const preview = beatgrid.previewSeconds
+    .slice(0, 4)
+    .map((seconds) => `${formatDecimal(seconds, 2)}s`)
+  const previewText =
+    preview.length === 0 ? 'No beat preview returned' : `Preview ${preview.join(', ')}`
   const stability =
     beatgrid.gridStability === undefined
       ? undefined

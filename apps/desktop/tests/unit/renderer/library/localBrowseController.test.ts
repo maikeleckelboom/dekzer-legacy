@@ -639,9 +639,7 @@ describe('createLocalBrowseController', () => {
 
     expect(itemRequests).toHaveLength(25)
     expect(itemRequests.slice(1).map((request) => request.resolvedParentPath)).toEqual(
-      childDirectories
-        .slice(0, 24)
-        .map((item) => item.identity.resolvedItemPath)
+      childDirectories.slice(0, 24).map((item) => item.identity.resolvedItemPath)
     )
     expect(itemRequests.map((request) => request.resolvedParentPath)).not.toContain(
       'C:\\Users\\Maikel\\Music\\Folder 25'
@@ -1047,8 +1045,12 @@ function loadedWindowForKey(
 function projectTree(state: BrowserState): BrowserProjection {
   const projection = projectAddSourceState({
     addSourceView: state.addSourceView ?? 'preview',
-    entryPointsState: state.localBrowseEntryPointsState,
-    itemStates: state.localBrowseItemStates
+    ...(state.localBrowseEntryPointsState === undefined
+      ? {}
+      : { entryPointsState: state.localBrowseEntryPointsState }),
+    ...(state.localBrowseItemStates === undefined
+      ? {}
+      : { itemStates: state.localBrowseItemStates })
   })
 
   expect(projection?.kind).toBe('tree')

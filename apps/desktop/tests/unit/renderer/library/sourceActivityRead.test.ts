@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { ReadSourceActivityReply } from '@dekzer/library-boundary-contract'
 
-import { createController, type ReadApi } from '../../../../src/renderer/library/sourceActivity/read'
+import {
+  createController,
+  type ReadApi
+} from '../../../../src/renderer/library/sourceActivity/read'
 import type { SourceActivityReadResult } from '../../../../src/shared/library/source/activity'
 
 describe('source activity read controller', () => {

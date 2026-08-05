@@ -181,6 +181,7 @@ impl LibraryBoundaryService {
                 .map(protocol::CommandReply::LibraryRoots),
             protocol::CommandRequest::MusicalAnalysis(command) => self
                 .handle_musical_analysis_command(command)
+                .map(Box::new)
                 .map(protocol::CommandReply::MusicalAnalysis),
             protocol::CommandRequest::SourceFileHash(command) => self
                 .handle_source_file_hash_command(command)
@@ -296,9 +297,6 @@ impl LibraryBoundaryService {
         request: protocol::StartRootScanRequest,
     ) -> protocol::ProtocolResult<protocol::StartRootScanReply> {
         let root_id = require_positive_i64(request.root_id, "rootId")?;
-        self.refresh_root_availability(root_id)?;
-        let scan_started_at_ms = unix_time_ms()?;
-
         let mut registry = self.scan_registry.lock().expect("scan registry poisoned");
 
         let terminal_handle = if let Some(existing) = registry.jobs.get(&root_id) {
@@ -318,6 +316,13 @@ impl LibraryBoundaryService {
         if let Some(handle) = terminal_handle {
             let _ = handle.join();
         }
+
+        let availability_changed = self
+            .durable_store
+            .refresh_root_availability_from_filesystem_for_root(root_id)
+            .map_err(map_store_error)?;
+        self.publish_root_availability_change(availability_changed)?;
+        let scan_started_at_ms = unix_time_ms()?;
 
         let root_class = self
             .durable_store
@@ -2126,7 +2131,9 @@ mod tests {
     #[test]
     fn analyze_playable_media_refreshes_store_owned_source_when_renderer_source_is_stale() {
         let (tempdir, context, service) = open_service_with_context();
-        let source_root = tempdir.path().join("musical-analysis-store-owned-refresh-root");
+        let source_root = tempdir
+            .path()
+            .join("musical-analysis-store-owned-refresh-root");
         std::fs::create_dir_all(&source_root).expect("create source root");
         let wav_bytes = tiny_wav_bytes(44_100, 2, 16, 44_100 * 4);
         std::fs::write(source_root.join("track.wav"), &wav_bytes).expect("write wav");
@@ -2288,11 +2295,13 @@ mod tests {
         .expect_direct_analyze_playable_media_reply();
 
         assert_eq!(reply.result.status, TrackMusicalAnalysisStatus::Blocked);
-        assert!(reply
-            .result
-            .warnings
-            .iter()
-            .any(|warning| warning.code == "selected_source_mismatch"));
+        assert!(
+            reply
+                .result
+                .warnings
+                .iter()
+                .any(|warning| warning.code == "selected_source_mismatch")
+        );
     }
 
     #[test]
@@ -2464,9 +2473,9 @@ mod tests {
 
     fn expect_analyze_playable_media_reply(reply: CommandReply) -> AnalyzePlayableMediaReply {
         match reply {
-            CommandReply::MusicalAnalysis(MusicalAnalysisReply::AnalyzePlayableMedia(reply)) => {
-                reply
-            }
+            CommandReply::MusicalAnalysis(reply) => match *reply {
+                MusicalAnalysisReply::AnalyzePlayableMedia(reply) => reply,
+            },
             other => panic!("expected analyze playable media reply, got {other:?}"),
         }
     }
@@ -2833,17 +2842,27 @@ mod tests {
 
     #[test]
     fn source_lifecycle_read_returns_authoritative_source_level_state() {
-        let (tempdir, _context, service) = open_service_with_context();
-        let source_root = tempdir.path().join("source-lifecycle-root");
-        std::fs::create_dir_all(&source_root).expect("create source root");
-
-        let (_json, registered) =
-            register_local_root(&service, source_root.to_string_lossy().into_owned());
+        let (_tempdir, _context, service) = open_service_with_context();
+        let source_id = service
+            .durable_store
+            .upsert_source(UpsertSourceInput {
+                source_id: Some(77),
+                source_class: "external_mounted".to_string(),
+                authority: "device".to_string(),
+                identity_kind: "fixture".to_string(),
+                identity_value: "authoritative-source-level-state".to_string(),
+                display_name: "Fixture".to_string(),
+                medium_label: None,
+                is_user_visible: true,
+                source_navigation_order_ordinal: None,
+                changed_at: 1,
+            })
+            .expect("insert source fixture");
 
         service
             .durable_store
             .upsert_source_state(UpsertSourceStateInput {
-                source_id: registered.root_id,
+                source_id,
                 mount_status: "unmounted".to_string(),
                 mount_epoch: 2,
                 access_state: SourceAccessState::Blocked,
@@ -2851,7 +2870,7 @@ mod tests {
                 access_error_detail: None,
                 access_checked_at: Some(30),
                 mount_root: None,
-                effective_path: Some(source_root.to_string_lossy().into_owned()),
+                effective_path: None,
                 observed_volume_label: None,
                 filesystem_type: None,
                 last_seen_at: Some(25),
@@ -2861,7 +2880,7 @@ mod tests {
         service
             .durable_store
             .upsert_source_scan_state(UpsertSourceScanStateInput {
-                source_id: registered.root_id,
+                source_id,
                 scan_phase: SourceScanPhase::Blocked,
                 last_scan_started_at: Some(10),
                 last_scan_finished_at: Some(20),
@@ -2872,9 +2891,9 @@ mod tests {
             })
             .expect("update scan state");
 
-        let reply = read_source_lifecycle(&service, registered.root_id);
+        let reply = read_source_lifecycle(&service, source_id);
         let lifecycle = reply.lifecycle.expect("known source lifecycle");
-        assert_eq!(lifecycle.source_id, registered.root_id);
+        assert_eq!(lifecycle.source_id, source_id);
         assert!(lifecycle.is_user_visible);
         assert_eq!(
             lifecycle.mount_status,
@@ -3434,15 +3453,26 @@ mod tests {
 
     #[test]
     fn source_integrity_read_does_not_report_blocked_access_as_empty() {
-        let (tempdir, _context, service) = open_service_with_context();
-        let source_root = tempdir.path().join("source-integrity-blocked-root");
-        std::fs::create_dir_all(&source_root).expect("create source root");
-        let (_json, registered) =
-            register_local_root(&service, source_root.to_string_lossy().into_owned());
+        let (_tempdir, _context, service) = open_service_with_context();
+        let source_id = service
+            .durable_store
+            .upsert_source(UpsertSourceInput {
+                source_id: Some(78),
+                source_class: "external_mounted".to_string(),
+                authority: "device".to_string(),
+                identity_kind: "fixture".to_string(),
+                identity_value: "blocked-source-integrity".to_string(),
+                display_name: "Fixture".to_string(),
+                medium_label: None,
+                is_user_visible: true,
+                source_navigation_order_ordinal: None,
+                changed_at: 1,
+            })
+            .expect("insert blocked source fixture");
         service
             .durable_store
             .upsert_source_state(UpsertSourceStateInput {
-                source_id: registered.root_id,
+                source_id,
                 mount_status: "mounted".to_string(),
                 mount_epoch: 2,
                 access_state: SourceAccessState::Blocked,
@@ -3450,7 +3480,7 @@ mod tests {
                 access_error_detail: None,
                 access_checked_at: Some(30),
                 mount_root: None,
-                effective_path: Some(source_root.to_string_lossy().into_owned()),
+                effective_path: None,
                 observed_volume_label: None,
                 filesystem_type: None,
                 last_seen_at: Some(25),
@@ -3458,7 +3488,7 @@ mod tests {
             })
             .expect("block source state");
 
-        let integrity = read_source_integrity(&service, registered.root_id);
+        let integrity = read_source_integrity(&service, source_id);
 
         assert_eq!(
             integrity.source_availability.state,

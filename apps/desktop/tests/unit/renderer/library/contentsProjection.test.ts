@@ -1755,7 +1755,9 @@ function browserProjection(state: BrowserState): BrowserProjection {
       : projectAddSourceState({
           addSourceView: state.addSourceView ?? 'preview',
           entryPointsState: state.localBrowseEntryPointsState,
-          itemStates: state.localBrowseItemStates
+          ...(state.localBrowseItemStates === undefined
+            ? {}
+            : { itemStates: state.localBrowseItemStates })
         })
 
   expect(projection?.kind).toBe('tree')

@@ -338,7 +338,7 @@ describe('Library home projection', () => {
   })
 
   it('maps source readiness to product-facing Library states', () => {
-    expect(projectLibrarySourceReadiness({ sourceReadiness: undefined })).toMatchObject({
+    expect(projectLibrarySourceReadiness({})).toMatchObject({
       productState: 'indexing',
       badge: 'Indexing'
     })

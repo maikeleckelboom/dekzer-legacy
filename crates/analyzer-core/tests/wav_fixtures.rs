@@ -372,8 +372,7 @@ fn non_16_bit_integer_wavs_are_rejected_with_typed_failure() {
             "{bit_depth}-bit integer WAV"
         );
         assert_eq!(
-            error.message,
-            "Analyzer V0 slice 1 supports 16-bit integer PCM WAV only",
+            error.message, "Analyzer V0 slice 1 supports 16-bit integer PCM WAV only",
             "{bit_depth}-bit integer WAV"
         );
     }

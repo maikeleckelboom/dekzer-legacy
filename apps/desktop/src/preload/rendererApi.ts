@@ -241,7 +241,9 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
         }
       },
       musicalAnalysis: {
-        async analyzePlayableMedia(request: MusicalAnalysisRequest): Promise<MusicalAnalysisResult> {
+        async analyzePlayableMedia(
+          request: MusicalAnalysisRequest
+        ): Promise<MusicalAnalysisResult> {
           return (await ipcRenderer.invoke(
             libraryControlChannels.musicalAnalysis.analyzePlayableMedia,
             request

@@ -11,7 +11,7 @@ describe('library browser surface containment', () => {
       'h-[80svh] min-h-0 flex-col overflow-hidden border border-(--color-border)'
     )
     expect(shell).toContain(
-      'grid min-h-0 flex-1 grid-cols-[minmax(14rem,18rem)_minmax(0,1fr)_minmax(15rem,19rem)] grid-rows-[minmax(0,1fr)_5rem] overflow-hidden'
+      'grid min-h-0 flex-1 grid-cols-[minmax(13rem,16rem)_minmax(0,1fr)_minmax(14rem,18rem)] grid-rows-[minmax(0,1fr)_3.25rem] overflow-hidden'
     )
     expect(table).toContain('min-h-0 flex-1 overflow-auto scrollbar-gutter-stable')
     expect(table).toContain(
@@ -19,26 +19,25 @@ describe('library browser surface containment', () => {
     )
   })
 
-  it('keeps browse profile control icon-only and accessible in the header', () => {
+  it('keeps the browse profile control explicit and accessible in the header', () => {
     const panel = readRendererSource('panel.vue')
 
     expect(panel).toContain(':aria-label="toolbarModel.libraryBrowseProfile.label"')
     expect(panel).toContain(':title="toolbarModel.libraryBrowseProfile.title"')
-    expect(panel).toContain('<Icon role="action.browseView" size="md" />')
-    expect(panel).not.toContain('Browse profile:')
+    expect(panel).toContain('Profile: {{ selectedLibraryBrowseProfileLabel }}')
     expect(panel).toContain('role="listbox"')
     expect(panel).toContain(':aria-selected="libraryBrowseProfile.profile.value === option.key"')
     expect(panel).toContain(':aria-label="toolbarModel.addSourceView.label"')
   })
 
-  it('keeps library search control compact, icon-first, and accessible', () => {
+  it('keeps the library search control compact, explicit, and accessible', () => {
     const panel = readRendererSource('panel.vue')
 
     expect(panel).toContain('border border-(--color-text-muted) bg-(--color-background)')
     expect(panel).toContain('focus-visible:border-(--color-accent)')
     expect(panel).toContain(':aria-label="toolbarModel.search.label"')
     expect(panel).toContain(':title="toolbarModel.search.title"')
-    expect(panel).toContain('<Icon role="action.search" size="md" />')
+    expect(panel).toContain('>\n        Search\n      </button>')
     expect(panel).toContain(':placeholder="toolbarModel.search.placeholder"')
     expect(panel).toContain('@keydown.escape.stop.prevent="handleSearchEscape"')
     expect(panel).toContain('aria-label="Clear search"')
@@ -65,7 +64,8 @@ describe('library browser surface containment', () => {
     expect(panel).toContain("activeSurface.value === 'addSource' ? 'Add Source' : 'Library Browse'")
     expect(panel).toContain('sourceAdmissionHandoffFromRoot(root)')
     expect(panel).toContain('projectSourceAdmissionHandoff({')
-    expect(panel).toContain('sourceAdmissionHandoff: sourceAdmissionHandoffView')
+    expect(panel).toContain('sourceAdmissionHandoff: contentsSourceAdmissionHandoffView')
+    expect(panel).toContain('sourceAdmissionHandoff: inspectorSourceAdmissionHandoffView')
     expect(panel).toContain("action.kind === 'viewSource'")
     expect(panel).toContain('showAdmittedSource(action.sourceId)')
     expect(panel).toContain("action.kind === 'scanSource'")

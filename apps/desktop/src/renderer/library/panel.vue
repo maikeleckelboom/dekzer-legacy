@@ -75,10 +75,7 @@ import {
   type ActiveSourceOperation,
   type StatusAction
 } from './sourceStatus/projection'
-import {
-  useTrackAnalysis,
-  type TrackAnalysisAction
-} from './trackAnalysis/controller'
+import { useTrackAnalysis, type TrackAnalysisAction } from './trackAnalysis/controller'
 import {
   clearSelection,
   isValidSelection,

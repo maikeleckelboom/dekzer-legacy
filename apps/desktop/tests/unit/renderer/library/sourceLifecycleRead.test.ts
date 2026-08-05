@@ -112,9 +112,10 @@ describe('createSourceLifecycleReadController', () => {
   })
 
   it('invalidates one source lifecycle snapshot and rejects late reads', async () => {
-    const staleRead = deferred<
-      Awaited<ReturnType<SourceLifecycleReadApi['sourceLifecycle']['readSourceLifecycle']>>
-    >()
+    const staleRead =
+      deferred<
+        Awaited<ReturnType<SourceLifecycleReadApi['sourceLifecycle']['readSourceLifecycle']>>
+      >()
     const api = sourceLifecycleApi(
       vi
         .fn()
@@ -133,7 +134,7 @@ describe('createSourceLifecycleReadController', () => {
         .mockReturnValueOnce(staleRead.promise)
         .mockResolvedValue({
           state: 'ready',
-          lifecycle: sourceLifecycle({ sourceId: '7', scanPhase: 'running' })
+          lifecycle: sourceLifecycle({ sourceId: '7', scanPhase: 'scanning' })
         })
     )
     const controller = createSourceLifecycleReadController(api)
@@ -154,7 +155,7 @@ describe('createSourceLifecycleReadController', () => {
 
     staleRead.resolve({
       state: 'ready',
-      lifecycle: sourceLifecycle({ sourceId: '7', scanPhase: 'running' })
+      lifecycle: sourceLifecycle({ sourceId: '7', scanPhase: 'scanning' })
     })
 
     await expect(stale).resolves.toBe(false)
@@ -163,7 +164,7 @@ describe('createSourceLifecycleReadController', () => {
     await expect(controller.refreshSourceLifecycles(['7'])).resolves.toBe(true)
     expect(controller.sourceLifecycleBySourceId.value.get('7')).toMatchObject({
       sourceId: '7',
-      scanPhase: 'running'
+      scanPhase: 'scanning'
     })
   })
 })

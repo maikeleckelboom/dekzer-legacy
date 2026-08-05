@@ -228,10 +228,7 @@ export function createController(libraryApi: ReadApi): Controller {
   }
 
   function invalidateRuns(sourceId: string): void {
-    latestRunSequenceBySourceId.set(
-      sourceId,
-      (latestRunSequenceBySourceId.get(sourceId) ?? 0) + 1
-    )
+    latestRunSequenceBySourceId.set(sourceId, (latestRunSequenceBySourceId.get(sourceId) ?? 0) + 1)
   }
 
   function isCurrentRead(sourceId: string, sequence: number): boolean {

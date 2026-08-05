@@ -93,10 +93,8 @@ impl SqliteDurableStore {
     pub fn read_playable_media_analysis_source_file_basis(
         &self,
         playable_media_id: i64,
-    ) -> Result<
-        StorePlayableMediaAnalysisSourceFileBasis,
-        StorePlayableMediaAnalysisTargetError,
-    > {
+    ) -> Result<StorePlayableMediaAnalysisSourceFileBasis, StorePlayableMediaAnalysisTargetError>
+    {
         let row = self
             .read_playable_media_analysis_target_row(playable_media_id)?
             .ok_or(
@@ -176,10 +174,8 @@ impl SqliteDurableStore {
     fn read_playable_media_analysis_source_file_basis_by_id(
         &self,
         source_file_id: SourceFileId,
-    ) -> Result<
-        StorePlayableMediaAnalysisSourceFileBasis,
-        StorePlayableMediaAnalysisTargetError,
-    > {
+    ) -> Result<StorePlayableMediaAnalysisSourceFileBasis, StorePlayableMediaAnalysisTargetError>
+    {
         let connection = self.open_read_connection()?;
         connection
             .query_row(

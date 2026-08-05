@@ -724,9 +724,7 @@ fn file_classes_predicate_sql(
 ) -> String {
     let predicates = file_classes
         .iter()
-        .map(|file_class| match file_class {
-            _ => format!("{file_class_column_sql} = '{}'", file_class.as_str()),
-        })
+        .map(|file_class| format!("{file_class_column_sql} = '{}'", file_class.as_str()))
         .collect::<Vec<_>>()
         .join(" OR ");
     format!("({predicates})")

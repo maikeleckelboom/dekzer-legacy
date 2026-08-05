@@ -245,9 +245,9 @@ async function validatesLocalBrowseItemSnapshotResponse(): Promise<void> {
       entryPointKind: "music",
       resolvedRootPath: "C:\\Users\\DJ\\Music",
       resolvedParentPath: "C:\\Users\\DJ\\Music",
+      itemFilter: "audio",
       offset: 0,
-      limit: 50,
-      profile: "audio"
+      limit: 50
     });
 
     equal(reply.status, "complete", "local browse item read status is preserved");

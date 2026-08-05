@@ -43,7 +43,7 @@ pub enum CommandRequest {
 pub enum CommandReply {
     LibraryBoundaryEvents(LibraryBoundaryEventStreamReply),
     LibraryRoots(LibraryRootReply),
-    MusicalAnalysis(MusicalAnalysisReply),
+    MusicalAnalysis(Box<MusicalAnalysisReply>),
     SourceFileHash(SourceFileHashReply),
     SourceMaintenance(Box<SourceMaintenanceReply>),
     TrackIdentityDecisions(TrackIdentityDecisionReply),
@@ -440,7 +440,7 @@ mod tests {
             maintenance_reply
         );
 
-        let musical_analysis_reply = CommandReply::MusicalAnalysis(
+        let musical_analysis_reply = CommandReply::MusicalAnalysis(Box::new(
             MusicalAnalysisReply::AnalyzePlayableMedia(super::AnalyzePlayableMediaReply {
                 result: super::TrackMusicalAnalysisResult {
                     target: super::TrackMusicalAnalysisTarget {
@@ -476,7 +476,7 @@ mod tests {
                     },
                 },
             }),
-        );
+        ));
         let json = serde_json::to_value(&musical_analysis_reply).expect("serialize analysis reply");
         assert_eq!(json["type"], json!("musicalAnalysis"));
         assert_eq!(json["payload"]["type"], json!("analyzePlayableMedia"));
