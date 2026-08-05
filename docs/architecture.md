@@ -127,7 +127,8 @@ basis information attached.
 
 ## What the architecture does not do
 
-There is no scheduler. Work runs as bounded maintenance units, not as a prioritized multi-lane queue.
+There is no scheduler. The work authority supports priority-ordered batch claiming and lease expiry reclaim, but
+nothing drives it as one, and maintenance runs as bounded-count passes rather than a prioritized multi-lane queue.
 
 There is no resource plane. It is reserved in the channel vocabulary and unimplemented, because no payload requires it
 yet.

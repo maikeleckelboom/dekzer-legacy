@@ -15,17 +15,17 @@ Source                                  implemented
       -> exact-byte attachment          implemented
         -> playable media               implemented
           -> media candidate            not implemented
-            -> track candidate          implemented for the one-file case
+            -> track candidate          implemented for the whole-file media case
               -> user decision          implemented
                 -> canonical track      not implemented
                   -> preparation        not implemented
                     -> workflow         future
 ```
 
-Everything except the media candidate layer exists in the current baseline, and the current track candidate layer
-reaches only the simple case described below. Canonical track identity and preparation are named here because the
-layers under them were shaped to leave room for them. The workflow layer belongs to
-[the vision](vision/spatial-performance-memory.md).
+Everything through user decision exists in the current baseline, except for the media-candidate layer. The current
+track-candidate implementation covers only the whole-file media case. Canonical track identity, preparation, and
+workflow remain unimplemented, and are named here because the layers under them were shaped to leave room for them.
+The workflow layer belongs to [the vision](vision/spatial-performance-memory.md).
 
 ## Why the layers exist
 
@@ -125,9 +125,9 @@ None of those can be modelled honestly as ordinary playable-file rows. Forcing t
 invents units that no file contains or collapses units that a user needs to address separately.
 
 The future layer would own audio and video file candidates, CUE document candidates, CUE-derived split-track
-candidates, and multi-file association candidates, each carrying the evidence and confidence behind it. Association
-between a CUE and its audio is evidence, not inference, and path proximity may be one input to it but never the sole
-authority.
+candidates, and multi-file association candidates, each carrying the evidence and confidence behind it. A CUE-to-audio
+association must remain an evidence-backed candidate with provenance and confidence. Filename or path proximity alone
+must not make it canonical.
 
 Two ordering consequences follow. Acoustic fingerprinting needs decoded audio, so it runs over media candidates rather
 than over raw attachments, and it produces its own evidence rather than extending the attachment layer. And CUE parse
@@ -140,10 +140,11 @@ non-standard encodings.
 A grouping of playable media that share exact current content evidence, with full provenance back to the occurrences,
 attachments, and observations that produced the grouping.
 
-The current implementation reaches only the one-file case: it groups playable media by exact BLAKE3 content evidence,
-so it can say that two occurrences of the same bytes look equivalent. That is genuinely useful and it is not the whole
-layer. When the media candidate layer above exists, track candidates would be produced from media candidates rather
-than directly from playable media, and the current exact-content grouping becomes the simplest case of that.
+The current implementation reaches only the whole-file media case. It groups playable media by exact BLAKE3 content
+evidence, so a candidate may cover several occurrences or playable-media records that share the same bytes. The
+limitation is not how many files a candidate spans, it is that each interpreted musical unit currently corresponds to
+an entire file. When the media candidate layer above exists, track candidates would be produced from media candidates
+rather than directly from playable media, and the current exact-content grouping becomes one case of that.
 
 Owns: the reversible claim "these look equivalent by exact content evidence".
 

@@ -23,8 +23,8 @@ the run that produced it. Evidence taken against a file that changed underneath 
 
 ## Decision
 
-Work runs as bounded-count maintenance units, and the work tables exist to provide provenance and uniqueness rather
-than execution control.
+Work runs as bounded-count maintenance units. Current inspect-source hash and probe operations use the work tables
+primarily for accepted-result provenance and active-row uniqueness, rather than to govern the expensive read itself.
 
 **A maintenance pass attempts a bounded number of candidates.** Scan-triggered maintenance performs at most one pass
 per stage, then stops and clears the pending request. Remaining candidates are explicit-command or future work. It
@@ -34,9 +34,14 @@ never enumerates and drains an entire source.
 load the initial basis, perform the expensive operation against the file, then open a write transaction. Inside that
 transaction the basis is reloaded and compared, and a mismatch rejects the commit.
 
-**Work items are created at commit time, not before the work.** Within that write transaction, the pass queues the
-work item, claims it with a lease, starts a run, records the artifact, and accepts the observation. The work item, run,
-and artifact therefore describe an accepted unit of work rather than scheduling one.
+**For the hash and probe paths, work items are created at commit time, after the expensive read.** Within that write
+transaction the pass queues the work item, claims it with a lease, starts a run, records the artifact, and accepts the
+observation. There the work item, run, and artifact describe an accepted unit of work rather than scheduling one.
+
+**Projection-rebuild work uses the same substrate as an actual queued instruction.** It leaves the item queued for a
+later claimant instead of completing it inline, and the work authority supports priority-ordered batch claiming, lease
+expiry reclaim, completion, failure, and blocking. That machinery is real execution control. What does not exist is a
+general scheduler consuming the work model, which is why the hash and probe paths do not go through it.
 
 **Work identity is unique while active.** A partial unique index over subject, work kind, and basis fingerprint,
 restricted to active states, makes duplicate live work for the same subject and basis impossible at the database level
@@ -61,12 +66,15 @@ change under a heavier workload.
 being performed.** A file that changes while it is being hashed is hashed to the end, and the commit is then rejected.
 The wasted read is accepted as the cost of not holding a write transaction open across an unbounded file read.
 
-**Leases cover the accepted commit lifecycle, not the expensive operation.** Because the work item is created after the
-read completes, a lease does not protect a long-running hash from a second attempt, and lease expiry is not currently a
-recovery path for abandoned reading. It bounds the committed record, not the worker.
+**On the hash and probe paths, leases cover the accepted commit lifecycle rather than the expensive operation.**
+Because the work item is created after the read completes, a lease does not protect a long-running hash from a second
+attempt, and lease expiry is not a recovery path for abandoned reading there. It bounds the committed record, not the
+worker. Lease expiry reclaim does work for items that are genuinely queued and claimed later.
 
-**There is no scheduler and no fairness guarantee.** Nothing prevents one source's work being processed ahead of
-another's beyond the order maintenance happens to run in. Nothing prioritizes a cheap operation over an expensive one.
+**There is no scheduler and no fairness guarantee.** The work authority can claim batches in priority order, but
+nothing currently drives it as a general scheduler. Nothing prevents one source's work being processed ahead of
+another's beyond the order maintenance happens to run in, and nothing prioritizes a cheap operation over an expensive
+one.
 
 Large sources are therefore not fully processed by one scan. Remaining candidates need an explicit command or a later
 maintenance trigger, and backlog is visible through remaining counts rather than hidden inside a queue.
@@ -115,6 +123,11 @@ because provenance enforced by convention is provenance that eventually is not t
 - Unbounded read loop: `hash_file_blake3` in the same file
 - Probe path with the same ordering: `probe_source_file_media_with_after_probe` in
   `crates/library-store-sqlite/src/store/source_file_media_probe.rs`
+- Projection-rebuild work left queued for a later claimant: `RebuildProjectionPromotionTx::rebuild_projection` in
+  `crates/library-store-sqlite/src/authority/promotion/rebuild_projection.rs`
+- Priority-ordered batch claiming and lease expiry reclaim: `claim_machine_work_batch`, alongside
+  `complete_machine_work_item`, `fail_machine_work_item`, and `block_machine_work_item` in
+  `crates/library-store-sqlite/src/authority/work/work_items.rs`
 - Batch bounding: `effective_hash_batch_limit` and `hash_source_file_blake3_batch`
 - Authority code: `crates/library-store-sqlite/src/authority/work/`
 - Bounded maintenance trigger: `crates/library-boundary-service/src/service.rs`
