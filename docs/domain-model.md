@@ -14,15 +14,17 @@ Source                                  implemented
     -> observation                      implemented
       -> exact-byte attachment          implemented
         -> playable media               implemented
-          -> track candidate            implemented
-            -> user decision            implemented
-              -> canonical track        not implemented
-                -> preparation          not implemented
-                  -> workflow           future
+          -> media candidate            not implemented
+            -> track candidate          implemented for the one-file case
+              -> user decision          implemented
+                -> canonical track      not implemented
+                  -> preparation        not implemented
+                    -> workflow         future
 ```
 
-Everything through user decision exists in the current baseline. Canonical track identity and preparation are named
-here because the layers below them were shaped to leave room for them. The workflow layer belongs to
+Everything except the media candidate layer exists in the current baseline, and the current track candidate layer
+reaches only the simple case described below. Canonical track identity and preparation are named here because the
+layers under them were shaped to leave room for them. The workflow layer belongs to
 [the vision](vision/spatial-performance-memory.md).
 
 ## Why the layers exist
@@ -108,15 +110,45 @@ Owns: evidence-backed playability.
 Does not own: canonical track identity or contents authority. Promotion requires both attachment identity and probe
 evidence, because a hash alone cannot distinguish a playable file from a corrupt container with the right extension.
 
+### Media candidate (not implemented)
+
+A playable or interpretable unit derived from attachment and probe evidence. This layer does not exist yet, and it is
+named here because the layers around it only make sense with the gap visible.
+
+Playable media answers "is this file playable". That is a per-file question, and it holds as long as one file is one
+musical unit. Real collections break that assumption in both directions. A single FLAC with a CUE sheet is one file
+holding many units, and the CUE is a second file that describes them without containing audio. A multi-disc rip is
+many files that belong to one release. A long DJ mix with an index is one file that a user may want to address by
+subrange.
+
+None of those can be modelled honestly as ordinary playable-file rows. Forcing them into one row per file either
+invents units that no file contains or collapses units that a user needs to address separately.
+
+The future layer would own audio and video file candidates, CUE document candidates, CUE-derived split-track
+candidates, and multi-file association candidates, each carrying the evidence and confidence behind it. Association
+between a CUE and its audio is evidence, not inference, and path proximity may be one input to it but never the sole
+authority.
+
+Two ordering consequences follow. Acoustic fingerprinting needs decoded audio, so it runs over media candidates rather
+than over raw attachments, and it produces its own evidence rather than extending the attachment layer. And CUE parse
+schema should follow an audit of real collection material rather than the specification alone, because the failure
+modes in real archives are wrong filename casing, missing referenced files, embedded sheets, hidden pregaps, and
+non-standard encodings.
+
 ### Track candidate
 
 A grouping of playable media that share exact current content evidence, with full provenance back to the occurrences,
 attachments, and observations that produced the grouping.
 
+The current implementation reaches only the one-file case: it groups playable media by exact BLAKE3 content evidence,
+so it can say that two occurrences of the same bytes look equivalent. That is genuinely useful and it is not the whole
+layer. When the media candidate layer above exists, track candidates would be produced from media candidates rather
+than directly from playable media, and the current exact-content grouping becomes the simplest case of that.
+
 Owns: the reversible claim "these look equivalent by exact content evidence".
 
-Does not own: canonical track identity, semantic recording matching, metadata reconciliation, or grouping the renderer
-may invent.
+Does not own: canonical track identity, semantic recording matching, metadata reconciliation, units that a file does
+not directly contain, or grouping the renderer may invent.
 
 ### User decision
 
@@ -164,8 +196,9 @@ Three kinds of sameness, deliberately not connected.
 | Acoustic identity | Fingerprint evidence | Not implemented | Same audio, possibly different encoding |
 | Track identity    | Canonical track      | Not implemented | Same musical item                       |
 
-Acoustic fingerprinting, when it exists, will run on known audio media rather than on raw attachments, because it needs
-decoded audio. It will produce its own evidence consumed by track identity, not extend the attachment layer.
+Acoustic fingerprinting, when it exists, is one future input to track identity rather than a channel that resolves it.
+It runs over media candidates rather than raw attachments, because it needs decoded audio and because the unit it
+should fingerprint is not always a whole file. It produces its own evidence and does not extend the attachment layer.
 
 ## Language
 

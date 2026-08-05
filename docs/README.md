@@ -22,7 +22,7 @@ Records for durable choices that are non-obvious from the code and would otherwi
 
 - [0001 Rust owns the generated boundary contract](decisions/0001-rust-owned-boundary-contract.md)
 - [0002 Evidence and user decisions are separate records](decisions/0002-evidence-separated-from-decisions.md)
-- [0003 Background work runs as bounded maintenance units](decisions/0003-bounded-work-items.md)
+- [0003 Background work is bounded-count maintenance with durable provenance](decisions/0003-bounded-work-items.md)
 - [Code naming discipline](decisions/code-naming-discipline.md)
 
 ## Elsewhere

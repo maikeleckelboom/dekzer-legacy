@@ -1,4 +1,4 @@
-# Background work runs as bounded maintenance units
+# Background work is bounded-count maintenance with durable provenance
 
 Status: Accepted
 Date: 2026-08-05
@@ -17,70 +17,81 @@ It is also a large amount of machinery whose behaviour cannot be validated witho
 Written first, its priority weights, lane assignments, and budget boundaries would be guesses, and wrong guesses in a
 scheduler are hard to detect because the system keeps working, just badly.
 
-The immediate requirement was narrower: scan completion must not block, a large file must not stall the application,
-and repeated maintenance runs must not corrupt anything.
+The immediate requirements were narrower. Scan completion must not enqueue an unbounded amount of synchronous work.
+Repeated maintenance runs must not corrupt anything or duplicate work. Every accepted observation must be traceable to
+the run that produced it. Evidence taken against a file that changed underneath must not be committed.
 
 ## Decision
 
-Work runs as bounded maintenance units rather than through a scheduler.
+Work runs as bounded-count maintenance units, and the work tables exist to provide provenance and uniqueness rather
+than execution control.
 
-**Scan-triggered maintenance performs at most one pass per stage**, then stops and clears the pending request.
-Remaining candidates are explicit-command or future work. It never synchronously drains a large source.
+**A maintenance pass attempts a bounded number of candidates.** Scan-triggered maintenance performs at most one pass
+per stage, then stops and clears the pending request. Remaining candidates are explicit-command or future work. It
+never enumerates and drains an entire source.
 
-**Work items are idempotent by construction.** A partial unique index over subject, work kind, and basis fingerprint,
+**Expensive reading happens before the write path opens.** The implemented hash and probe paths follow the same shape:
+load the initial basis, perform the expensive operation against the file, then open a write transaction. Inside that
+transaction the basis is reloaded and compared, and a mismatch rejects the commit.
+
+**Work items are created at commit time, not before the work.** Within that write transaction, the pass queues the
+work item, claims it with a lease, starts a run, records the artifact, and accepts the observation. The work item, run,
+and artifact therefore describe an accepted unit of work rather than scheduling one.
+
+**Work identity is unique while active.** A partial unique index over subject, work kind, and basis fingerprint,
 restricted to active states, makes duplicate live work for the same subject and basis impossible at the database level
 rather than by convention in the code that enqueues it.
 
-**Work items carry a basis fingerprint.** The fingerprint identifies the input state the work was created against. Work
-whose basis no longer matches current observations is stale and is not executed against outdated inputs.
-
-**Work items are leased.** A leased item carries an expiry, enforced by a schema check, so an abandoned run is
-detectable rather than permanently occupying its subject.
-
-**Runs and artifacts are recorded separately from the item.** A work item may have many runs. A run produces artifacts
-carrying the adapter key, adapter version, basis fingerprint, and payload hash that produced them. Artifacts are stored
-inline or in a file store depending on size.
-
 **Accepted observations cite the artifact that produced them.** `source_file_observations.accepted_artifact_id` is a
-non-null foreign key to `work_artifacts`. An observation cannot exist without the run that produced it, which is what
-makes evidence provenance a schema property rather than a convention.
+non-null foreign key to `work_artifacts`, and artifacts carry the adapter key, adapter version, basis fingerprint, and
+payload hash. An observation cannot exist without the run that produced it, which makes evidence provenance a schema
+property rather than a convention.
 
 **The scope is deliberately small.** Two work kinds exist: inspecting a source file and rebuilding a projection. Three
 priority classes exist and are not used for lane routing.
 
 ## Consequences
 
-Large sources are not fully processed by one scan. Remaining hash, attachment, and promotion candidates need an
-explicit command or a later maintenance trigger. Backlog is visible through remaining counts rather than hidden inside
-a queue, which is honest but means a freshly scanned large source is not immediately fully analyzed.
+**Batch limits bound how many candidates a pass attempts. They do not bound the time spent on one candidate.** Hashing
+reads a file to completion in a 64 KiB loop with no byte limit, time limit, checkpoint, or cancellation check. A large
+or slow file may still occupy a maintenance pass. This is a real limitation and the first thing that will need to
+change under a heavier workload.
 
-A single large file cannot stall the pipeline, because a pass is bounded by count rather than running to exhaustion.
-That was the actual requirement, and it is met without lanes or budgets.
+**Basis validation prevents an outdated result from being committed. It does not prevent the underlying work from
+being performed.** A file that changes while it is being hashed is hashed to the end, and the commit is then rejected.
+The wasted read is accepted as the cost of not holding a write transaction open across an unbounded file read.
 
-Maintenance can be re-run safely. Combined with the idempotence index and with evidence and decisions being separate
-records, repeated runs converge rather than duplicating or overwriting. See
+**Leases cover the accepted commit lifecycle, not the expensive operation.** Because the work item is created after the
+read completes, a lease does not protect a long-running hash from a second attempt, and lease expiry is not currently a
+recovery path for abandoned reading. It bounds the committed record, not the worker.
+
+**There is no scheduler and no fairness guarantee.** Nothing prevents one source's work being processed ahead of
+another's beyond the order maintenance happens to run in. Nothing prioritizes a cheap operation over an expensive one.
+
+Large sources are therefore not fully processed by one scan. Remaining candidates need an explicit command or a later
+maintenance trigger, and backlog is visible through remaining counts rather than hidden inside a queue.
+
+Maintenance can be re-run safely. Combined with the active-row uniqueness index and with evidence and decisions being
+separate records, repeated runs converge rather than duplicating or overwriting. See
 [evidence separated from decisions](0002-evidence-separated-from-decisions.md).
 
 Every accepted observation is traceable to an adapter version. When a probe adapter produces bad results, the affected
 observations are identifiable rather than being indistinguishable from good ones.
 
-There is no fairness guarantee. Nothing prevents one source's work from being processed ahead of another's beyond the
-order maintenance happens to run in. This is acceptable at current scale and is the first thing that will break under
-a heavier workload.
-
-There is no checkpointing. A large hash restarts rather than resuming. This is a real cost on very large files and is
-the second thing that will need to change.
-
 ## Rejected alternatives
 
 **A full scheduler with lanes, resource budget groups, checkpointing, and starvation prevention.** The design is
 sound and this decision is not an argument against it. Rejected for now because its parameters cannot be chosen
-honestly without a workload to tune against, and because it is a large surface to maintain in support of a requirement
-that bounded passes already satisfy. It is recorded in Git history and should be reconsidered when a measured workload
-shows bounded units are insufficient.
+honestly without a workload to tune against, and because it is a large surface to maintain. It is recorded in Git
+history and should be reconsidered when a measured workload shows bounded-count passes are insufficient. The
+limitations listed above are the evidence that would justify it.
 
 **Draining all pending work on scan completion.** Simple and complete. Rejected because it makes scan completion
-unbounded on large sources, which is the failure the bounded pass exists to prevent.
+unbounded on large sources.
+
+**Holding the write transaction open across the file read.** Would let the work item and lease genuinely govern
+execution. Rejected because it holds a SQLite write lock for the duration of an arbitrarily long read, blocking every
+other writer. Deferring the transaction until after the read is why basis revalidation exists at all.
 
 **A plain FIFO queue.** Rejected for the same reason a scheduler was deferred, from the other direction: it adds queue
 machinery without adding the prioritization that would justify it.
@@ -96,8 +107,14 @@ because provenance enforced by convention is provenance that eventually is not t
 - Schema: `work_items`, `work_runs`, `work_artifacts`, `work_artifact_inline_payloads`,
   `work_artifact_file_store_entries`, `work_artifact_claims` in
   `crates/library-store-sqlite/migrations/20260502000000_substrate_baseline.sql`
-- Idempotence: the `work_items_active_work` partial unique index over subject, work kind, and basis fingerprint
-- Lease enforcement: the `state = 'leased'` implies non-null `leased_until` check constraint
+- Active-row uniqueness: the `work_items_active_work` partial unique index over subject, work kind, and basis
+  fingerprint
 - Provenance: the non-null `accepted_artifact_id` foreign key on `source_file_observations`
+- Hash path ordering and basis revalidation: `hash_source_file_blake3_with_after_hash` and
+  `commit_blake3_hash_evidence` in `crates/library-store-sqlite/src/store/source_file_hash.rs`
+- Unbounded read loop: `hash_file_blake3` in the same file
+- Probe path with the same ordering: `probe_source_file_media_with_after_probe` in
+  `crates/library-store-sqlite/src/store/source_file_media_probe.rs`
+- Batch bounding: `effective_hash_batch_limit` and `hash_source_file_blake3_batch`
 - Authority code: `crates/library-store-sqlite/src/authority/work/`
-- Bounded maintenance: `crates/library-boundary-service/src/service.rs`
+- Bounded maintenance trigger: `crates/library-boundary-service/src/service.rs`

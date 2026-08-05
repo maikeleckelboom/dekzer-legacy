@@ -177,7 +177,7 @@ canonical tracks. Preparation, Prepared Room, Performed Room, and runtime eviden
 | Musical analysis                                  | Bounded experiment       | Inspector-triggered BPM, key, and beatgrid attempt for 16-bit PCM WAV. Advisory, warning-bearing, and never persisted.                     |
 | Preparation workflow                              | Planned                  | Durable preparation facets, artifact contracts, and readiness decisions are not implemented.                                               |
 | Prepared Room and Performed Room                  | Future vision only       | The domain model constrains identity and provenance work but has no product-backed UI or persistence.                                      |
-| Waveforms and deck runtime                        | Proposal and future work | Architecture documents exist. No production waveform artifact pipeline, playback deck, or performance session exists in this repository.   |
+| Waveforms and deck runtime                        | Future work              | No production waveform artifact pipeline, playback deck, or performance session exists. Prior design work remains in Git history.          |
 | Hardware and streaming services                   | Outside V0               | No controller integration, hardware support, or streaming provider support.                                                                |
 
 ## Verification

@@ -33,11 +33,16 @@ that survives path changes, without silent merging and without treating a hash a
 This is the next meaningful product milestone because almost everything after it needs a stable thing to refer to. A
 preparation artifact, a crate, and a performance reference all need to name a track that outlives its current path.
 
-Two things block hardening it. Acoustic fingerprint evidence has to exist, and it runs on decoded audio rather than on
-raw attachments, so it depends on a media candidate layer above the current one. And an import interoperability
-contract has to land first, because cue, loop, beatgrid, and playlist data from rekordbox, Serato, and Traktor must be
-receivable as provenance-bound evidence by the candidate schema from the start. Designing that schema first and adding
-foreign data later closes off the ingestion path.
+Two things block hardening it.
+
+The first is the [media candidate layer](domain-model.md#media-candidate-not-implemented). Current track candidates
+group whole files by exact content, which holds only while one file is one musical unit. CUE-backed albums, multi-disc
+rips, and long indexed mixes break that in both directions, and they cannot be represented as ordinary playable-file
+rows. Acoustic fingerprinting depends on the same layer, because it needs decoded audio and a unit to fingerprint.
+
+The second is an import interoperability contract, because cue, loop, beatgrid, and playlist data from rekordbox,
+Serato, and Traktor must be receivable as provenance-bound evidence by the candidate schema from the start. Designing
+that schema first and adding foreign data later closes off the ingestion path.
 
 **Supporting work along the way.** Tag observations as raw evidence rather than canonical metadata. A CUE corpus audit
 against real collection material before any CUE parse schema is designed, because the edge cases in real archives are
@@ -74,8 +79,9 @@ Deferred on purpose. These are not backlog items waiting for capacity.
 - **Playlists and crates as the central workflow model.** The organizational model matters and should not default to
   the flat structure that is easiest to build first.
 - **AR, VR, audience, and social surfaces.** These project a model that does not exist yet.
-- **A work scheduler with lanes, resource budgets, and checkpointing.** Current work runs as bounded maintenance units.
-  A scheduler is justified when a real workload proves that bounded units are insufficient, not before. See
+- **A work scheduler with lanes, resource budgets, and checkpointing.** Current work runs as bounded-count maintenance
+  passes with no per-file time limit, so a large file can still occupy a pass. A scheduler is justified when a measured
+  workload shows that is actually hurting, not before. See
   [the bounded work items decision](decisions/0003-bounded-work-items.md).
 - **Attachment garbage collection.** Orphaned attachment rows after link replacement are known and left alone. Removing
   data automatically is exactly the behaviour the domain model refuses.

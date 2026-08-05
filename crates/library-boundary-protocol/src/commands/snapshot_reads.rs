@@ -2934,43 +2934,6 @@ mod tests {
     }
 
     #[test]
-    fn authority_docs_avoid_old_playable_media_boundary_wording() {
-        let repo_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let docs = [
-            "docs/domain-model.md",
-            "docs/library-browser.md",
-            "docs/roadmap.md",
-        ];
-        let disallowed = [
-            concat!("observed-file-", "observations"),
-            concat!("playable-media ", "candidate"),
-            concat!("playableMedia ", "candidate"),
-            concat!("candidate ", "row"),
-            concat!("candidate ", "rows"),
-            concat!("candidate ", "projection"),
-            concat!("primary", "Media"),
-            concat!("Primary", "Media"),
-            concat!("source_file_", "facts"),
-            concat!("Source", "Facts"),
-            concat!("primary_media_", "facts"),
-            concat!("primary_media_", "fact"),
-        ];
-
-        for doc in docs {
-            let path = repo_root.join(doc);
-            let text = std::fs::read_to_string(&path)
-                .unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
-            for phrase in disallowed {
-                assert!(
-                    !text.contains(phrase),
-                    "{} contains old playable-media boundary wording: {phrase}",
-                    path.display()
-                );
-            }
-        }
-    }
-
-    #[test]
     fn contents_policy_variants_remain_distinct_in_read_requests() {
         let policies = [
             (

@@ -7,7 +7,9 @@ Everything needed to run, verify, and reset the repository. Commands here are ch
 
 - **Windows.** The only supported V0 path. Source intake resolves Windows known folders and volumes.
 - **Node.js 25 or newer.** Enforced by the root `engines` field.
-- **pnpm 10.33.2.** Pinned by `packageManager`. Run `corepack enable` if pnpm is not already available.
+- **pnpm 10.33.2.** Pinned by `packageManager`. Use that exact version. Where Corepack is available it can activate
+  the pinned version, but recent Node builds no longer bundle it. Otherwise install 10.33.2 directly or invoke it as
+  `npx pnpm@10.33.2`.
 - **A stable Rust toolchain with Rust 2024 edition support.** Cargo is invoked by development preflight, contract
   export, and several test scripts.
 - **An interactive desktop session** for the Electron end-to-end tests. They launch a real window and will not run
@@ -75,8 +77,13 @@ Verification commands report. Fix commands write.
 pnpm fix
 ```
 
-`fix` runs Prettier and ESLint with `--fix` across the desktop app, then `cargo fmt --all`. `pnpm fix:ts` and
-`pnpm fix:rust` run each half. `pnpm format:check` and `pnpm lint` only report, and are what `pnpm verify` uses.
+`fix` runs Prettier and ESLint with `--fix` across the desktop app, formats the root `README.md` and `docs/`, then
+runs `cargo fmt --all`. `pnpm fix:ts` and `pnpm fix:rust` run each half, and `pnpm format:docs` formats only the
+documentation. `pnpm format:check` and `pnpm lint` only report, and are what `pnpm verify` uses.
+
+Formatting is checked in two places because Prettier resolves differently per package. The desktop package checks
+everything under `apps/desktop`, and the root `format:docs:check` covers `README.md` and `docs/`. Both run inside
+`pnpm verify`.
 
 Run `pnpm fix` before `pnpm verify` when a run fails on formatting. It will not fix type errors, failing tests, or
 Clippy findings that need a real change.

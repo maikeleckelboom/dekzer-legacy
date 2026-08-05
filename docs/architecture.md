@@ -41,7 +41,8 @@ truth for cross-language shapes. It does not own presentation.
 
 **The Rust boundary service** handles commands, publishes events, and runs bounded maintenance. Maintenance after a
 scan performs one pass each of hashing, attachment materialization, probing, playable-media promotion, candidate
-production, and decision production, then stops. It does not drain a large source synchronously. Remaining work is
+production, and decision production, then stops. Each pass attempts a bounded number of candidates, so it does not
+enumerate and drain a whole source. It does not bound the time spent on any one candidate. Remaining work is
 explicit-command or future-scheduler work. See
 [the bounded work items decision](decisions/0003-bounded-work-items.md).
 
