@@ -2937,11 +2937,9 @@ mod tests {
     fn authority_docs_avoid_old_playable_media_boundary_wording() {
         let repo_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let docs = [
-            "docs/library/evidence/playable-media-promotion-contract.md",
-            "docs/library/evidence/media-identity-schema-authority.md",
-            "docs/library/identity/track-identity-candidate-contract.md",
-            "docs/docs-authority-map.md",
-            "docs/library/roadmap/product-roadmap-and-substrate-authority.md",
+            "docs/domain-model.md",
+            "docs/library-browser.md",
+            "docs/roadmap.md",
         ];
         let disallowed = [
             concat!("observed-file-", "observations"),

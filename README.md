@@ -165,20 +165,20 @@ canonical tracks. Preparation, Prepared Room, Performed Room, and runtime eviden
 
 ## Current status
 
-| Area                                              | Status                         | Current boundary                                                                                                                           |
-| ------------------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| Local source registration and activation          | Working V0 slice               | Windows known folders, volumes, folder selection, admission, and pre-scan navigation readiness.                                            |
-| Scanning and durable library substrate            | Working V0 slice               | SQLite-backed hierarchy, inventory, coverage, observations, maintenance, and restart persistence.                                          |
-| Hierarchy and contents browsing                   | Working V0 slice               | Source and folder scopes, recursive contents, retained reads, list and column projections, and pagination.                                 |
-| Scoped search and filters                         | Working V0 slice               | FTS5-backed text search plus Audio, Audio + Video, and All Files profiles. Search order is backend-owned. User sort controls are deferred. |
-| Missing and offline handling                      | Working V0 slice               | Known sources remain visible as unavailable or missing and recover after restore. Blocked and incomplete do not become empty.              |
-| Attachment, playable-media, and identity evidence | Implemented substrate          | Exact bytes, occurrence links, playable media, candidates, decisions, and review reads. No canonical track authority yet.                  |
-| Technical audio analysis                          | Implemented bounded core       | Deterministic technical facts for supported integer PCM WAV. Headless and test-oriented, with no persistence or product authority.         |
-| Musical analysis                                  | Bounded experiment             | Inspector-triggered BPM, key, and beatgrid attempt for 16-bit PCM WAV. Advisory, warning-bearing, and never persisted.                     |
-| Preparation workflow                              | Planned                        | Durable preparation facets, artifact contracts, and readiness decisions are not implemented.                                               |
-| Prepared Room and Performed Room                  | Doctrine-only future direction | The domain model constrains identity and provenance work but has no product-backed UI or persistence.                                      |
-| Waveforms and deck runtime                        | Proposal and future work       | Architecture documents exist. No production waveform artifact pipeline, playback deck, or performance session exists in this repository.   |
-| Hardware and streaming services                   | Outside V0                     | No controller integration, hardware support, or streaming provider support.                                                                |
+| Area                                              | Status                   | Current boundary                                                                                                                           |
+| ------------------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Local source registration and activation          | Working V0 slice         | Windows known folders, volumes, folder selection, admission, and pre-scan navigation readiness.                                            |
+| Scanning and durable library substrate            | Working V0 slice         | SQLite-backed hierarchy, inventory, coverage, observations, maintenance, and restart persistence.                                          |
+| Hierarchy and contents browsing                   | Working V0 slice         | Source and folder scopes, recursive contents, retained reads, list and column projections, and pagination.                                 |
+| Scoped search and filters                         | Working V0 slice         | FTS5-backed text search plus Audio, Audio + Video, and All Files profiles. Search order is backend-owned. User sort controls are deferred. |
+| Missing and offline handling                      | Working V0 slice         | Known sources remain visible as unavailable or missing and recover after restore. Blocked and incomplete do not become empty.              |
+| Attachment, playable-media, and identity evidence | Implemented substrate    | Exact bytes, occurrence links, playable media, candidates, decisions, and review reads. No canonical track authority yet.                  |
+| Technical audio analysis                          | Implemented bounded core | Deterministic technical facts for supported integer PCM WAV. Headless and test-oriented, with no persistence or product authority.         |
+| Musical analysis                                  | Bounded experiment       | Inspector-triggered BPM, key, and beatgrid attempt for 16-bit PCM WAV. Advisory, warning-bearing, and never persisted.                     |
+| Preparation workflow                              | Planned                  | Durable preparation facets, artifact contracts, and readiness decisions are not implemented.                                               |
+| Prepared Room and Performed Room                  | Future vision only       | The domain model constrains identity and provenance work but has no product-backed UI or persistence.                                      |
+| Waveforms and deck runtime                        | Proposal and future work | Architecture documents exist. No production waveform artifact pipeline, playback deck, or performance session exists in this repository.   |
+| Hardware and streaming services                   | Outside V0               | No controller integration, hardware support, or streaming provider support.                                                                |
 
 ## Verification
 
@@ -209,8 +209,7 @@ The roadmap follows dependency order rather than feature volume:
 5. Introduce Prepared Room, performance instances, and immutable Performed Room history.
 6. Add runtime evidence and further projection surfaces only after their upstream owners exist.
 
-The full sequence, gates, and vetoes live in the
-[product roadmap and substrate authority plan](docs/library/roadmap/product-roadmap-and-substrate-authority.md).
+The full sequence, its blockers, and what is deliberately deferred live in the [roadmap](docs/roadmap.md).
 
 ## Run locally
 
@@ -238,16 +237,18 @@ scenarios.
 
 ## Start reading
 
-- [Product doctrine](docs/product/product-doctrine.md) explains the V0 product target, trust laws, and the boundary
-  between current work and spatial performance memory.
-- [Product roadmap and substrate authority](docs/library/roadmap/product-roadmap-and-substrate-authority.md) records the
-  layer sequence, implementation gates, and explicit vetoes.
-- [Source activation and navigation readiness](docs/product/source-activation-and-navigation-readiness.md) defines
-  pre-scan browsing, coverage, verified-empty behavior, state retention, and user-intent safety.
-- [Electron boundary spine](docs/decisions/electron-boundary-spine.md) explains command, publication, host failure,
-  readiness, and renderer ownership across the desktop process boundary.
-- [Documentation authority map](docs/docs-authority-map.md) identifies which documents are canonical, companions,
-  proposals, or future architecture.
+- [Product](docs/product.md) explains the V0 product target, the principles that decide current work, and the explicit
+  non-goals.
+- [Architecture](docs/architecture.md) explains command, publication, host failure, readiness, and renderer ownership
+  across the desktop process boundary.
+- [Domain model](docs/domain-model.md) explains the identity, evidence, and decision layers and what each may claim.
+- [Library browser](docs/library-browser.md) defines pre-scan browsing, coverage, verified-empty behavior, state
+  retention, and user-intent safety.
+- [Roadmap](docs/roadmap.md) records what works now, what comes next, and what is deferred.
+- [Development](docs/development.md) covers requirements, commands, verification, and storage reset.
+
+The [documentation index](docs/README.md) lists the full set, including the future vision document and the surviving
+decision records.
 
 ## Project status and license
 

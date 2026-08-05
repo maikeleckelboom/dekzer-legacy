@@ -20,4 +20,6 @@ This package intentionally contains the bootable desktop shell plus the lazy mai
 
 ## Developer docs
 
-- [Dev database reset](./docs/dev-database-reset.md) — how to reset development storage after a baseline change.
+- [Development](../../docs/development.md) covers requirements, verification, storage status, doctor, and reset.
+- [TypeScript absence semantics](./docs/typescript-absence-semantics.md) covers `undefined` versus `null` at the
+  boundary.
