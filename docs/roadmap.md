@@ -1,5 +1,9 @@
 # Roadmap
 
+> **Superseded roadmap.** This describes the former V0 development sequence, not active
+> work or a commitment for the next Dekzer generation. See
+> [legacy closure and handoff](legacy-closure.md).
+
 Sequencing follows substrate dependency rather than feature visibility. A layer is built when the thing underneath it
 can answer the questions it will ask.
 

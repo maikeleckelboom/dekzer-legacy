@@ -1,5 +1,9 @@
 # Dekzer product
 
+> **Historical V0 document.** Development of this codebase concluded in October 2026.
+> This is not a current plan for the next Dekzer generation. See
+> [legacy closure and handoff](legacy-closure.md).
+
 Dekzer is a local-first DJ workstation. V0 is a reliable local music library foundation, not a performance system.
 
 This document describes what Dekzer is building now. The long-term product thesis lives in

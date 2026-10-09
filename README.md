@@ -1,4 +1,20 @@
-# Dekzer
+# Dekzer (legacy)
+
+> **Status: concluded on 9 October 2026.** This repository preserves the first Dekzer
+> desktop R&D implementation. Development of this generation has ended. The owner will
+> archive the repository on GitHub.
+>
+> The next Dekzer product thesis treats a **DJ performance as a durable, shared musical
+> object**. That direction will be developed separately, without automatically inheriting
+> this codebase, schema, or architecture.
+>
+> **Not production-ready:** no playback decks, DJ controller support, livestreaming, or
+> performance history. Packaged desktop builds do not include the Rust backend executable.
+>
+> Read the [legacy closure and handoff](docs/legacy-closure.md). Everything below preserves
+> the V0 project overview. Forward-looking statements are historical, not active commitments.
+
+---
 
 > Dekzer is a local-first DJ workstation built to make music libraries trustworthy before performance workflows become ambitious.
 
@@ -9,9 +25,9 @@ The current V0 is a working Windows desktop application for registering local mu
 browsing source and folder scopes, filtering and searching indexed files, and inspecting readiness without confusing
 incomplete work with an empty library.
 
-**Status:** pre-alpha and under active development. Windows is the only supported V0 development path today. The app
-runs from source, and packaged builds do not yet include the Rust backend executable. Dekzer is not ready for live DJ
-performance.
+**V0 status at closure:** pre-alpha. Windows is the only supported V0 development path. The app
+runs from source, packaged builds do not include the Rust backend executable, and it is not ready
+for live DJ performance.
 
 [What works today](#what-works-today) · [Architecture](#architecture) · [Current status](#current-status) ·
 [Run locally](#run-locally) · [Start reading](#start-reading)
@@ -252,11 +268,11 @@ decision records.
 
 ## Project status and license
 
-Dekzer is pre-alpha. It is suitable for architecture review, implementation study, and controlled development testing.
+Legacy V0 remains pre-alpha. It is suitable for architecture review, implementation study, and controlled development testing.
 It is not suitable for real DJ performance, library migration, or irreplaceable preparation work.
 
-This is an independent product and systems-engineering project. No contribution process or support commitment is
-published yet.
+This was an independent product and systems-engineering R&D project. No contribution process or
+support commitment is provided for this generation.
 
 The Rust workspace manifests declare the project crates as MIT licensed. A repository-level `LICENSE` file is not
 currently present, so repository-wide reuse terms are not fully documented yet.

@@ -1,9 +1,14 @@
-# Dekzer documentation
+# Dekzer legacy documentation
+
+**Development concluded on 9 October 2026.** Read the [closure and handoff](legacy-closure.md)
+before the historical V0 product, architecture, and roadmap documents below.
 
 Start with the [root README](../README.md) for what Dekzer is and how to run it.
 
 ## Documents
 
+- [legacy-closure.md](legacy-closure.md) records the project conclusion, reusable lessons,
+  known limitations, and archival handoff.
 - [product.md](product.md) covers what V0 does, the principles that decide current work, and what is deliberately not
   being built.
 - [architecture.md](architecture.md) covers how the Vue, Electron, and Rust layers fit together and who owns what.

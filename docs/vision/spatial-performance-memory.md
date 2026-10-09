@@ -1,5 +1,9 @@
 # Vision: spatial performance memory
 
+> **Preserved research.** This proposal was not implemented in legacy V0. It may inform
+> the next Dekzer product direction, but does not bind its design or architecture. See
+> [legacy closure and handoff](../legacy-closure.md).
+
 **This document describes future direction. None of it is implemented.** Nothing here is a current roadmap commitment,
 and nothing here should be cited to justify a backend decision on its own. For what Dekzer actually does today, read
 [the product overview](../product.md) and [the roadmap](../roadmap.md).
